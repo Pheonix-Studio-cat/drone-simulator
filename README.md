@@ -26,6 +26,25 @@ Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffn
 ### 11 Drohnenmodelle
 Von der 249-g-Ultraleichtdrohne über klassische und professionelle Kameradrohnen bis zu Cinewhoop und 5-Zoll-Racer – jedes Modell mit eigenen, realen Vorbildern nachempfundenen Kennwerten (Masse, Schub, Trägheit, Windempfindlichkeit, Akku, Flugzeit).
 
+### 6 Karten mit echtem Höhen-Terrain
+- 🌳 **Standard** – Wiesen, Wälder, sanfte Hügel
+- 🏚️ **Lostplace** – verlassenes Industriegelände mit 60-m-Schornstein, offener Halle und Bürogerippe (perfekt für FPV-Dives)
+- 🧊 **Antarktis** – Eiswüste mit Forschungsstation
+- 🏔️ **Berge & Seen** – alpine Gipfel mit Schneegrenze und Bergseen (Wasserlandung = Totalverlust!)
+- 🌾 **Flachland** – Felder, Windräder, Bauernhof
+- 🏙️ **Großstadt** – Hochhaus-Schluchten, Straßen, Autos und viele Fußgänger
+
+Auf allen Karten laufen Menschen herum – wer sie anfliegt, crasht. Alle Karten sind prozedural generiert und komplett offline.
+
+### Crash, Trümmer & Bergung
+Bei einem Absturz zerlegt sich die Drohne in Einzelteile (Propeller, Arme, Akku, Rumpf), die physikalisch korrekt durch die Gegend fliegen. Das Wrack bleibt liegen – und kann mit einer **Bergungsdrohne** (Taste `B`) abgeholt werden: hinfliegen, 2 s darüber hovern, zurücktragen. Das Wrack am Haken verändert die Flugphysik spürbar.
+
+### Foto-Modus
+Foto-Button 📷 (Taste `F`): Schnappschüsse landen in einer **Galerie** im Menü (mit Download). Die Foto-Mission speichert ihre Bilder ebenfalls dort.
+
+### Steuerempfindlichkeit
+Drei Stufen (Langsam/Normal/Schnell) – wie die Cine-/Normal-/Sport-Modi echter Drohnen. Auf Touch-Geräten (iPad/Smartphone) startet der Simulator automatisch auf **Langsam**.
+
 ### Missionen
 - 🏁 **Rennstrecke** – 2 Runden durch 8 Tore, Bestzeit wird gespeichert
 - 📷 **Foto-Mission** – 5 Punkte anfliegen und ruhig hovern
@@ -47,6 +66,8 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 | `Leertaste` | Arm / Disarm |
 | `M` | Flugmodus wechseln |
 | `C` | Kamera wechseln |
+| `F` | Foto aufnehmen |
+| `B` | Bergungsdrohne starten (nach Crash) |
 | `R` | Zurücksetzen |
 | `1`–`4` | Windstärke |
 | `Esc` | Menü |
