@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Drohnen-Simulator</title>
+<style>
+:root{
+  --bg:#0b0f14; --panel:rgba(16,22,30,.92); --panel2:rgba(28,38,50,.9);
+  --acc:#37c6ff; --acc2:#7bff9e; --warn:#ffb020; --bad:#ff5d5d;
+  --txt:#e8f0f8; --dim:#8ea4b8; --line:rgba(120,160,200,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+  font-family:"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:var(--txt);
+  touch-action:none;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hud{pointer-events:none}
+/* ---------- Button-Leiste ---------- */
+#btnbar{position:absolute;top:calc(8px + env(safe-area-inset-top));right:calc(8px + env(safe-area-inset-right));
+  display:flex;gap:6px;z-index:20}
+#btnbar button{background:var(--panel);border:1px solid var(--line);color:var(--txt);
+  border-radius:9px;padding:9px 12px;font-size:13px;font-weight:600;cursor:pointer;min-width:52px}
+#btnbar button:active{background:var(--panel2)}
+#btnbar button.armed{background:#67251f;border-color:#c25047;color:#ffd9d5}
+/* ---------- Toast ---------- */
+#toast{position:absolute;left:50%;top:16%;transform:translateX(-50%);z-index:15;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 18px;
+  font-size:15px;font-weight:600;opacity:0;transition:opacity .25s;pointer-events:none;text-align:center;max-width:86vw}
+#toast.show{opacity:1}
+/* ---------- Menü ---------- */
+#menu{position:absolute;inset:0;z-index:30;background:radial-gradient(1200px 800px at 50% -10%,#16222e 0%,#0a0e13 70%);
+  overflow-y:auto;padding:22px 16px calc(30px + env(safe-area-inset-bottom));touch-action:pan-y}
+#menu .wrap{max-width:1000px;margin:0 auto}
+#menu h1{font-size:clamp(22px,4.5vw,34px);letter-spacing:.5px;margin-bottom:2px}
+#menu h1 span{color:var(--acc)}
+#menu .sub{color:var(--dim);font-size:13px;margin-bottom:18px}
+#menu h2{font-size:15px;color:var(--acc);text-transform:uppercase;letter-spacing:1.5px;margin:20px 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer;transition:border-color .15s}
+.card:hover{border-color:rgba(120,180,220,.5)}
+.card.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc),0 4px 18px rgba(55,198,255,.15)}
+.card .nm{font-weight:700;font-size:14.5px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.card .chip{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.5px;white-space:nowrap}
+.chip.cam{background:rgba(55,198,255,.15);color:var(--acc)}
+.chip.fpv{background:rgba(123,255,158,.13);color:var(--acc2)}
+.card .ds{color:var(--dim);font-size:11.5px;margin:5px 0 7px;line-height:1.35;min-height:30px}
+.card .sp{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:10.5px;color:#b9cbdc}
+.card .sp b{color:var(--txt);font-weight:600}
+.mcard .ds{min-height:unset}
+.rowbtns{display:flex;gap:8px;flex-wrap:wrap}
+.rowbtns button{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:9px;
+  padding:9px 16px;font-size:13px;cursor:pointer}
+.rowbtns button.sel{border-color:var(--acc);color:var(--acc);font-weight:700}
+#startBtn{display:block;width:100%;max-width:420px;margin:26px auto 8px;padding:15px;font-size:18px;font-weight:800;
+  letter-spacing:1px;color:#03202e;background:linear-gradient(180deg,#5fd4ff,#25a9e0);border:none;border-radius:13px;cursor:pointer}
+#startBtn:active{filter:brightness(.9)}
+.help{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+  font-size:12.5px;color:#c4d4e4;line-height:1.65}
+.help b{color:var(--txt)}
+.help .k{display:inline-block;background:#1c2836;border:1px solid var(--line);border-radius:5px;padding:0 6px;
+  font-family:ui-monospace,monospace;font-size:11px;margin:0 1px}
+/* ---------- Mobile ---------- */
+@media (max-width:640px){
+  #btnbar button{padding:8px 9px;font-size:12px;min-width:44px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="hud"></canvas>
+<div id="toast"></div>
+<div id="btnbar">
+  <button id="bArm">ARM</button>
+  <button id="bMode">GPS</button>
+  <button id="bCam">KAM</button>
+  <button id="bReset">RESET</button>
+  <button id="bMenu">MENÜ</button>
+</div>
+<div id="menu"><div class="wrap">
+  <h1>DROHNEN-<span>SIMULATOR</span></h1>
+  <div class="sub">Realistische Flugphysik · 11 Modelle · Missionen · Tastatur, Gamepad &amp; Touch</div>
+  <h2>Drohne wählen</h2>
+  <div class="grid" id="droneGrid"></div>
+  <h2>Mission</h2>
+  <div class="grid" id="missionGrid"></div>
+  <h2>Wind</h2>
+  <div class="rowbtns" id="windRow"></div>
+  <h2>Steuerung</h2>
+  <div class="help" id="helpBox">
+    <b>Tastatur (Mode 2):</b> <span class="k">W</span>/<span class="k">S</span> Gas ·
+    <span class="k">A</span>/<span class="k">D</span> Gieren (Yaw) ·
+    <span class="k">Pfeiltasten</span> Nicken/Rollen ·
+    <span class="k">Leertaste</span> Arm/Disarm ·
+    <span class="k">M</span> Flugmodus · <span class="k">C</span> Kamera ·
+    <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
+    <b>Gamepad:</b> Linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2) – wird automatisch erkannt.<br>
+    <b>Touch:</b> Virtuelle Sticks unten links (Gas/Yaw) und rechts (Nick/Roll), Buttons oben rechts.
+  </div>
+  <button id="startBtn">ABHEBEN</button>
+</div></div>
+<script>
+"use strict";
+/* =========================================================================
+   Drohnen-Simulator – eine Datei, keine Abhängigkeiten.
+   Physik: 6-DOF-Starrkörper @500 Hz, Motor-/Batterie-/Wind-Modell,
+   Flight Controller mit GPS-, ATTI-, ANGLE- und ACRO-Modus.
+   ========================================================================= */
+
+/* ---------------- Mathe: Vektoren, Quaternionen, Matrizen ---------------- */
+const V3 = {
+  make:(x=0,y=0,z=0)=>[x,y,z],
+  add:(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],
+  sub:(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],
+  scale:(a,s)=>[a[0]*s,a[1]*s,a[2]*s],
+  dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],
+  cross:(a,b)=>[a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]],
+  len:a=>Math.hypot(a[0],a[1],a[2]),
+  norm:(a)=>{const l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l];},
+  lerp:(a,b,t)=>[a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t],
+};
+// Quaternion [x,y,z,w] – rotiert Body-Frame nach Welt.
+const Q = {
+  ident:()=>[0,0,0,1],
+  mul:(a,b)=>[
+    a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],
+    a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
+    a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],
+    a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]],
+  norm:(q)=>{const l=Math.hypot(q[0],q[1],q[2],q[3])||1;return [q[0]/l,q[1]/l,q[2]/l,q[3]/l];},
+  axisAngle:(ax,ang)=>{const s=Math.sin(ang/2);return [ax[0]*s,ax[1]*s,ax[2]*s,Math.cos(ang/2)];},
+  // v (Body) -> Welt
+  rot:(q,v)=>{
+    const x=q[0],y=q[1],z=q[2],w=q[3];
+    const tx=2*(y*v[2]-z*v[1]), ty=2*(z*v[0]-x*v[2]), tz=2*(x*v[1]-y*v[0]);
+    return [v[0]+w*tx+y*tz-z*ty, v[1]+w*ty+z*tx-x*tz, v[2]+w*tz+x*ty-y*tx];
+  },
+  // v (Welt) -> Body (Rotation mit konjugiertem q)
+  rotInv:(q,v)=>Q.rot([-q[0],-q[1],-q[2],q[3]],v),
+  // Integration: dq/dt = 0.5 * q ⊗ (0, ω_body)
+  integrate:(q,w,dt)=>{
+    const dq=Q.mul(q,[w[0]*dt/2, w[1]*dt/2, w[2]*dt/2, 1]);
+    return Q.norm(dq);
+  },
+  fromYaw:(yaw)=>[0,Math.sin(yaw/2),0,Math.cos(yaw/2)],
+};
+const M4 = {
+  ident:()=>new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
+  mul:(a,b)=>{ // a*b (column-major)
+    const o=new Float32Array(16);
+    for(let c=0;c<4;c++)for(let r=0;r<4;r++){
+      o[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
+    }
+    return o;
+  },
+  persp:(fovY,asp,n,f)=>{
+    const t=1/Math.tan(fovY/2), o=new Float32Array(16);
+    o[0]=t/asp; o[5]=t; o[10]=(f+n)/(n-f); o[11]=-1; o[14]=2*f*n/(n-f);
+    return o;
+  },
+  fromQuatPos:(q,p,s=1)=>{
+    const x=q[0],y=q[1],z=q[2],w=q[3];
+    const o=new Float32Array(16);
+    o[0]=(1-2*(y*y+z*z))*s; o[1]=(2*(x*y+z*w))*s;  o[2]=(2*(x*z-y*w))*s;  o[3]=0;
+    o[4]=(2*(x*y-z*w))*s;  o[5]=(1-2*(x*x+z*z))*s; o[6]=(2*(y*z+x*w))*s;  o[7]=0;
+    o[8]=(2*(x*z+y*w))*s;  o[9]=(2*(y*z-x*w))*s;  o[10]=(1-2*(x*x+y*y))*s; o[11]=0;
+    o[12]=p[0]; o[13]=p[1]; o[14]=p[2]; o[15]=1;
+    return o;
+  },
+  lookAt:(eye,at,up)=>{
+    const z=V3.norm(V3.sub(eye,at));           // Kamera schaut entlang -z
+    const x=V3.norm(V3.cross(up,z));
+    const y=V3.cross(z,x);
+    const o=new Float32Array(16);
+    o[0]=x[0];o[1]=y[0];o[2]=z[0];o[3]=0;
+    o[4]=x[1];o[5]=y[1];o[6]=z[1];o[7]=0;
+    o[8]=x[2];o[9]=y[2];o[10]=z[2];o[11]=0;
+    o[12]=-V3.dot(x,eye);o[13]=-V3.dot(y,eye);o[14]=-V3.dot(z,eye);o[15]=1;
+    return {m:o, x, y, z};
+  },
+  translate:(x,y,z)=>{const o=M4.ident();o[12]=x;o[13]=y;o[14]=z;return o;},
+  scale:(x,y,z)=>{const o=M4.ident();o[0]=x;o[5]=y;o[10]=z;return o;},
+  rotY:(a)=>{const c=Math.cos(a),s=Math.sin(a),o=M4.ident();o[0]=c;o[2]=-s;o[8]=s;o[10]=c;return o;},
+  rotX:(a)=>{const c=Math.cos(a),s=Math.sin(a),o=M4.ident();o[5]=c;o[6]=s;o[9]=-s;o[10]=c;return o;},
+  rotZ:(a)=>{const c=Math.cos(a),s=Math.sin(a),o=M4.ident();o[0]=c;o[1]=s;o[4]=-s;o[5]=c;return o;},
+};
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const lerp=(a,b,t)=>a+(b-a)*t;
+const deg=Math.PI/180;
+const G=9.81, RHO=1.225;
+
+/* ---------------- Drohnen-Katalog ----------------
+   Kennwerte sind realen Drohnenklassen nachempfunden (neutrale Namen).
+   mass kg · arm m (Motorabstand je Achse) · twr Schub/Gewicht · tau Motor-Zeitkonstante s
+   maxTilt ° · maxSpeed m/s · climb/desc m/s · batt {Zellen, mAh, Schwebeflugzeit min}
+   modes: GPS (Position-Hold), ATTI (Neigung+Höhenhalten), ANGLE (Neigung+manuelles Gas), ACRO (Raten) */
+const DRONES=[
+ {id:'mini1', name:'Pocket Mini', cls:'cam',
+  desc:'249-g-Ultraleichtdrohne. Ruhig und sparsam, aber windempfindlich.',
+  mass:0.249, arm:0.075, twr:1.9, tauUp:0.10, tauDn:0.14, propR:0.06,
+  maxTilt:30, maxSpeed:13, climb:4, desc_:3, yawRate:110,
+  batt:{cells:2, mah:2250, min:30}, modes:['GPS','ATTI'], gpsQ:1.0, agility:.7,
+  rates:{max:400,expo:.6}, camAngle:0, fovFpv:72,
+  style:{c1:[.82,.84,.87],c2:[.25,.28,.32],bodyL:.14,bodyW:.08,bodyH:.045,gimbal:1}},
+ {id:'mini4', name:'Mini Pro', cls:'cam',
+  desc:'Moderne 249-g-Klasse mit kräftigeren Motoren und besserem Windverhalten.',
+  mass:0.249, arm:0.082, twr:2.3, tauUp:0.08, tauDn:0.12, propR:0.065,
+  maxTilt:35, maxSpeed:16, climb:5, desc_:4, yawRate:130,
+  batt:{cells:2, mah:2590, min:34}, modes:['GPS','ATTI'], gpsQ:1.0, agility:.8,
+  rates:{max:400,expo:.6}, camAngle:0, fovFpv:75,
+  style:{c1:[.86,.87,.9],c2:[.2,.22,.26],bodyL:.15,bodyW:.085,bodyH:.05,gimbal:1}},
+ {id:'air', name:'Air Kompakt', cls:'cam',
+  desc:'600-g-Mittelklasse: schnell, stabil, gutes Allround-Verhalten.',
+  mass:0.595, arm:0.09, twr:2.2, tauUp:0.09, tauDn:0.13, propR:0.075,
+  maxTilt:35, maxSpeed:19, climb:6, desc_:6, yawRate:130,
+  batt:{cells:3, mah:3500, min:30}, modes:['GPS','ATTI'], gpsQ:1.0, agility:.75,
+  rates:{max:400,expo:.6}, camAngle:0, fovFpv:75,
+  style:{c1:[.35,.37,.4],c2:[.15,.16,.18],bodyL:.18,bodyW:.1,bodyH:.055,gimbal:1}},
+ {id:'pro', name:'Pro Faltdrohne', cls:'cam',
+  desc:'900-g-Profiklasse mit großem Sensor: sehr stabil, lange Flugzeit.',
+  mass:0.895, arm:0.105, twr:2.1, tauUp:0.10, tauDn:0.14, propR:0.09,
+  maxTilt:35, maxSpeed:21, climb:8, desc_:6, yawRate:120,
+  batt:{cells:4, mah:5000, min:43}, modes:['GPS','ATTI'], gpsQ:1.0, agility:.7,
+  rates:{max:360,expo:.6}, camAngle:0, fovFpv:72,
+  style:{c1:[.42,.43,.45],c2:[.13,.14,.16],bodyL:.2,bodyW:.11,bodyH:.06,gimbal:1}},
+ {id:'classic', name:'Klassik Quad', cls:'cam',
+  desc:'Weißer 1,4-kg-Klassiker der älteren Generation: groß, träge, gutmütig.',
+  mass:1.38, arm:0.175, twr:2.0, tauUp:0.13, tauDn:0.18, propR:0.12,
+  maxTilt:32, maxSpeed:20, climb:6, desc_:4, yawRate:100,
+  batt:{cells:4, mah:5870, min:28}, modes:['GPS','ATTI'], gpsQ:0.95, agility:.55,
+  rates:{max:300,expo:.6}, camAngle:0, fovFpv:70,
+  style:{c1:[.93,.93,.95],c2:[.75,.76,.78],bodyL:.2,bodyW:.2,bodyH:.09,gimbal:1,legs:1}},
+ {id:'cine', name:'Cine Profi', cls:'cam',
+  desc:'3,4-kg-Kameraplattform für Filmproduktionen: schwer, schnell, felsenstabil.',
+  mass:3.44, arm:0.30, twr:2.1, tauUp:0.14, tauDn:0.20, propR:0.19,
+  maxTilt:40, maxSpeed:26, climb:6, desc_:4, yawRate:90,
+  batt:{cells:6, mah:8600, min:25}, modes:['GPS','ATTI'], gpsQ:1.0, agility:.5,
+  rates:{max:280,expo:.6}, camAngle:0, fovFpv:70,
+  style:{c1:[.2,.21,.24],c2:[.65,.66,.7],bodyL:.32,bodyW:.16,bodyH:.1,gimbal:1,legs:1}},
+ {id:'legacy', name:'Legacy Erstflieger', cls:'cam',
+  desc:'Frühe Kameradrohnen-Generation: schwammiges GPS, driftet, kurze Flugzeit.',
+  mass:1.2, arm:0.175, twr:1.8, tauUp:0.16, tauDn:0.22, propR:0.115,
+  maxTilt:28, maxSpeed:10, climb:6, desc_:3, yawRate:90,
+  batt:{cells:3, mah:2200, min:10}, modes:['GPS','ATTI'], gpsQ:0.35, agility:.45,
+  rates:{max:250,expo:.6}, camAngle:0, fovFpv:65,
+  style:{c1:[.9,.9,.92],c2:[.85,.3,.25],bodyL:.19,bodyW:.19,bodyH:.09,gimbal:0,legs:1}},
+ {id:'whoop', name:'Cinewhoop', cls:'fpv',
+  desc:'FPV-Drohne mit Propellerschutz: sanft, viel Luftwiderstand, ideal für enge Räume.',
+  mass:0.41, arm:0.062, twr:2.9, tauUp:0.055, tauDn:0.09, propR:0.038,
+  maxTilt:35, maxSpeed:14, climb:6, desc_:6, yawRate:180,
+  batt:{cells:4, mah:2420, min:18}, modes:['GPS','ANGLE','ACRO'], gpsQ:.9, agility:1.1,
+  rates:{max:560,expo:.65}, camAngle:15, fovFpv:110,
+  style:{c1:[.16,.17,.2],c2:[.85,.3,.3],bodyL:.1,bodyW:.07,bodyH:.045,ducts:1}},
+ {id:'hyfpv', name:'Hybrid FPV', cls:'fpv',
+  desc:'Schnelle FPV-Drohne mit Stabilisierung: bis ~140 km/h, GPS-Schwebe auf Knopfdruck.',
+  mass:0.795, arm:0.09, twr:4.0, tauUp:0.05, tauDn:0.08, propR:0.064,
+  maxTilt:40, maxSpeed:27, climb:15, desc_:10, yawRate:200,
+  batt:{cells:6, mah:2000, min:14}, modes:['GPS','ANGLE','ACRO'], gpsQ:.95, agility:1.3,
+  rates:{max:640,expo:.65}, camAngle:22, fovFpv:112,
+  style:{c1:[.2,.21,.24],c2:[.4,.75,.4],bodyL:.14,bodyW:.09,bodyH:.06}},
+ {id:'race5', name:'Race 5 Zoll', cls:'fpv',
+  desc:'Klassischer 5-Zoll-Racer: brutale Beschleunigung, volle manuelle Kontrolle.',
+  mass:0.65, arm:0.08, twr:6.5, tauUp:0.035, tauDn:0.06, propR:0.0635,
+  maxTilt:55, maxSpeed:33, climb:20, desc_:15, yawRate:260,
+  batt:{cells:6, mah:1300, min:6}, modes:['ANGLE','ACRO'], gpsQ:0, agility:1.6,
+  rates:{max:860,expo:.7}, camAngle:30, fovFpv:118,
+  style:{c1:[.13,.14,.16],c2:[.95,.55,.1],bodyL:.13,bodyW:.04,bodyH:.035}},
+ {id:'race3', name:'Race 3 Zoll', cls:'fpv',
+  desc:'Leichter Micro-Racer: nervös, wendig, verzeiht wenig.',
+  mass:0.35, arm:0.055, twr:5.5, tauUp:0.03, tauDn:0.05, propR:0.038,
+  maxTilt:55, maxSpeed:26, climb:16, desc_:12, yawRate:280,
+  batt:{cells:4, mah:850, min:5}, modes:['ANGLE','ACRO'], gpsQ:0, agility:1.8,
+  rates:{max:900,expo:.7}, camAngle:25, fovFpv:115,
+  style:{c1:[.14,.15,.17],c2:[.3,.7,.95],bodyL:.09,bodyW:.035,bodyH:.03}},
+];
+// Abgeleitete Physik-Kennwerte pro Modell
+for(const d of DRONES){
+  d.tmax = d.twr*d.mass*G;                       // Gesamtschub max (N)
+  d.tmaxMotor = d.tmax/4;
+  // Trägheit: grobe Quader-Näherung, skaliert mit Masse und Armlänge
+  const r=d.arm*1.5;
+  d.Ix = d.mass*r*r*0.45; d.Iz = d.mass*r*r*0.45; d.Iy = d.mass*r*r*0.8;
+  // Horizontaler Widerstand so, dass maxSpeed bei maxTilt erreicht wird
+  const tilt=d.maxTilt*deg;
+  d.dragH = d.cls==='fpv'
+    ? d.tmax*0.85*Math.sin(55*deg)/(d.maxSpeed>30? d.maxSpeed*1.35 : d.maxSpeed*1.3)**2
+    : d.mass*G*Math.tan(tilt)/(d.maxSpeed**2);
+  if(d.style.ducts) d.dragH*=2.2;                 // Ducts bremsen deutlich
+  d.dragV = d.dragH*1.6;
+  d.dragL = d.dragH*2.5;                          // linearer Anteil (niedrige Speeds)
+  d.kq = 0.018;                                   // Reaktionsmoment/Schub (m)
+  d.hoverAmp = d.batt.mah/1000*60/d.batt.min;     // Strom im Schwebeflug (A)
+}
+
+/* ---------------- Missionen ---------------- */
+const MISSIONS=[
+ {id:'free', name:'Freiflug', icon:'∞',
+  desc:'Kein Ziel, keine Zeit – einfach fliegen und üben.'},
+ {id:'race', name:'Rennstrecke', icon:'🏁',
+  desc:'2 Runden durch 8 Tore in der richtigen Reihenfolge. Bestzeit wird gespeichert.'},
+ {id:'photo', name:'Foto-Mission', icon:'📷',
+  desc:'5 Fotopunkte anfliegen und dort 2 s ruhig hovern, um das Foto zu machen.'},
+ {id:'delivery', name:'Liefermission', icon:'📦',
+  desc:'Paket an der gelben Plattform aufnehmen (2 s darüber hovern) und auf der grünen Plattform sanft absetzen. Die Zuladung verändert die Flugphysik spürbar.'},
+ {id:'landing', name:'Präzisionslandung', icon:'🎯',
+  desc:'Mit nur 22 % Akku starten und auf der kleinen Plattform so sanft wie möglich landen.'},
+];
+// Renn-Tore: Rundkurs um den Startplatz
+const RACE_GATES=(()=>{const g=[];const R=62;
+  for(let i=0;i<8;i++){
+    const a=i/8*Math.PI*2;
+    const wob=Math.sin(i*2.7)*14;
+    const x=Math.sin(a)*(R+wob), z=-Math.cos(a)*(R+wob);
+    const h=3.2+((i*37)%3)*1.9;
+    g.push({x, z, y:h, yaw:a+Math.PI/2 + Math.sin(i*1.9)*0.35, w:5, hgt:3.4});
+  }
+  return g;})();
+const PHOTO_POINTS=[
+  {x:35,y:12,z:-30},{x:-48,y:20,z:-55},{x:-70,y:8,z:25},{x:10,y:30,z:70},{x:60,y:15,z:45}
+];
+const PLAT_PICKUP ={x:24,  y:1.0, z:-18, r:2.2, col:[.95,.8,.15]};
+const PLAT_DROP   ={x:-58, y:1.4, z:42,  r:2.2, col:[.25,.85,.4]};
+const PLAT_LANDING={x:42,  y:0.9, z:52,  r:1.4, col:[.9,.35,.3]};
+const PKG_MASS=0.35;
+
+/* ---------------- WebGL-Renderer ---------------- */
+const glc=document.getElementById('gl');
+const gl=glc.getContext('webgl',{antialias:true});
+if(!gl){document.body.innerHTML='<p style="padding:30px">WebGL wird von diesem Browser nicht unterstützt.</p>';throw new Error('no webgl');}
+
+function mkShader(vs,fs){
+  const comp=(t,src)=>{const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);
+    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s)+'\n'+src);
+    return s;};
+  const p=gl.createProgram();
+  gl.attachShader(p,comp(gl.VERTEX_SHADER,vs));gl.attachShader(p,comp(gl.FRAGMENT_SHADER,fs));
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));
+  const u={},n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
+  for(let i=0;i<n;i++){const inf=gl.getActiveUniform(p,i);u[inf.name.replace('[0]','')]=gl.getUniformLocation(p,inf.name);}
+  return {p,u};
+}
+const FOG_COL=[0.62,0.74,0.86], FOG_DENS=0.0016;
+const SUN=V3.norm([0.45,0.8,0.32]);
+
+const objSh=mkShader(`
+attribute vec3 aP; attribute vec3 aN;
+uniform mat4 uProj,uView,uModel; uniform mat3 uNrm;
+varying vec3 vN; varying vec3 vW;
+void main(){
+  vec4 w=uModel*vec4(aP,1.0); vW=w.xyz;
+  vN=uNrm*aN;
+  gl_Position=uProj*uView*w;
+}`,`
+precision mediump float;
+varying vec3 vN; varying vec3 vW;
+uniform vec3 uColor,uSun,uCam,uFogCol; uniform float uFogD,uAlpha;
+void main(){
+  vec3 n=normalize(vN);
+  float dif=max(dot(n,uSun),0.0);
+  float amb=0.42+0.18*max(n.y,0.0);
+  vec3 c=uColor*(amb+dif*0.75);
+  float d=length(vW-uCam);
+  float f=1.0-exp(-uFogD*uFogD*d*d);
+  gl_FragColor=vec4(mix(c,uFogCol,f),uAlpha);
+}`);
+
+const gndSh=mkShader(`
+attribute vec3 aP;
+uniform mat4 uProj,uView; uniform vec3 uCtr;
+varying vec3 vW;
+void main(){ vec3 w=aP+vec3(uCtr.x,0.0,uCtr.z); vW=w; gl_Position=uProj*uView*vec4(w,1.0); }`,`
+precision mediump float;
+varying vec3 vW;
+uniform vec3 uCam,uFogCol,uSun; uniform float uFogD;
+float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p){
+  vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);
+}
+void main(){
+  vec2 p=vW.xz;
+  float n=noise(p*0.35)*0.6+noise(p*1.7)*0.4;
+  vec3 grass=mix(vec3(0.23,0.42,0.18),vec3(0.34,0.55,0.24),n);
+  // Mähstreifen für Geschwindigkeitsempfinden
+  grass*=1.0+0.05*sin(p.x*0.55)*sin(p.y*0.55);
+  // Startplatz: Asphaltkreis mit weißem Ring und H
+  float r=length(p);
+  vec3 c=grass;
+  if(r<3.2){
+    c=vec3(0.24,0.25,0.27)*(0.9+0.1*n);
+    if(abs(r-2.6)<0.12) c=vec3(0.85);
+    vec2 q=abs(p);
+    if((q.x<0.9&&abs(q.y)<0.16)|| (abs(p.x-0.75)<0.16&&q.y<0.8) || (abs(p.x+0.75)<0.16&&q.y<0.8)) c=vec3(0.85);
+  } else if(r<3.5){ c=mix(vec3(0.24,0.25,0.27),grass,(r-3.2)/0.3); }
+  float dif=max(uSun.y,0.0)*0.7+0.45;
+  c*=dif;
+  float d=length(vW-uCam);
+  float f=1.0-exp(-uFogD*uFogD*d*d);
+  gl_FragColor=vec4(mix(c,uFogCol,f),1.0);
+}`);
+
+const skySh=mkShader(`
+attribute vec2 aP; varying vec2 vUV;
+void main(){ vUV=aP; gl_Position=vec4(aP,0.9999,1.0); }`,`
+precision mediump float;
+varying vec2 vUV;
+uniform vec3 uR,uU,uF,uSun,uFogCol; uniform float uTan,uAsp;
+void main(){
+  vec3 dir=normalize(uF+uR*vUV.x*uTan*uAsp+uU*vUV.y*uTan);
+  float t=clamp(dir.y,0.0,1.0);
+  vec3 sky=mix(uFogCol,vec3(0.25,0.5,0.85),pow(t,0.55));
+  float s=max(dot(dir,uSun),0.0);
+  sky+=vec3(1.0,0.9,0.7)*pow(s,600.0)*3.0+vec3(1.0,0.85,0.6)*pow(s,8.0)*0.18;
+  if(dir.y<0.0) sky=uFogCol*0.98;
+  gl_FragColor=vec4(sky,1.0);
+}`);
+const skyBuf=gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1, 3,-1, -1,3]),gl.STATIC_DRAW);
+const gndBuf=gl.createBuffer();
+{ const S=2600, v=[-S,0,-S, S,0,-S, S,0,S, -S,0,-S, S,0,S, -S,0,S];
+  gl.bindBuffer(gl.ARRAY_BUFFER,gndBuf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(v),gl.STATIC_DRAW); }
+
+/* --- Mesh-Builder: transformierte Grundkörper in ein VBO backen --- */
+function Builder(){ this.pos=[]; this.nrm=[]; }
+Builder.prototype.tri=function(a,b,c){
+  const n=V3.norm(V3.cross(V3.sub(b,a),V3.sub(c,a)));
+  this.pos.push(...a,...b,...c); this.nrm.push(...n,...n,...n);
+};
+Builder.prototype.quad=function(a,b,c,d){ this.tri(a,b,c); this.tri(a,c,d); };
+// Quader w×h×d, Mittelpunkt an p, um yaw gedreht
+Builder.prototype.box=function(w,h,d,p=[0,0,0],yaw=0){
+  const hw=w/2,hh=h/2,hd=d/2,cy=Math.cos(yaw),sy=Math.sin(yaw);
+  const T=v=>[p[0]+v[0]*cy+v[2]*sy, p[1]+v[1], p[2]-v[0]*sy+v[2]*cy];
+  const v=[[-hw,-hh,-hd],[hw,-hh,-hd],[hw,hh,-hd],[-hw,hh,-hd],
+           [-hw,-hh,hd],[hw,-hh,hd],[hw,hh,hd],[-hw,hh,hd]].map(T);
+  this.quad(v[0],v[3],v[2],v[1]); this.quad(v[4],v[5],v[6],v[7]);
+  this.quad(v[0],v[1],v[5],v[4]); this.quad(v[2],v[3],v[7],v[6]);
+  this.quad(v[1],v[2],v[6],v[5]); this.quad(v[0],v[4],v[7],v[3]);
+};
+// Zylinder/Kegel: Radius r0 unten, r1 oben, Höhe h, Fuß bei p
+Builder.prototype.cyl=function(r0,r1,h,p=[0,0,0],seg=10){
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*Math.PI*2, a1=(i+1)/seg*Math.PI*2;
+    const c0=Math.cos(a0),s0=Math.sin(a0),c1=Math.cos(a1),s1=Math.sin(a1);
+    const b0=[p[0]+c0*r0,p[1],p[2]+s0*r0], b1=[p[0]+c1*r0,p[1],p[2]+s1*r0];
+    const t0=[p[0]+c0*r1,p[1]+h,p[2]+s0*r1], t1=[p[0]+c1*r1,p[1]+h,p[2]+s1*r1];
+    this.quad(b0,t0,t1,b1);
+    if(r0>0.001) this.tri([p[0],p[1],p[2]],b1,b0);
+    if(r1>0.001) this.tri([p[0],p[1]+h,p[2]],t0,t1);
+  }
+};
+Builder.prototype.build=function(){
+  const m={n:this.pos.length/3};
+  m.vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,m.vb);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.pos),gl.STATIC_DRAW);
+  m.nb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,m.nb);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.nrm),gl.STATIC_DRAW);
+  return m;
+};
+function mesh(f){const b=new Builder();f(b);return b.build();}
+
+/* --- Zeichnen --- */
+let VIEW={proj:M4.ident(),view:M4.ident(),cam:[0,2,8],right:[1,0,0],up:[0,1,0],fwd:[0,0,-1],fov:60*deg};
+function drawMesh(m,model,color,alpha=1){
+  gl.useProgram(objSh.p);
+  gl.uniformMatrix4fv(objSh.u.uProj,false,VIEW.proj);
+  gl.uniformMatrix4fv(objSh.u.uView,false,VIEW.view);
+  gl.uniformMatrix4fv(objSh.u.uModel,false,model);
+  // Normalenmatrix: obere 3×3 (Modelle nutzen nur Rotation+uniforme Skalierung)
+  const nm=new Float32Array([model[0],model[1],model[2],model[4],model[5],model[6],model[8],model[9],model[10]]);
+  gl.uniformMatrix3fv(objSh.u.uNrm,false,nm);
+  gl.uniform3fv(objSh.u.uColor,color);
+  gl.uniform3fv(objSh.u.uSun,SUN);
+  gl.uniform3fv(objSh.u.uCam,VIEW.cam);
+  gl.uniform3fv(objSh.u.uFogCol,FOG_COL);
+  gl.uniform1f(objSh.u.uFogD,FOG_DENS);
+  gl.uniform1f(objSh.u.uAlpha,alpha);
+  gl.bindBuffer(gl.ARRAY_BUFFER,m.vb);
+  const aP=gl.getAttribLocation(objSh.p,'aP');gl.enableVertexAttribArray(aP);gl.vertexAttribPointer(aP,3,gl.FLOAT,false,0,0);
+  gl.bindBuffer(gl.ARRAY_BUFFER,m.nb);
+  const aN=gl.getAttribLocation(objSh.p,'aN');gl.enableVertexAttribArray(aN);gl.vertexAttribPointer(aN,3,gl.FLOAT,false,0,0);
+  gl.drawArrays(gl.TRIANGLES,0,m.n);
+}
+
+/* ---------------- Szene ---------------- */
+const rnd=(()=>{let s=42;return ()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};})();
+const OBSTACLES=[]; // {x,z,r,h} Zylinderkollision
+// Bäume (ein Mesh für Stämme, eins für Kronen)
+const treeTrunks=new Builder(), treeTops=new Builder();
+for(let i=0;i<110;i++){
+  const a=rnd()*Math.PI*2, r=26+rnd()*230;
+  const x=Math.cos(a)*r, z=Math.sin(a)*r;
+  // Rennstrecke halbwegs freihalten
+  if(Math.abs(Math.hypot(x,z)-62)<9 && rnd()<0.7) continue;
+  const h=3.5+rnd()*5, tr=0.14+rnd()*0.14;
+  treeTrunks.cyl(tr,tr*0.75,h*0.42,[x,0,z],7);
+  const stufen=2+((i%2));
+  for(let s=0;s<stufen;s++){
+    const fy=h*0.28+s*h*0.24, fr=(1.6+rnd()*0.9)*(1-s*0.28);
+    treeTops.cyl(fr,fr*0.15,h*0.36,[x,fy,z],8);
+  }
+  OBSTACLES.push({x,z,r:0.35,h:h*0.5});
+}
+const treeTrunkMesh=treeTrunks.build(), treeTopMesh=treeTops.build();
+// Hügelkette am Horizont
+const hillMesh=mesh(b=>{
+  for(let i=0;i<26;i++){
+    const a=i/26*Math.PI*2+0.2;
+    const r=650+((i*53)%160), x=Math.cos(a)*r, z=Math.sin(a)*r;
+    b.cyl(120+((i*31)%90),8,40+((i*17)%70),[x,0,z],9);
+  }
+});
+// Ein paar Gebäude/Hallen
+const bldMesh=mesh(b=>{
+  const B=[[90,-60,14,10,7],[110,-40,10,16,5],[-95,-80,12,12,9],[-120,55,18,10,6],[75,95,10,10,8]];
+  for(const [x,z,w,d,h] of B){ b.box(w,h,d,[x,h/2,z],(x*7)%3*0.5); OBSTACLES.push({x,z,r:Math.max(w,d)/2,h}); }
+});
+// Renn-Tor (Einzelmesh, wird pro Tor transformiert gezeichnet)
+const gateMesh=mesh(b=>{
+  const W=5,H=3.4,T=0.22;
+  b.box(W+2*T,T,T,[0,H+T/2,0]);
+  b.box(T,H+T,T,[-W/2-T/2,(H+T)/2,0]);
+  b.box(T,H+T,T,[ W/2+T/2,(H+T)/2,0]);
+  b.box(1.2,0.5,0.06,[0,H+T+0.28,0]); // Nummernschild
+});
+// Plattform (Zylinder), Foto-Marker (Doppelkegel), Paket, Schattenscheibe
+const platMesh=mesh(b=>{ b.cyl(1,1,1,[0,0,0],18); });
+const markerMesh=mesh(b=>{ b.cyl(0.0,0.7,0.9,[0,-0.9,0],6); b.cyl(0.7,0.0,0.9,[0,0,0],6); });
+const pkgMesh=mesh(b=>{ b.box(0.34,0.26,0.3,[0,0.13,0]); });
+const shadowMesh=mesh(b=>{ b.cyl(1,1,0.001,[0,0,0],20); });
+const padWpMesh=mesh(b=>{ b.cyl(1,1,0.02,[0,0,0],20); });
+
+/* --- Drohnen-Mesh je Modell (Körper statisch, Propeller separat) --- */
+function buildDroneMesh(d){
+  const st=d.style, L=st.bodyL, W=st.bodyW, H=st.bodyH, arm=d.arm;
+  const body=mesh(b=>{
+    b.box(W,H,L,[0,0,0]);                              // Rumpf (vorn = -z)
+    b.box(W*0.7,H*0.5,L*0.4,[0,H*0.6,L*0.1]);          // Rücken
+    if(st.gimbal) b.box(0.045*(1+d.mass*0.3),0.05*(1+d.mass*0.3),0.05,[0,-H*0.75,-L/2*0.9]);
+    if(!st.gimbal && d.cls==='fpv') b.box(W*0.5,H*0.6,0.02,[0,H*0.35,-L/2-0.005]); // FPV-Kamera
+    const at=0.35*H;
+    for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+      // Arm
+      const ax=sx*arm, az=sz*arm;
+      const alen=Math.hypot(ax,az);
+      b.box(0.055*alen,at,alen,[ax/2,0,az/2],Math.atan2(-ax,az)+(sz<0?Math.PI:0));
+      // Motor
+      b.cyl(0.02+d.mass*0.004,0.02+d.mass*0.004,H*0.7,[ax,-H*0.1,az],8);
+      if(st.ducts) b.cyl(d.propR*1.25,d.propR*1.25,0.03,[ax,H*0.35,az],14);
+    }
+    if(st.legs){ for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]])
+      b.box(0.02,H*2.2,0.02,[sx*W*0.45,-H*1.4,sz*L*0.35]); }
+  });
+  // Propellerblätter (2 Blätter) + transparente Scheibe für hohe Drehzahl
+  const prop=mesh(b=>{ b.box(d.propR*2,0.006,d.propR*0.22,[0,0,0]); b.box(d.propR*0.22,0.006,d.propR*2,[0,0,0]); });
+  const disc=mesh(b=>{ b.cyl(d.propR,d.propR,0.004,[0,0,0],16); });
+  return {body,prop,disc};
+}
+const DRONE_MESH={};
+for(const d of DRONES) DRONE_MESH[d.id]=buildDroneMesh(d);
+
+/* ---------------- Eingabe: Tastatur, Gamepad, Touch ----------------
+   Stick-Konvention (Mode 2): thr,yaw = linker Stick · pit,rol = rechter Stick
+   Alle Werte -1..1. pit +1 = Stick nach vorn, rol +1 = Stick nach rechts. */
+const IN={thr:-1,yaw:0,pit:0,rol:0,src:'keys'};
+const KEYS={};
+const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+
+addEventListener('keydown',e=>{
+  if(e.repeat)return;
+  KEYS[e.code]=true;
+  if(/^(KeyW|KeyA|KeyS|KeyD|Arrow)/.test(e.code)&&IN.src!=='test'){IN.src='keys';padActive=false;}
+  handleKey(e.code); // Aktionen (in Teil "Steuerlogik" definiert)
+});
+addEventListener('keyup',e=>{KEYS[e.code]=false;});
+
+// Sanfte Rampen, damit digitale Tasten wie analoge Sticks wirken
+function updateKeyInput(dt,springThr){
+  const ramp=(cur,target,up=4.5,down=6)=>{
+    const r=(Math.abs(target)>Math.abs(cur)&&Math.sign(target)===Math.sign(cur||target))?up:down;
+    const d=target-cur, m=r*dt;
+    return Math.abs(d)<=m?target:cur+Math.sign(d)*m;
+  };
+  const kv=(a,b)=>(KEYS[a]?1:0)-(KEYS[b]?1:0);
+  IN.yaw=ramp(IN.yaw,kv('KeyD','KeyA'));
+  IN.pit=ramp(IN.pit,kv('ArrowUp','ArrowDown'));
+  IN.rol=ramp(IN.rol,kv('ArrowRight','ArrowLeft'));
+  const tk=kv('KeyW','KeyS');
+  if(springThr){ IN.thr=ramp(IN.thr,tk,3.5,4.5); }
+  else{ IN.thr=clamp(IN.thr+tk*dt*1.1,-1,1); } // manuelles Gas: Stick bleibt stehen
+}
+
+/* --- Gamepad --- */
+let padActive=false;
+function pollGamepad(){
+  const pads=navigator.getGamepads?navigator.getGamepads():[];
+  for(const p of pads){
+    if(!p||p.axes.length<4)continue;
+    const db=v=>Math.abs(v)<0.07?0:(v-Math.sign(v)*0.07)/0.93;
+    const lx=db(p.axes[0]),ly=db(p.axes[1]),rx=db(p.axes[2]),ry=db(p.axes[3]);
+    if(Math.abs(lx)+Math.abs(ly)+Math.abs(rx)+Math.abs(ry)>0.02) padActive=true;
+    if(padActive){
+      IN.yaw=lx; IN.thr=-ly; IN.rol=rx; IN.pit=-ry; IN.src='pad';
+      if(p.buttons[0]&&p.buttons[0].pressed&&!pollGamepad._a){pollGamepad._a=true;handleKey('Space');}
+      if(p.buttons[0]&&!p.buttons[0].pressed)pollGamepad._a=false;
+    }
+    break;
+  }
+}
+
+/* --- Touch: zwei virtuelle Sticks (floating) + eigene Zeichnung im HUD --- */
+const TOUCH={l:null,r:null,rad:70}; // {id,cx,cy,x,y} je Stick
+function stickZone(x){ return x<innerWidth/2?'l':'r'; }
+if(IS_TOUCH){
+  const down=e=>{
+    if(APP.state!=='fly')return;
+    for(const t of e.changedTouches){
+      if(t.clientY<innerHeight*0.25)continue;         // oben: Buttons/HUD
+      const z=stickZone(t.clientX);
+      if(TOUCH[z])continue;
+      TOUCH[z]={id:t.identifier,cx:t.clientX,cy:t.clientY,x:0,y:0};
+    }
+    e.preventDefault();
+  };
+  const move=e=>{
+    for(const t of e.changedTouches){
+      for(const z of ['l','r']){
+        const s=TOUCH[z];
+        if(s&&s.id===t.identifier){
+          s.x=clamp((t.clientX-s.cx)/TOUCH.rad,-1,1);
+          s.y=clamp((s.cy-t.clientY)/TOUCH.rad,-1,1);
+        }
+      }
+    }
+    e.preventDefault();
+  };
+  const up=e=>{
+    for(const t of e.changedTouches){
+      for(const z of ['l','r']){
+        if(TOUCH[z]&&TOUCH[z].id===t.identifier){
+          if(z==='l'&&!APP.springThr){ TOUCH.thrHold=IN.thr; } // Gas stehen lassen
+          TOUCH[z]=null;
+        }
+      }
+    }
+  };
+  const hudEl=document.getElementById('hud');
+  hudEl.style.pointerEvents='auto';
+  hudEl.addEventListener('touchstart',down,{passive:false});
+  hudEl.addEventListener('touchmove',move,{passive:false});
+  hudEl.addEventListener('touchend',up);
+  hudEl.addEventListener('touchcancel',up);
+}
+function updateTouchInput(springThr){
+  const l=TOUCH.l,r=TOUCH.r;
+  if(l){ IN.yaw=l.x; IN.thr=l.y; IN.src='touch'; }
+  else if(IS_TOUCH&&IN.src==='touch'){ IN.yaw=0; IN.thr=springThr?0:(TOUCH.thrHold??IN.thr); }
+  if(r){ IN.rol=r.x; IN.pit=r.y; IN.src='touch'; }
+  else if(IS_TOUCH&&IN.src==='touch'){ IN.rol=0; IN.pit=0; }
+}
+
+/* ---------------- Audio: Motorsound ---------------- */
+const SND={ctx:null,g:null,o1:null,o2:null,f:null,level:0};
+function initAudio(){
+  if(SND.ctx)return;
+  try{
+    const C=window.AudioContext||window.webkitAudioContext; if(!C)return;
+    const ctx=new C();
+    const g=ctx.createGain();g.gain.value=0;
+    const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=900;f.Q.value=2;
+    const o1=ctx.createOscillator();o1.type='sawtooth';o1.frequency.value=90;
+    const o2=ctx.createOscillator();o2.type='square';o2.frequency.value=182;
+    const g2=ctx.createGain();g2.gain.value=0.35;
+    o1.connect(f);o2.connect(g2);g2.connect(f);f.connect(g);g.connect(ctx.destination);
+    o1.start();o2.start();
+    SND.ctx=ctx;SND.g=g;SND.o1=o1;SND.o2=o2;SND.f=f;
+  }catch(err){/* Sound optional */}
+}
+function updateAudio(motorAvg,armed,dt){
+  if(!SND.ctx)return;
+  if(SND.ctx.state==='suspended')SND.ctx.resume();
+  const target=armed?0.05+motorAvg*0.14:0;
+  SND.level=lerp(SND.level,target,clamp(dt*8,0,1));
+  const sizeF=1/Math.sqrt((APP.model?APP.model.propR:0.06)/0.06);
+  const base=70+motorAvg*240;
+  SND.g.gain.value=SND.level;
+  SND.o1.frequency.value=base*sizeF;
+  SND.o2.frequency.value=base*2.02*sizeF;
+  SND.f.frequency.value=400+motorAvg*2600;
+}
+
+/* ---------------- Simulationszustand ---------------- */
+const APP={
+  state:'menu', paused:false,
+  model:DRONES[1], modeIdx:0, camera:0, windLevel:1,
+  missionId:'free', mission:null,
+  time:0,
+  get mode(){ return this.model.modes[this.modeIdx]; },
+  get springThr(){ const m=this.mode; return m==='GPS'||m==='ATTI'; },
+};
+const DT=1/500;
+const WIND_SPEEDS=[0,2,5,9];
+const WIND_NAMES=['Windstill','Leicht (2 m/s)','Mäßig (5 m/s)','Stark (9 m/s)'];
+let windDir=Math.random()*Math.PI*2;
+
+const DR={
+  pos:[0,0,0], vel:[0,0,0], q:Q.ident(), w:[0,0,0],
+  motors:[0,0,0,0], propAng:[0,0,0,0],
+  armed:false, onGround:true, crashed:false, groundTimer:0,
+  soc:1, volts:0, amps:0, battF:1,
+  pkg:false, iTerm:[0,0,0], flightTime:0,
+  driftV:[0,0], // GPS-Drift (alte Modelle)
+  dbg:{rateT:[0,0,0],T:0},
+};
+function resetDrone(fullBatt=true){
+  const d=APP.model;
+  DR.pos=[0, groundClear(d)+0.001, 0]; DR.vel=[0,0,0];
+  DR.q=Q.fromYaw(0); DR.w=[0,0,0];
+  DR.motors=[0,0,0,0]; DR.armed=false; DR.onGround=true; DR.crashed=false;
+  DR.groundTimer=0; DR.iTerm=[0,0,0]; DR.flightTime=0; DR.pkg=false; DR.driftV=[0,0];
+  if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
+  IN.thr=APP.springThr?0:-1; IN.yaw=IN.pit=IN.rol=0;
+  TOUCH.thrHold=IN.thr;
+  if(APP.mission) APP.mission.reset();
+}
+function groundClear(d){ return d.style.legs? d.style.bodyH*2.4+0.02 : d.style.bodyH*0.8+d.propR*0.15+0.02; }
+
+/* --- Wind --- */
+function windAt(t,y){
+  const s=WIND_SPEEDS[APP.windLevel];
+  if(s===0)return [0,0,0];
+  const gust=1+0.35*Math.sin(t*0.9)+0.22*Math.sin(t*2.7+1.7)+0.12*Math.sin(t*6.3+0.4);
+  const cross=0.25*Math.sin(t*1.3+2.2)+0.15*Math.sin(t*4.1);
+  const hf=Math.min(1,0.5+y/40);            // bodennah weniger Wind
+  const dx=Math.cos(windDir),dz=Math.sin(windDir);
+  return [ (dx*gust - dz*cross)*s*hf, 0.15*s*Math.sin(t*1.9+3)*hf, (dz*gust + dx*cross)*s*hf ];
+}
+
+/* ---------------- Flight Controller ---------------- */
+function flightController(dt){
+  const d=APP.model, mode=APP.mode;
+  const m=d.mass+(DR.pkg?PKG_MASS:0);
+  const q=DR.q;
+  const right=Q.rot(q,[1,0,0]), up=Q.rot(q,[0,1,0]), fwd=Q.rot(q,[0,0,-1]);
+  // Horizontale Pilotenbasis (Heading)
+  let h=[fwd[0],0,fwd[2]], hl=Math.hypot(h[0],h[2]);
+  if(hl<0.05){ h=[up[0],0,up[2]]; hl=Math.hypot(h[0],h[2])||1; }
+  h=[h[0]/hl,0,h[2]/hl];
+  const rh=[-h[2],0,h[0]]; // rechts = 90° zu Heading
+
+  const rates=d.rates, expo=rates.expo;
+  const curve=v=>Math.sign(v)*(Math.abs(v)**3*expo+Math.abs(v)*(1-expo));
+  let rateT=[0,0,0], T=0;
+  const thr01=clamp((IN.thr+1)/2,0,1);
+  const Ka=5.5+2.5*d.agility;
+
+  if(mode==='ACRO'){
+    const mr=rates.max*deg;
+    rateT=[ -curve(IN.pit)*mr, -curve(IN.yaw)*mr*0.6, -curve(IN.rol)*mr ];
+    T=thr01*thr01*d.tmax;
+  }else{
+    // Neigungsziel (GPS: aus Geschwindigkeitsregelung, sonst direkt vom Stick)
+    let ud;                                    // Soll-„oben“-Vektor (Welt)
+    const maxT=Math.tan(d.maxTilt*deg);
+    if(mode==='GPS'){
+      // Sticks = Sollgeschwindigkeit; Regler neigt die Drohne entsprechend
+      let vtx=(h[0]*IN.pit+rh[0]*IN.rol)*d.maxSpeed,
+          vtz=(h[2]*IN.pit+rh[2]*IN.rol)*d.maxSpeed;
+      // GPS-Drift alter Modelle: langsamer Zufallslauf des Haltepunkts
+      const slop=1-d.gpsQ;
+      if(slop>0){
+        DR.driftV[0]+= (Math.random()-0.5)*slop*4*dt; DR.driftV[1]+=(Math.random()-0.5)*slop*4*dt;
+        DR.driftV[0]*= (1-0.15*dt); DR.driftV[1]*=(1-0.15*dt);
+        vtx+=DR.driftV[0]*3; vtz+=DR.driftV[1]*3;
+      }
+      const kv=1.6*(0.4+0.6*d.gpsQ);
+      // Vorsteuerung: Luftwiderstand bei Zielgeschwindigkeit kompensieren
+      let ax=kv*(vtx-DR.vel[0])+d.dragH*vtx*Math.abs(vtx)/m,
+          az=kv*(vtz-DR.vel[2])+d.dragH*vtz*Math.abs(vtz)/m;
+      const am=G*maxT, al=Math.hypot(ax,az);
+      if(al>am){ ax*=am/al; az*=am/al; }
+      // Vertikal: Stick = Steig-/Sinkrate
+      const db=0.08;
+      const vzT=IN.thr>db? (IN.thr-db)/(1-db)*d.climb : IN.thr<-db? (IN.thr+db)/(1-db)*d.desc_ : 0;
+      const ay=clamp(3.2*(vzT-DR.vel[1]),-G*0.8,G*1.2);
+      const F=[m*ax, m*(G+ay), m*az];
+      const Fl=V3.len(F);
+      ud=V3.scale(F,1/(Fl||1));
+      T=Fl;
+      // Am Boden: Motoren im Leerlauf, bis Steigen kommandiert wird
+      if(DR.onGround&&vzT<=0.02){ T=0.03*d.tmax; rateT=[0,0,0]; ud=null; }
+    }else{ // ATTI / ANGLE: Stick = Neigungswinkel
+      const tx=(h[0]*IN.pit+rh[0]*IN.rol)*maxT, tz=(h[2]*IN.pit+rh[2]*IN.rol)*maxT;
+      ud=V3.norm([tx,1,tz]);
+      if(mode==='ATTI'){
+        const db=0.08;
+        const vzT=IN.thr>db? (IN.thr-db)/(1-db)*d.climb : IN.thr<-db? (IN.thr+db)/(1-db)*d.desc_ : 0;
+        const ay=clamp(3.2*(vzT-DR.vel[1]),-G*0.8,G*1.2);
+        T=m*(G+ay)/clamp(up[1],0.35,1);
+        if(DR.onGround&&vzT<=0.02){ T=0.03*d.tmax; rateT=[0,0,0]; ud=null; }
+      }else{ // ANGLE: manuelles Gas
+        T=thr01*thr01*d.tmax;
+      }
+    }
+    if(ud){
+      const ub=Q.rotInv(q,ud);
+      rateT[0]=Ka*ub[2]; rateT[2]=-Ka*ub[0];
+      const mr=d.rates.max*deg*0.8;
+      rateT[0]=clamp(rateT[0],-mr,mr); rateT[2]=clamp(rateT[2],-mr,mr);
+    }
+    rateT[1]=-curve(IN.yaw)*d.yawRate*deg;
+  }
+  DR.dbg.rateT=rateT; DR.dbg.T=T;
+
+  // Ratenregler (PI, „computed torque“) → Drehmomente
+  const Kr=14+10*d.agility, Ki=6;
+  const tq=[0,0,0], I=[d.Ix,d.Iy,d.Iz];
+  for(let i=0;i<3;i++){
+    const err=rateT[i]-DR.w[i];
+    DR.iTerm[i]=clamp(DR.iTerm[i]+err*Ki*dt, -6, 6);
+    if(DR.onGround||!DR.armed)DR.iTerm[i]=0;
+    tq[i]=I[i]*(Kr*err+DR.iTerm[i]);
+  }
+  const a=d.arm;
+  const tqMaxXZ=2*d.tmaxMotor*a, tqMaxY=2*d.tmaxMotor*d.kq;
+  tq[0]=clamp(tq[0],-tqMaxXZ,tqMaxXZ);
+  tq[2]=clamp(tq[2],-tqMaxXZ,tqMaxXZ);
+  tq[1]=clamp(tq[1],-tqMaxY,tqMaxY);
+
+  // Mixer: Motoranordnung X (sx,sz,dir): 0 VR, 1 HR, 2 HL, 3 VL
+  const MOT=[[1,-1,1],[1,1,-1],[-1,1,1],[-1,-1,-1]];
+  const idle=DR.armed?0.02:0;
+  for(let i=0;i<4;i++){
+    const [sx,sz,dir]=MOT[i];
+    let ti=T/4 + tq[0]*(-sz)/(4*a) + tq[2]*(sx)/(4*a) + tq[1]*dir/(4*d.kq);
+    ti=clamp(ti, idle*d.tmaxMotor, d.tmaxMotor);
+    const nt=DR.armed?Math.sqrt(ti/d.tmaxMotor):0;
+    const tau=nt>DR.motors[i]?d.tauUp:d.tauDn;
+    DR.motors[i]+= (nt-DR.motors[i])*(1-Math.exp(-dt/tau));
+  }
+}
+
+/* ---------------- Physik-Schritt ---------------- */
+function physStep(dt){
+  const d=APP.model;
+  APP.time+=dt;
+  const springThr=APP.springThr;
+  if(IN.src!=='test'){
+    if(IN.src!=='pad'&&IN.src!=='touch') updateKeyInput(dt,springThr);
+    if(IS_TOUCH) updateTouchInput(springThr);
+  }
+
+  flightController(dt);
+
+  const m=d.mass+(DR.pkg?PKG_MASS:0);
+  const q=DR.q, up=Q.rot(q,[0,1,0]);
+  // Bodeneffekt & Batteriefaktor
+  const alt=DR.pos[1]-groundHeightAt(DR.pos[0],DR.pos[2]);
+  const ge=1+0.10*Math.exp(-Math.max(alt,0)/(d.propR*4));
+  const bf=DR.battF;
+  // Schub
+  let Tsum=0;
+  const MOT=[[1,-1,1],[1,1,-1],[-1,1,1],[-1,-1,-1]];
+  const thr=[0,0,0,0];
+  for(let i=0;i<4;i++){ thr[i]=d.tmaxMotor*DR.motors[i]*DR.motors[i]*bf*ge; Tsum+=thr[i]; }
+  // Drehmomente aus Schubdifferenzen + Reaktionsmoment
+  let tqx=0,tqy=0,tqz=0;
+  for(let i=0;i<4;i++){
+    const [sx,sz,dir]=MOT[i];
+    tqx+=thr[i]*(-sz*d.arm); tqz+=thr[i]*(sx*d.arm); tqy+=thr[i]*dir*d.kq;
+  }
+  // Aerodynamische Rotationsdämpfung (Propeller/Rahmen)
+  tqx-=d.Ix*(2.0*DR.w[0]+0.5*DR.w[0]*Math.abs(DR.w[0]));
+  tqy-=d.Iy*(2.5*DR.w[1]+0.5*DR.w[1]*Math.abs(DR.w[1]));
+  tqz-=d.Iz*(2.0*DR.w[2]+0.5*DR.w[2]*Math.abs(DR.w[2]));
+  // Turbulenz
+  if(APP.windLevel>0&&!DR.onGround){
+    const wl=APP.windLevel, t=APP.time;
+    tqx+=d.Ix*Math.sin(t*9.1+1)*wl*0.5*(1+0.3/d.mass);
+    tqz+=d.Iz*Math.sin(t*7.7+4)*wl*0.5*(1+0.3/d.mass);
+  }
+  DR.w[0]+=tqx/d.Ix*dt; DR.w[1]+=tqy/d.Iy*dt; DR.w[2]+=tqz/d.Iz*dt;
+  DR.q=Q.integrate(q,DR.w,dt);
+
+  // Kräfte: Schub + Widerstand + Gewicht
+  const wind=windAt(APP.time,DR.pos[1]);
+  const vAir=V3.sub(DR.vel,wind);
+  const vb=Q.rotInv(DR.q,vAir);
+  const pkgD=DR.pkg?1.25:1;
+  const Fdb=[
+    -(d.dragH*vb[0]*Math.abs(vb[0])+d.dragL*vb[0])*pkgD,
+    -(d.dragV*vb[1]*Math.abs(vb[1])+d.dragL*vb[1])*pkgD,
+    -(d.dragH*vb[2]*Math.abs(vb[2])+d.dragL*vb[2])*pkgD];
+  const Fd=Q.rot(DR.q,Fdb);
+  const acc=[
+    (up[0]*Tsum+Fd[0])/m,
+    (up[1]*Tsum+Fd[1])/m-G,
+    (up[2]*Tsum+Fd[2])/m];
+  DR.vel=V3.add(DR.vel,V3.scale(acc,dt));
+  DR.pos=V3.add(DR.pos,V3.scale(DR.vel,dt));
+  if(DR.armed&&!DR.onGround)DR.flightTime+=dt;
+
+  // Propeller-Anzeige
+  for(let i=0;i<4;i++){ const dir=MOT[i][2]; DR.propAng[i]+=dir*(4+DR.motors[i]*160)*dt*(0.06/d.propR); }
+
+  batteryStep(dt,Tsum,m);
+  groundAndCollisions(dt,m);
+}
+
+function batteryStep(dt,Tsum,m){
+  const d=APP.model, b=d.batt;
+  const hoverT=m*G;
+  const load=Math.max(Tsum/hoverT,0.02);
+  DR.amps=DR.armed? d.hoverAmp*Math.pow(load,1.5)+0.25 : 0.05;
+  DR.soc=Math.max(0,DR.soc - DR.amps*dt/3600/(b.mah/1000));
+  const ocv=3.35+0.85*DR.soc;
+  const sag=Math.min(0.4,0.055*Math.pow(DR.amps/d.hoverAmp,0.8));
+  const vc=Math.max(2.9,ocv-sag);
+  DR.volts=vc*b.cells;
+  DR.battF=DR.soc<=0? 0.55 : 0.75+0.35*clamp((vc-3.3)/0.9,0,1);
+}
+
+/* --- Boden, Plattformen, Hindernisse --- */
+function groundHeightAt(x,z){
+  let g=0;
+  for(const p of activePlatforms()){
+    if(Math.hypot(x-p.x,z-p.z)<p.r) g=Math.max(g,p.y);
+  }
+  return g;
+}
+function activePlatforms(){
+  if(APP.missionId==='delivery')return [PLAT_PICKUP,PLAT_DROP];
+  if(APP.missionId==='landing')return [PLAT_LANDING];
+  return [];
+}
+function tiltAngle(){
+  const up=Q.rot(DR.q,[0,1,0]);
+  return Math.acos(clamp(up[1],-1,1));
+}
+function groundAndCollisions(dt,m){
+  const d=APP.model, clear=groundClear(d);
+  const gh=groundHeightAt(DR.pos[0],DR.pos[2]);
+  const bottom=DR.pos[1]-clear;
+  const vh=Math.hypot(DR.vel[0],DR.vel[2]);
+  if(bottom<=gh){
+    const impact=-DR.vel[1];
+    const tilt=tiltAngle();
+    DR.pos[1]=gh+clear;
+    if(!DR.onGround&&(impact>3.6||vh>6||(tilt>55*deg&&DR.armed))){ crash('Zu hart aufgeschlagen'); }
+    DR.vel[1]=Math.max(0,DR.vel[1]);
+    // Bodenreibung + Aufrichten
+    const f=Math.exp(-8*dt);
+    DR.vel[0]*=f; DR.vel[2]*=f;
+    DR.w[0]*=f; DR.w[2]*=f; DR.w[1]*=Math.exp(-4*dt);
+    if(tilt<70*deg&&!DR.crashed){
+      // sanft zurück auf die Beine
+      const upv=Q.rot(DR.q,[0,1,0]);
+      const ax=V3.cross(upv,[0,1,0]);
+      const l=V3.len(ax);
+      if(l>0.001){ DR.q=Q.norm(Q.mul(Q.axisAngle(V3.scale(ax,1/l),l*4*dt),DR.q)); }
+    }
+    if(!DR.onGround){ DR.onGround=true; if(APP.mission)APP.mission.onTouchdown(impact,vh); }
+    // Motor-Stopp beim Landen (Stick unten halten)
+    if(DR.armed&&APP.springThr){
+      if(IN.thr<-0.5){ DR.groundTimer+=dt; if(DR.groundTimer>1.2){ DR.armed=false; toast('Motoren gestoppt'); } }
+      else DR.groundTimer=0;
+    }
+    if(DR.armed&&!APP.springThr&&IN.thr<=-0.98) DR.groundTimer+=dt;
+    else if(!APP.springThr) DR.groundTimer=0;
+  }else{
+    if(bottom>gh+0.02)DR.onGround=false;
+    DR.groundTimer=0;
+  }
+  // Hindernisse (Bäume, Gebäude): Zylinder
+  for(const o of OBSTACLES){
+    if(DR.pos[1]-clear>o.h)continue;
+    const dx=DR.pos[0]-o.x,dz=DR.pos[2]-o.z;
+    const dist=Math.hypot(dx,dz), rr=o.r+d.arm*1.4;
+    if(dist<rr){
+      const sp=V3.len(DR.vel);
+      if(sp>2.5&&DR.armed&&!DR.onGround){ crash('Kollision!'); }
+      const nx=dx/(dist||1),nz=dz/(dist||1);
+      DR.pos[0]=o.x+nx*rr; DR.pos[2]=o.z+nz*rr;
+      const vn=DR.vel[0]*nx+DR.vel[2]*nz;
+      if(vn<0){ DR.vel[0]-=vn*nx*1.4; DR.vel[2]-=vn*nz*1.4; }
+    }
+  }
+  // Weltgrenze
+  const R=Math.hypot(DR.pos[0],DR.pos[2]);
+  if(R>500){ const s=500/R; DR.pos[0]*=s; DR.pos[2]*=s; toast('Reichweitengrenze erreicht'); }
+}
+function crash(msg){
+  if(DR.crashed)return;
+  DR.crashed=true; DR.armed=false; DR.motors=[0,0,0,0];
+  if(APP.mission)APP.mission.onCrash();
+  toast('💥 '+msg+' – R oder RESET zum Neustart');
+}
+
+/* ---------------- Missionen ---------------- */
+function fmtTime(s){ const m=Math.floor(s/60),ss=(s%60).toFixed(1); return m+':'+(ss<10?'0':'')+ss; }
+function makeMission(id){
+  if(id==='free')return null;
+  const M={id,t:0,done:false,failed:false,lines:['',''],
+    reset(){this.t=0;this.done=false;this.failed=false;this.init();},
+    onTouchdown(){},onCrash(){this.failed=true;},init(){},step(){}};
+  if(id==='race'){
+    M.laps=2;
+    M.init=function(){this.idx=0;this.lap=0;this.started=false;this.prev=[...DR.pos];
+      this.best=parseFloat(localStorage.getItem('ds_best')||'0')||null;};
+    M.step=function(dt){
+      if(this.done)return;
+      if(this.started)this.t+=dt;
+      const g=RACE_GATES[this.idx];
+      const n=[Math.sin(g.yaw),0,Math.cos(g.yaw)];
+      const rel0=[this.prev[0]-g.x,this.prev[1]-g.y,this.prev[2]-g.z];
+      const rel1=[DR.pos[0]-g.x,DR.pos[1]-g.y,DR.pos[2]-g.z];
+      const s0=rel0[0]*n[0]+rel0[2]*n[2], s1=rel1[0]*n[0]+rel1[2]*n[2];
+      if(s0<0&&s1>=0){
+        const lat=Math.abs(rel1[0]*n[2]-rel1[2]*n[0]);
+        if(lat<g.w/2&&Math.abs(rel1[1])<g.hgt/2){
+          this.started=true;
+          this.idx++;
+          toast('Tor '+this.idx+'/'+RACE_GATES.length+(this.idx===RACE_GATES.length?' – Runde!':''));
+          if(this.idx>=RACE_GATES.length){
+            this.idx=0;this.lap++;
+            if(this.lap>=this.laps){
+              this.done=true;
+              const best=this.best;
+              if(!best||this.t<best){localStorage.setItem('ds_best',this.t);this.best=this.t;
+                toast('🏁 Ziel! Neue Bestzeit: '+fmtTime(this.t));}
+              else toast('🏁 Ziel! Zeit: '+fmtTime(this.t)+' (Bestzeit '+fmtTime(best)+')');
+            }
+          }
+        }
+      }
+      this.prev=[...DR.pos];
+      const dist=Math.hypot(DR.pos[0]-g.x,DR.pos[2]-g.z);
+      this.lines=[this.done?'🏁 Ziel! '+fmtTime(this.t):'Runde '+(this.lap+1)+'/'+this.laps+' · Tor '+(this.idx+1)+'/'+RACE_GATES.length+' ('+dist.toFixed(0)+' m)',
+        (this.started?'⏱ '+fmtTime(this.t):'⏱ startet am 1. Tor')+(this.best?' · Best '+fmtTime(this.best):'')];
+    };
+  }
+  if(id==='photo'){
+    M.init=function(){this.idx=0;this.hover=0;};
+    M.step=function(dt){
+      if(this.done)return;
+      this.t+=dt;
+      const p=PHOTO_POINTS[this.idx];
+      const dist=Math.hypot(DR.pos[0]-p.x,DR.pos[1]-p.y,DR.pos[2]-p.z);
+      const slow=V3.len(DR.vel)<1.4;
+      if(dist<4&&slow&&!DR.onGround){ this.hover+=dt;
+        if(this.hover>=2){ this.idx++; this.hover=0; toast('📷 Foto '+this.idx+'/'+PHOTO_POINTS.length);
+          if(this.idx>=PHOTO_POINTS.length){this.done=true;toast('✅ Alle Fotos im Kasten! ('+fmtTime(this.t)+')');} } }
+      else this.hover=Math.max(0,this.hover-dt*2);
+      if(!this.done){
+        this.lines=['Fotopunkt '+(this.idx+1)+'/'+PHOTO_POINTS.length+' · '+dist.toFixed(0)+' m',
+          dist<4?(slow?'Ruhig halten… '+(this.hover/2*100).toFixed(0)+' %':'Zu schnell – langsamer!'):'⏱ '+fmtTime(this.t)];
+      } else this.lines=['✅ Mission erfüllt','⏱ '+fmtTime(this.t)];
+    };
+  }
+  if(id==='delivery'){
+    M.init=function(){this.phase='pickup';this.hover=0;DR.pkg=false;};
+    M.step=function(dt){
+      if(this.done)return;
+      this.t+=dt;
+      if(this.phase==='pickup'){
+        const p=PLAT_PICKUP;
+        const dh=Math.hypot(DR.pos[0]-p.x,DR.pos[2]-p.z), da=DR.pos[1]-p.y;
+        if(dh<p.r&&da>0.2&&da<3&&V3.len(DR.vel)<1.2&&!DR.onGround){
+          this.hover+=dt;
+          if(this.hover>=2){DR.pkg=true;this.phase='deliver';this.hover=0;
+            toast('📦 Paket aufgenommen (+'+(PKG_MASS*1000).toFixed(0)+' g) – zur grünen Plattform!');}
+        } else this.hover=Math.max(0,this.hover-dt*2);
+        this.lines=['Zur GELBEN Plattform ('+dh.toFixed(0)+' m), 2 s darüber hovern',
+          this.hover>0?'Aufnehmen… '+(this.hover/2*100).toFixed(0)+' %':'⏱ '+fmtTime(this.t)];
+      }else if(this.phase==='deliver'){
+        const p=PLAT_DROP;
+        const dh=Math.hypot(DR.pos[0]-p.x,DR.pos[2]-p.z);
+        this.lines=['Paket zur GRÜNEN Plattform bringen ('+dh.toFixed(0)+' m)','Sanft landen! ⏱ '+fmtTime(this.t)];
+      }
+    };
+    M.onTouchdown=function(impact){
+      if(this.phase!=='deliver'||this.done)return;
+      const p=PLAT_DROP;
+      if(Math.hypot(DR.pos[0]-p.x,DR.pos[2]-p.z)<p.r&&Math.abs(DR.pos[1]-p.y-groundClear(APP.model))<0.5){
+        if(impact<2.2){this.done=true;DR.pkg=false;
+          toast('✅ Paket zugestellt in '+fmtTime(this.t)+' (Aufsetzen: '+impact.toFixed(1)+' m/s)');this.lines=['✅ Zugestellt!','⏱ '+fmtTime(this.t)];}
+        else toast('📦 Zu hart! ('+impact.toFixed(1)+' m/s) – nochmal anheben und sanft absetzen');
+      }
+    };
+  }
+  if(id==='landing'){
+    M.init=function(){};
+    M.step=function(dt){
+      if(this.done)return;
+      this.t+=dt;
+      const p=PLAT_LANDING;
+      const dh=Math.hypot(DR.pos[0]-p.x,DR.pos[2]-p.z);
+      this.lines=['Auf der ROTEN Plattform landen ('+dh.toFixed(0)+' m)',
+        'Akku: '+(DR.soc*100).toFixed(0)+' % – sanft aufsetzen!'];
+    };
+    M.onTouchdown=function(impact){
+      if(this.done)return;
+      const p=PLAT_LANDING;
+      if(Math.hypot(DR.pos[0]-p.x,DR.pos[2]-p.z)<p.r&&DR.pos[1]>p.y-0.2){
+        this.done=true;
+        const note=impact<0.8?'🏆 Perfekt!':impact<1.8?'✅ Gut gelandet.':'⚠️ Ganz schön ruppig…';
+        toast(note+' Aufsetzen mit '+impact.toFixed(2)+' m/s bei '+(DR.soc*100).toFixed(0)+' % Akku');
+        this.lines=['✅ Gelandet: '+impact.toFixed(2)+' m/s',''];
+      }
+    };
+  }
+  M.init();
+  return M;
+}
+
+/* ---------------- Kamera & Renderbild ---------------- */
+let chasePos=null;
+function computeCamera(){
+  const d=APP.model;
+  const q=DR.q,p=DR.pos;
+  const fwd=Q.rot(q,[0,0,-1]);
+  let h=[fwd[0],0,fwd[2]];const hl=Math.hypot(h[0],h[2])||1;h=[h[0]/hl,0,h[2]/hl];
+  const cams=['FPV','CHASE','BODEN'];
+  const cm=cams[APP.camera%3];
+  if(cm==='FPV'){
+    const eye=V3.add(p,Q.rot(q,[0,d.style.bodyH*0.4,-d.style.bodyL*0.55]));
+    if(d.cls==='cam'){ // stabilisierter Gimbal: Horizont bleibt gerade
+      const at=V3.add(eye,V3.add(h,[0,-0.08,0]));
+      return {eye,at,up:[0,1,0],fov:d.fovFpv*deg,name:cm};
+    }
+    const a=d.camAngle*deg;
+    const dir=Q.rot(q,[0,Math.sin(a),-Math.cos(a)]);
+    const up=Q.rot(q,[0,Math.cos(a),Math.sin(a)]);
+    return {eye,at:V3.add(eye,dir),up,fov:d.fovFpv*deg,name:cm};
+  }
+  if(cm==='CHASE'){
+    const dist=2.2+d.arm*14;
+    const want=V3.add(p,V3.add(V3.scale(h,-dist),[0,dist*0.42,0]));
+    chasePos=chasePos?V3.lerp(chasePos,want,0.08):want;
+    // Kamera nicht in den Boden
+    chasePos[1]=Math.max(chasePos[1],groundHeightAt(chasePos[0],chasePos[2])+0.4);
+    return {eye:[...chasePos],at:V3.add(p,[0,0.2,0]),up:[0,1,0],fov:62*deg,name:cm};
+  }
+  const eye=[4,1.8,7];
+  const dist=V3.len(V3.sub(p,eye));
+  return {eye,at:p,up:[0,1,0],fov:clamp(52/(1+dist/28),10,52)*deg,name:cm};
+}
+function resize(){
+  const dpr=Math.min(devicePixelRatio||1,2);
+  for(const c of [glc,hudc]){
+    c.width=innerWidth*dpr;c.height=innerHeight*dpr;
+  }
+  gl.viewport(0,0,glc.width,glc.height);
+}
+const hudc=document.getElementById('hud');
+const hud=hudc.getContext('2d');
+addEventListener('resize',resize);
+
+function render(){
+  const cam=computeCamera();
+  const la=M4.lookAt(cam.eye,cam.at,cam.up);
+  VIEW.proj=M4.persp(cam.fov,glc.width/glc.height,0.05,3000);
+  VIEW.view=la.m; VIEW.cam=cam.eye;
+  VIEW.right=la.x; VIEW.up=la.y; VIEW.fwd=[-la.z[0],-la.z[1],-la.z[2]];
+  VIEW.fov=cam.fov; VIEW.name=cam.name;
+
+  gl.clearColor(FOG_COL[0],FOG_COL[1],FOG_COL[2],1);
+  gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  gl.disable(gl.BLEND);
+  // Himmel
+  gl.disable(gl.DEPTH_TEST);
+  gl.useProgram(skySh.p);
+  gl.uniform3fv(skySh.u.uR,VIEW.right);gl.uniform3fv(skySh.u.uU,VIEW.up);gl.uniform3fv(skySh.u.uF,VIEW.fwd);
+  gl.uniform3fv(skySh.u.uSun,SUN);gl.uniform3fv(skySh.u.uFogCol,FOG_COL);
+  gl.uniform1f(skySh.u.uTan,Math.tan(cam.fov/2));gl.uniform1f(skySh.u.uAsp,glc.width/glc.height);
+  gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);
+  { const aP=gl.getAttribLocation(skySh.p,'aP');gl.enableVertexAttribArray(aP);gl.vertexAttribPointer(aP,2,gl.FLOAT,false,0,0);
+    gl.drawArrays(gl.TRIANGLES,0,3); }
+  gl.enable(gl.DEPTH_TEST);
+  // Boden
+  gl.useProgram(gndSh.p);
+  gl.uniformMatrix4fv(gndSh.u.uProj,false,VIEW.proj);
+  gl.uniformMatrix4fv(gndSh.u.uView,false,VIEW.view);
+  gl.uniform3fv(gndSh.u.uCtr,[cam.eye[0],0,cam.eye[2]]);
+  gl.uniform3fv(gndSh.u.uCam,cam.eye);gl.uniform3fv(gndSh.u.uFogCol,FOG_COL);
+  gl.uniform3fv(gndSh.u.uSun,SUN);gl.uniform1f(gndSh.u.uFogD,FOG_DENS);
+  gl.bindBuffer(gl.ARRAY_BUFFER,gndBuf);
+  { const aP=gl.getAttribLocation(gndSh.p,'aP');gl.enableVertexAttribArray(aP);gl.vertexAttribPointer(aP,3,gl.FLOAT,false,0,0);
+    gl.drawArrays(gl.TRIANGLES,0,6); }
+  // Statische Szene
+  const I=M4.ident();
+  drawMesh(hillMesh,I,[0.36,0.5,0.34]);
+  drawMesh(treeTrunkMesh,I,[0.4,0.28,0.16]);
+  drawMesh(treeTopMesh,I,[0.16,0.4,0.18]);
+  drawMesh(bldMesh,I,[0.62,0.6,0.58]);
+  // Missionsobjekte
+  if(APP.missionId==='race'){
+    const mi=APP.mission;
+    RACE_GATES.forEach((g,i)=>{
+      const mm=M4.mul(M4.translate(g.x,g.y-g.hgt/2,g.z),M4.rotY(g.yaw));
+      const isNext=mi&&!mi.done&&i===mi.idx;
+      drawMesh(gateMesh,mm,isNext?[0.2,0.95,0.45]:[0.75,0.78,0.82]);
+    });
+  }
+  if(APP.missionId==='photo'){
+    const mi=APP.mission;
+    PHOTO_POINTS.forEach((p,i)=>{
+      const done=mi&&i<mi.idx, next=mi&&!mi.done&&i===mi.idx;
+      const bob=next?Math.sin(APP.time*2)*0.3:0;
+      const mm=M4.mul(M4.translate(p.x,p.y+bob,p.z),M4.rotY(APP.time*(next?1.5:0.2)));
+      drawMesh(markerMesh,mm,done?[0.3,0.55,0.35]:next?[0.35,0.85,1.0]:[0.65,0.7,0.78]);
+      const gm=M4.mul(M4.translate(p.x,0.03,p.z),M4.scale(3,1,3));
+      drawMesh(padWpMesh,gm,done?[0.3,0.55,0.35]:[0.35,0.7,0.9]);
+    });
+  }
+  for(const p of activePlatforms()){
+    const mm=M4.mul(M4.translate(p.x,0,p.z),M4.scale(p.r,p.y,p.r));
+    drawMesh(platMesh,mm,p.col);
+  }
+  if(APP.missionId==='delivery'&&APP.mission&&APP.mission.phase==='pickup'&&!DR.pkg){
+    drawMesh(pkgMesh,M4.translate(PLAT_PICKUP.x,PLAT_PICKUP.y,PLAT_PICKUP.z),[0.75,0.55,0.3]);
+  }
+  // Drohne (in der FPV-Ansicht nicht: die eigenen Props würden das Bild füllen)
+  const d=APP.model;
+  gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  if(cam.name!=='FPV'){
+    const DM=DRONE_MESH[d.id];
+    const bodyM=M4.fromQuatPos(DR.q,DR.pos);
+    drawMesh(DM.body,bodyM,d.style.c1);
+    const MOT=[[1,-1],[1,1],[-1,1],[-1,-1]];
+    for(let i=0;i<4;i++){
+      const [sx,sz]=MOT[i];
+      const pm=M4.mul(bodyM,M4.mul(M4.translate(sx*d.arm,d.style.bodyH*0.42,sz*d.arm),M4.rotY(DR.propAng[i])));
+      drawMesh(DM.prop,pm,d.style.c2,DR.motors[i]>0.35?0.55:1);
+      if(DR.motors[i]>0.25){
+        gl.depthMask(false);
+        drawMesh(DM.disc,pm,d.style.c2,0.18+DR.motors[i]*0.15);
+        gl.depthMask(true);
+      }
+    }
+    if(DR.pkg){
+      drawMesh(pkgMesh,M4.mul(bodyM,M4.translate(0,-d.style.bodyH*2.2-0.26,0)),[0.75,0.55,0.3]);
+    }
+  }
+  // Schatten
+  const gh=groundHeightAt(DR.pos[0],DR.pos[2]);
+  const alt=Math.max(0,DR.pos[1]-gh);
+  const sa=0.4*clamp(1-alt/30,0,1);
+  if(sa>0.01){
+    gl.depthMask(false);
+    const ss=d.arm*3*(1+alt*0.04);
+    drawMesh(shadowMesh,M4.mul(M4.translate(DR.pos[0],gh+0.02,DR.pos[2]),M4.scale(ss,1,ss)),[0.02,0.05,0.02],sa);
+    gl.depthMask(true);
+  }
+  gl.disable(gl.BLEND);
+}
+
+/* ---------------- HUD ---------------- */
+function drawHUD(){
+  const w=hudc.width,hh=hudc.height;
+  hud.clearRect(0,0,w,hh);
+  if(APP.state!=='fly')return;
+  const u=clamp(Math.min(w,hh)/760,0.7,2.1);
+  const d=APP.model;
+  hud.textBaseline='middle';
+  const up=Q.rot(DR.q,[0,1,0]),fw=Q.rot(DR.q,[0,0,-1]),rt=Q.rot(DR.q,[1,0,0]);
+  const pitch=Math.asin(clamp(fw[1],-1,1));
+  const roll=Math.atan2(-rt[1],up[1]);
+  const spd=Math.hypot(DR.vel[0],DR.vel[2]);
+  const alt=DR.pos[1]-groundClear(d);
+
+  // Künstlicher Horizont (nur FPV – in Außenansichten sieht man die Lage direkt)
+  const cx=w/2, isFPV=VIEW.name==='FPV';
+  const cy=isFPV?hh/2:hh*0.42, R=88*u;
+  if(isFPV){
+  hud.save();
+  hud.beginPath();hud.arc(cx,cy,R,0,7);hud.clip();
+  hud.translate(cx,cy);hud.rotate(-roll);
+  const py=pitch/(45*deg)*R;
+  hud.fillStyle='rgba(70,140,220,0.16)';hud.fillRect(-R*1.6,-R*2+py,R*3.2,R*2);
+  hud.fillStyle='rgba(150,100,50,0.16)';hud.fillRect(-R*1.6,py,R*3.2,R*2);
+  hud.strokeStyle='rgba(255,255,255,0.75)';hud.lineWidth=1.6*u;
+  hud.beginPath();hud.moveTo(-R*1.4,py);hud.lineTo(R*1.4,py);hud.stroke();
+  hud.strokeStyle='rgba(255,255,255,0.35)';hud.font=`${10*u}px sans-serif`;hud.fillStyle='rgba(255,255,255,0.5)';
+  for(const a of [-30,-15,15,30]){
+    const y=py-a/45*R;
+    hud.beginPath();hud.moveTo(-24*u,y);hud.lineTo(24*u,y);hud.stroke();
+  }
+  hud.restore();
+  hud.strokeStyle='rgba(255,220,60,0.9)';hud.lineWidth=2.4*u;
+  hud.beginPath();hud.moveTo(cx-40*u,cy);hud.lineTo(cx-12*u,cy);hud.lineTo(cx-6*u,cy+7*u);
+  hud.moveTo(cx+40*u,cy);hud.lineTo(cx+12*u,cy);hud.lineTo(cx+6*u,cy+7*u);hud.stroke();
+  hud.strokeStyle='rgba(255,255,255,0.4)';hud.lineWidth=1.5*u;
+  hud.beginPath();hud.arc(cx,cy,R,0,7);hud.stroke();
+  }
+
+  // Geschwindigkeit / Höhe
+  const box=(x,y,ww,label,val,unit)=>{
+    hud.fillStyle='rgba(10,16,24,0.55)';
+    hud.fillRect(x-ww/2,y-30*u,ww,60*u);
+    hud.strokeStyle='rgba(120,170,210,0.35)';hud.lineWidth=1;hud.strokeRect(x-ww/2,y-30*u,ww,60*u);
+    hud.fillStyle='#9fb6c9';hud.font=`${11*u}px sans-serif`;hud.textAlign='center';
+    hud.fillText(label,x,y-18*u);
+    hud.fillStyle='#fff';hud.font=`bold ${21*u}px sans-serif`;
+    hud.fillText(val,x,y+4*u);
+    hud.fillStyle='#9fb6c9';hud.font=`${10*u}px sans-serif`;
+    hud.fillText(unit,x,y+20*u);
+  };
+  box(cx-R-70*u,cy,92*u,'TEMPO',(spd*3.6).toFixed(0),'km/h');
+  box(cx+R+70*u,cy,92*u,'HÖHE',alt.toFixed(1),'m');
+  // Vario
+  hud.fillStyle='#cfe3f2';hud.font=`${11*u}px sans-serif`;hud.textAlign='center';
+  hud.fillText((DR.vel[1]>=0?'▲ ':'▼ ')+Math.abs(DR.vel[1]).toFixed(1)+' m/s',cx+R+70*u,cy+44*u);
+
+  // Statusleiste oben links
+  hud.textAlign='left';
+  const pad=12*u, lh=19*u; let y=pad+lh/2 + (IS_TOUCH?0:0);
+  const chip=(txt,col)=>{
+    hud.font=`bold ${12*u}px sans-serif`;
+    const tw=hud.measureText(txt).width+14*u;
+    hud.fillStyle='rgba(10,16,24,0.6)';hud.fillRect(pad,y-lh/2,tw,lh-2);
+    hud.fillStyle=col;hud.fillText(txt,pad+7*u,y+1);
+    y+=lh;
+    return tw;
+  };
+  chip(d.name+'  ·  '+APP.mode+(DR.pkg?'  ·  📦':''),'#7cd6ff');
+  chip(DR.crashed?'💥 ABGESTÜRZT – R drücken':DR.armed?(DR.onGround?'ARMED · am Boden':'IN DER LUFT'):'DISARMED – Leertaste/ARM',
+       DR.crashed?'#ff6b5d':DR.armed?'#7bff9e':'#ffd479');
+  if(APP.windLevel>0)chip('💨 '+WIND_NAMES[APP.windLevel],'#cfe3f2');
+  chip('KAMERA: '+VIEW.name,'#9fb6c9');
+  if(APP.mission){
+    y+=4*u;
+    chip(APP.mission.lines[0]||'','#ffe27a');
+    if(APP.mission.lines[1])chip(APP.mission.lines[1],'#cfe3f2');
+  }
+
+  // Batterie unten Mitte
+  const bw=170*u,bx=cx-bw/2,by=hh-34*u;
+  const pct=DR.soc;
+  hud.fillStyle='rgba(10,16,24,0.6)';hud.fillRect(bx-8*u,by-14*u,bw+16*u,30*u);
+  hud.fillStyle='rgba(255,255,255,0.14)';hud.fillRect(bx,by-6*u,bw,12*u);
+  hud.fillStyle=pct>0.3?'#59d97c':pct>0.15?'#ffb020':'#ff5d5d';
+  hud.fillRect(bx,by-6*u,bw*pct,12*u);
+  hud.fillStyle='#fff';hud.font=`bold ${11*u}px sans-serif`;hud.textAlign='center';
+  hud.fillText((pct*100).toFixed(0)+' %  ·  '+DR.volts.toFixed(1)+' V  ·  '+fmtTime(DR.flightTime),cx,by-22*u);
+  if(pct<0.15&&Math.sin(APP.time*6)>0){
+    hud.fillStyle='#ff5d5d';hud.font=`bold ${15*u}px sans-serif`;
+    hud.fillText(pct<=0?'⚠ AKKU LEER – NOTLANDUNG ⚠':'⚠ AKKU KRITISCH – LANDEN ⚠',cx,by-44*u);
+  }
+
+  // Sticks
+  const stick=(x,y,r,vx,vy,active)=>{
+    hud.strokeStyle=active?'rgba(120,210,255,0.8)':'rgba(255,255,255,0.28)';
+    hud.lineWidth=2*u;
+    hud.beginPath();hud.arc(x,y,r,0,7);hud.stroke();
+    hud.beginPath();hud.moveTo(x-r,y);hud.lineTo(x+r,y);hud.moveTo(x,y-r);hud.lineTo(x,y+r);
+    hud.strokeStyle='rgba(255,255,255,0.12)';hud.lineWidth=1;hud.stroke();
+    hud.fillStyle=active?'rgba(120,210,255,0.9)':'rgba(255,255,255,0.55)';
+    hud.beginPath();hud.arc(x+vx*r,y-vy*r,r*0.22,0,7);hud.fill();
+  };
+  if(IS_TOUCH){
+    TOUCH.rad=Math.max(60,Math.min(w,hh)*0.085);
+    const r=TOUCH.rad, dpr=w/innerWidth;
+    const lx=TOUCH.l?TOUCH.l.cx*dpr:r*1.6+20, ly=TOUCH.l?TOUCH.l.cy*dpr:hh-r*1.4-20;
+    const rx=TOUCH.r?TOUCH.r.cx*dpr:w-r*1.6-20, ry=TOUCH.r?TOUCH.r.cy*dpr:hh-r*1.4-20;
+    stick(lx,ly,r*dpr*0+r,IN.yaw,APP.springThr?IN.thr:IN.thr,!!TOUCH.l);
+    stick(rx,ry,r,IN.rol,IN.pit,!!TOUCH.r);
+  }else{
+    const r=34*u;
+    stick(pad+r+6*u,hh-r-14*u,r,IN.yaw,IN.thr,false);
+    stick(w-pad-r-6*u,hh-r-14*u,r,IN.rol,IN.pit,false);
+  }
+}
+
+/* ---------------- Menü & Aktionen ---------------- */
+const $=id=>document.getElementById(id);
+let toastTimer=0;
+function toast(msg,ms=2600){
+  const t=$('toast');t.innerHTML=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms);
+}
+function buildMenu(){
+  const dg=$('droneGrid');
+  dg.innerHTML='';
+  for(const d of DRONES){
+    const c=document.createElement('div');c.className='card'+(d.id===APP.model.id?' sel':'');
+    c.innerHTML=`<div class="nm">${d.name}<span class="chip ${d.cls}">${d.cls==='cam'?'KAMERA':'FPV'}</span></div>
+      <div class="ds">${d.desc}</div>
+      <div class="sp"><span>⚖ <b>${(d.mass*1000).toFixed(0)} g</b></span>
+      <span>🚀 <b>${(d.maxSpeed*3.6).toFixed(0)}${d.cls==='fpv'?'+':''} km/h</b></span>
+      <span>🔋 <b>${d.batt.min} min · ${d.batt.cells}S</b></span>
+      <span>⚡ <b>${d.twr.toFixed(1)}:1</b></span></div>`;
+    c.onclick=()=>{APP.model=d;APP.modeIdx=0;buildMenu();};
+    dg.appendChild(c);
+  }
+  const mg=$('missionGrid');
+  mg.innerHTML='';
+  for(const m of MISSIONS){
+    const c=document.createElement('div');c.className='card mcard'+(m.id===APP.missionId?' sel':'');
+    c.innerHTML=`<div class="nm">${m.icon} ${m.name}</div><div class="ds">${m.desc}</div>`;
+    c.onclick=()=>{APP.missionId=m.id;buildMenu();};
+    mg.appendChild(c);
+  }
+  const wr=$('windRow');
+  wr.innerHTML='';
+  WIND_NAMES.forEach((n,i)=>{
+    const b=document.createElement('button');
+    b.textContent=n;if(i===APP.windLevel)b.className='sel';
+    b.onclick=()=>{APP.windLevel=i;buildMenu();};
+    wr.appendChild(b);
+  });
+  $('startBtn').textContent=(APP.state==='fly'&&!configChanged())?'WEITERFLIEGEN':'ABHEBEN';
+}
+let flownConfig='';
+function configChanged(){ return flownConfig!==APP.model.id+'|'+APP.missionId; }
+function openMenu(){ APP.paused=true;$('menu').style.display='block';buildMenu(); }
+function closeMenuAndStart(){
+  initAudio();
+  $('menu').style.display='none';
+  if(APP.state!=='fly'||configChanged()){
+    APP.mission=makeMission(APP.missionId);
+    APP.state='fly';
+    APP.camera=APP.model.cls==='fpv'?0:1;
+    chasePos=null;
+    flownConfig=APP.model.id+'|'+APP.missionId;
+    resetDrone(true);
+    toast(APP.model.name+' bereit – '+(IS_TOUCH?'ARM drücken und Gas geben!':'Leertaste zum Armen, dann W für Gas'),3600);
+  }
+  APP.paused=false;
+  updateButtons();
+}
+function updateButtons(){
+  $('bArm').textContent=DR.armed?'STOP':'ARM';
+  $('bArm').classList.toggle('armed',DR.armed);
+  $('bMode').textContent=APP.mode;
+}
+function tryArm(){
+  if(APP.state!=='fly'||APP.paused)return;
+  if(DR.crashed){toast('Erst zurücksetzen (R / RESET)');return;}
+  if(DR.armed){DR.armed=false;toast('Disarmed');}
+  else{
+    if(!APP.springThr&&IN.thr>-0.85){toast('⚠ Gas auf Minimum, dann armen!');updateButtons();return;}
+    DR.armed=true;DR.iTerm=[0,0,0];
+    toast(APP.springThr?'Motoren gestartet – Gas-Stick nach oben zum Abheben':'Armed! Vorsichtig Gas geben');
+  }
+  updateButtons();
+}
+function cycleMode(){
+  if(APP.state!=='fly')return;
+  APP.modeIdx=(APP.modeIdx+1)%APP.model.modes.length;
+  const m=APP.mode;
+  if(!APP.springThr&&IN.src!=='pad'&&!TOUCH.l){
+    // Wechsel auf manuelles Gas: Stick sinnvoll vorbelegen (ungefähr Schwebe)
+    const hover=Math.sqrt((APP.model.mass*G)/(APP.model.tmax));
+    if(!DR.onGround)IN.thr=hover*2-1; else IN.thr=-1;
+    TOUCH.thrHold=IN.thr;
+  }
+  const info={GPS:'GPS: hält Position & Höhe von selbst',ATTI:'ATTI: hält Höhe, driftet mit dem Wind',
+    ANGLE:'ANGLE: selbstaufrichtend, Gas manuell',ACRO:'ACRO: volle manuelle Kontrolle!'}[m];
+  toast('Modus '+m+' – '+info);
+  updateButtons();
+}
+function handleKey(code){
+  if(code==='Escape'){
+    if(APP.state==='fly'){ if(APP.paused)closeMenuAndStart(); else openMenu(); }
+    return;
+  }
+  if(APP.state!=='fly'||APP.paused)return;
+  if(code==='Space')tryArm();
+  else if(code==='KeyM')cycleMode();
+  else if(code==='KeyC'){APP.camera=(APP.camera+1)%3;}
+  else if(code==='KeyR'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}
+  else if(/^Digit[1-4]$/.test(code)){APP.windLevel=+code.slice(5)-1;toast('💨 '+WIND_NAMES[APP.windLevel]);}
+}
+$('bArm').onclick=tryArm;
+$('bMode').onclick=cycleMode;
+$('bCam').onclick=()=>{if(APP.state==='fly')APP.camera=(APP.camera+1)%3;};
+$('bReset').onclick=()=>{if(APP.state==='fly'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}};
+$('bMenu').onclick=()=>{if(APP.paused)closeMenuAndStart();else openMenu();};
+$('startBtn').onclick=closeMenuAndStart;
+
+/* ---------------- Hauptschleife ---------------- */
+let lastT=0,acc=0;
+function frame(t){
+  requestAnimationFrame(frame);
+  const dt=Math.min((t-lastT)/1000||0,0.1);lastT=t;
+  pollGamepad();
+  if(APP.state==='fly'&&!APP.paused){
+    acc+=dt;let n=0;
+    while(acc>=DT&&n++<60){physStep(DT);acc-=DT;}
+    if(APP.mission)APP.mission.step(dt);
+    updateAudio((DR.motors[0]+DR.motors[1]+DR.motors[2]+DR.motors[3])/4,DR.armed,dt);
+  } else updateAudio(0,false,dt);
+  if(APP.state==='fly'){render();drawHUD();}
+}
+resize();
+buildMenu();
+requestAnimationFrame(frame);
+
+/* --- Test-API (für automatisierte Prüfung) --- */
+window.T={
+  APP,DR,IN,
+  key:handleKey,
+  start(droneId,missionId){
+    if(droneId)APP.model=DRONES.find(d=>d.id===droneId)||APP.model;
+    if(missionId)APP.missionId=missionId;
+    APP.modeIdx=0;closeMenuAndStart();
+  },
+  set(o){IN.src='test';Object.assign(IN,o,{src:'test'});},
+  release(){IN.src='keys';},
+  tick(sec){ // Physik synchron vorspulen (deterministische Tests)
+    const steps=Math.round(sec/DT);
+    for(let i=0;i<steps;i++){physStep(DT);if(APP.mission)APP.mission.step(DT);}
+  },
+  st(){return {pos:[...DR.pos],vel:[...DR.vel],mode:APP.mode,armed:DR.armed,
+    onGround:DR.onGround,crashed:DR.crashed,soc:DR.soc,volts:DR.volts,
+    motors:[...DR.motors],tilt:tiltAngle()/deg};},
+};
+</script>
+</body>
+</html>
