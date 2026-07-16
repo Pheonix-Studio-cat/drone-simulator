@@ -2,7 +2,9 @@
 
 Ein realistischer Drohnen-Simulator in **einer einzigen Datei** – ohne Installation, ohne Abhängigkeiten.
 
-**Einfach [`index.html`](index.html) im Browser öffnen und losfliegen.** Läuft auf Desktop, Tablet und Smartphone.
+### ▶️ [Direkt im Browser spielen](https://pheonix-studio-cat.github.io/drone-simulator/)
+
+Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffnen. Läuft auf Desktop, Tablet und Smartphone.
 
 ## Features
 
