@@ -450,14 +450,21 @@ void main(){
 }`,`
 precision mediump float;
 varying vec3 vN; varying vec3 vW; varying vec3 vC;
-uniform vec3 uColor,uSun,uCam,uFogCol; uniform float uFogD,uAlpha,uSpec;
+uniform vec3 uColor,uSun,uCam,uFogCol,uZenC; uniform float uFogD,uAlpha,uSpec;
 void main(){
   vec3 n=normalize(vN);
+  vec3 V=normalize(uCam-vW);
   float dif=max(dot(n,uSun),0.0);
-  float amb=0.42+0.18*max(n.y,0.0);
-  vec3 c=uColor*vC*(amb+dif*0.75);
-  vec3 h=normalize(uSun+normalize(uCam-vW));
-  c+=vec3(1.0,0.98,0.92)*pow(max(dot(n,h),0.0),36.0)*uSpec;
+  // Hemisphärisches Umgebungslicht: Himmel von oben, Bodenreflex von unten
+  vec3 skyA=mix(uFogCol,uZenC,0.5)*0.62;
+  vec3 gndA=uFogCol*vec3(0.42,0.46,0.4);
+  vec3 amb=mix(gndA,skyA,n.y*0.5+0.5);
+  vec3 c=uColor*vC*(amb+vec3(1.0,0.96,0.87)*dif*0.85);
+  // Fresnel-Umgebungsreflex an gewölbten Flächen
+  float fr=pow(1.0-max(dot(n,V),0.0),3.0);
+  c+=mix(uFogCol,uZenC,0.6)*fr*uSpec*1.5;
+  vec3 h=normalize(uSun+V);
+  c+=vec3(1.0,0.98,0.92)*(pow(max(dot(n,h),0.0),60.0)*1.2+pow(max(dot(n,h),0.0),8.0)*0.15)*uSpec;
   float d=length(vW-uCam);
   float f=1.0-exp(-uFogD*uFogD*d*d);
   gl_FragColor=vec4(mix(c,uFogCol,f),uAlpha);
@@ -661,6 +668,7 @@ function drawMesh(m,model,color=[1,1,1],alpha=1,spec=0.12){
   gl.uniform1f(objSh.u.uFogD,ENV.fogD);
   gl.uniform1f(objSh.u.uAlpha,alpha);
   gl.uniform1f(objSh.u.uSpec,spec);
+  gl.uniform3fv(objSh.u.uZenC,ENV.sky);
   bindAttr(objSh.aP,m.vb,3);
   bindAttr(objSh.aN,m.nb,3);
   bindAttr(objSh.aC,m.cb,3);
@@ -748,6 +756,8 @@ function buildDroneMesh(d){
                 {z:-L*0.1,y:H*0.5,w:W*0.56,h:H*0.42,e:2.6},
                 {z:L*0.12,y:H*0.44,w:W*0.5,h:H*0.36,e:2.4},
                 {z:L*0.24,y:H*0.3,w:W*0.12,h:H*0.1,e:2.2}],14,[0.5,0.51,0.54]);
+      // dunkles Sensor-"Gesicht" an der Nase
+      b.ellipsoid(W*0.3,H*0.28,L*0.1,[0,-H*0.02,-L*0.44],12,7,[0.1,0.1,0.12]);
       if(d.id==='mini4'){ for(const s of [-1,1])
         b.ellipsoid(0.009,0.008,0.006,[s*W*0.24,H*0.3,-L*0.44],8,5,[0.08,0.08,0.1]); }
       if(d.id==='pro'){
@@ -909,13 +919,17 @@ function buildDroneMesh(d){
     }
   }
   const body=b.build();
+  // Schlanke Propellerblätter: 2 Blätter bei Kameradrohnen, 3 bei FPV (wie real)
   const prop=mesh(pb=>{
-    for(const a of [0,Math.PI/2]){
-      pb.box(d.propR*1.5,0.006,d.propR*0.16,[0,0,0],a,bladeCol);
-      if(tipCol)for(const s of [-1,1])
-        pb.box(d.propR*0.42,0.0065,d.propR*0.17,[Math.cos(a)*s*d.propR*0.79,0,-Math.sin(a)*s*d.propR*0.79],a,tipCol);
+    const R=d.propR, nb=d.cls==='fpv'?3:2;
+    for(let k=0;k<nb;k++){
+      const a=k/nb*Math.PI*2;
+      const dir=[Math.cos(a),0,-Math.sin(a)];
+      pb.box(R*0.5,0.0038,R*0.14,[dir[0]*R*0.27,0,dir[2]*R*0.27],a,bladeCol);
+      pb.box(R*0.42,0.0036,R*0.11,[dir[0]*R*0.66,0.001,dir[2]*R*0.66],a,tipCol||bladeCol);
+      pb.ellipsoid(R*0.09,0.0022,R*0.05,[dir[0]*R*0.9,0.001,dir[2]*R*0.9],8,4,tipCol||bladeCol);
     }
-    pb.ellipsoid(d.propR*0.16,0.008,d.propR*0.16,[0,0,0],8,5,hubCol);
+    pb.ellipsoid(R*0.12,0.007,R*0.12,[0,0,0],8,5,hubCol);
   });
   const disc=mesh(pb=>{ pb.cyl(d.propR,d.propR,0.004,[0,0,0],16,bladeCol); });
   return {body,prop,disc,propY:pY};
