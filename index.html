@@ -450,12 +450,14 @@ void main(){
 }`,`
 precision mediump float;
 varying vec3 vN; varying vec3 vW; varying vec3 vC;
-uniform vec3 uColor,uSun,uCam,uFogCol; uniform float uFogD,uAlpha;
+uniform vec3 uColor,uSun,uCam,uFogCol; uniform float uFogD,uAlpha,uSpec;
 void main(){
   vec3 n=normalize(vN);
   float dif=max(dot(n,uSun),0.0);
   float amb=0.42+0.18*max(n.y,0.0);
   vec3 c=uColor*vC*(amb+dif*0.75);
+  vec3 h=normalize(uSun+normalize(uCam-vW));
+  c+=vec3(1.0,0.98,0.92)*pow(max(dot(n,h),0.0),36.0)*uSpec;
   float d=length(vW-uCam);
   float f=1.0-exp(-uFogD*uFogD*d*d);
   gl_FragColor=vec4(mix(c,uFogCol,f),uAlpha);
@@ -555,6 +557,58 @@ Builder.prototype.cyl=function(r0,r1,h,p=[0,0,0],seg=10,col=null,caps=true){
     if(caps&&r1>0.001) this.tri([p[0],p[1]+h,p[2]],t0,t1);
   }
 };
+// Röhre zwischen zwei Punkten (runder, konischer Querschnitt, weiche Normalen)
+Builder.prototype.tube=function(p0,p1,r0,r1,seg=8,col=null){
+  const cc=col||[1,1,1];
+  const ax=V3.norm(V3.sub(p1,p0));
+  const ref=Math.abs(ax[1])<0.92?[0,1,0]:[1,0,0];
+  const u=V3.norm(V3.cross(ref,ax)), v=V3.cross(ax,u);
+  const pt=(p,r,a)=>V3.add(p,V3.add(V3.scale(u,Math.cos(a)*r),V3.scale(v,Math.sin(a)*r)));
+  const nr=(a)=>V3.add(V3.scale(u,Math.cos(a)),V3.scale(v,Math.sin(a)));
+  for(let i=0;i<seg;i++){
+    const a0=i/seg*2*Math.PI, a1=(i+1)/seg*2*Math.PI;
+    const q=[pt(p0,r0,a0),pt(p0,r0,a1),pt(p1,r1,a1),pt(p1,r1,a0)];
+    const n=[nr(a0),nr(a1),nr(a1),nr(a0)];
+    for(const t of [[0,2,1],[0,3,2]])for(const k of t){
+      this.pos.push(...q[k]); this.nrm.push(...n[k]); this.col.push(...cc);
+    }
+  }
+};
+// Loft: Rumpf aus Querschnittsprofilen entlang z (Superellipse-Querschnitt, weiche Normalen)
+// prof: {z, y:Mittelhöhe, w, h, e:Kantenrundung (2=oval, 4=eckiger)}
+Builder.prototype.loft=function(profiles,seg=18,col=null){
+  const cc=col||[1,1,1];
+  const rings=profiles.map(P=>{
+    const pts=[];
+    const e=P.e||2.6;
+    for(let i=0;i<seg;i++){
+      const t=i/seg*2*Math.PI, c=Math.cos(t), s=Math.sin(t);
+      pts.push([Math.sign(c)*Math.pow(Math.abs(c),2/e)*P.w/2,
+                (P.y||0)+Math.sign(s)*Math.pow(Math.abs(s),2/e)*P.h/2,
+                P.z]);
+    }
+    return pts;
+  });
+  const NR=rings.length;
+  const nrm=rings.map((ring,k)=>ring.map((p,i)=>{
+    const du=V3.sub(ring[(i+1)%seg],ring[(i-1+seg)%seg]);
+    const dv=V3.sub(rings[Math.min(k+1,NR-1)][i],rings[Math.max(k-1,0)][i]);
+    let n=V3.norm(V3.cross(dv,du));
+    const ctr=[0,profiles[k].y||0,profiles[k].z];
+    if(V3.dot(n,V3.sub(p,ctr))<0)n=V3.scale(n,-1);
+    return n;
+  }));
+  for(let k=0;k<NR-1;k++){
+    for(let i=0;i<seg;i++){
+      const j=(i+1)%seg;
+      const q=[rings[k][i],rings[k][j],rings[k+1][j],rings[k+1][i]];
+      const n=[nrm[k][i],nrm[k][j],nrm[k+1][j],nrm[k+1][i]];
+      for(const t of [[0,2,1],[0,3,2]])for(const kk of t){
+        this.pos.push(...q[kk]); this.nrm.push(...n[kk]); this.col.push(...cc);
+      }
+    }
+  }
+};
 // Ellipsoid mit weichen Normalen (f0/f1: Ausschnitt der Polarhöhe, 0=Süd, 1=Nord)
 Builder.prototype.ellipsoid=function(rx,ry,rz,p=[0,0,0],segU=14,segV=9,col=null,f0=0,f1=1){
   const cc=col||[1,1,1];
@@ -593,7 +647,7 @@ function bindAttr(loc,buf,size){
   gl.enableVertexAttribArray(loc);
   gl.vertexAttribPointer(loc,size,gl.FLOAT,false,0,0);
 }
-function drawMesh(m,model,color=[1,1,1],alpha=1){
+function drawMesh(m,model,color=[1,1,1],alpha=1,spec=0.12){
   gl.useProgram(objSh.p);
   gl.uniformMatrix4fv(objSh.u.uProj,false,VIEW.proj);
   gl.uniformMatrix4fv(objSh.u.uView,false,VIEW.view);
@@ -606,6 +660,7 @@ function drawMesh(m,model,color=[1,1,1],alpha=1){
   gl.uniform3fv(objSh.u.uFogCol,ENV.fog);
   gl.uniform1f(objSh.u.uFogD,ENV.fogD);
   gl.uniform1f(objSh.u.uAlpha,alpha);
+  gl.uniform1f(objSh.u.uSpec,spec);
   bindAttr(objSh.aP,m.vb,3);
   bindAttr(objSh.aN,m.nb,3);
   bindAttr(objSh.aC,m.cb,3);
@@ -646,51 +701,70 @@ const PERSON_MESHES={
   parka:[personMesh([0.95,0.45,0.1],[0.2,0.22,0.28],1),personMesh([0.9,0.2,0.15],[0.18,0.2,0.25],1)],
 };
 
-/* --- Drohnen-Meshes: jedem Modell seinem realen Vorbild nachempfunden ---
+/* --- Drohnen-Meshes: Loft-Rümpfe und Röhren-Arme, den realen Vorbildern nah ---
    (vorn = -z; Propeller-Ebene: style.propY bzw. bodyH*0.42) */
 function buildDroneMesh(d){
   const st=d.style, L=st.bodyL, W=st.bodyW, H=st.bodyH, arm=d.arm;
-  const dark=[0.1,0.1,0.12], silver=[0.72,0.73,0.76];
+  const dark=[0.09,0.09,0.11], silver=[0.7,0.71,0.74];
   const pY=st.propY!==undefined?st.propY:H*0.42;
   const b=new Builder();
-  const armTo=(x,z,w,t,col,y=0)=>{ const len=Math.hypot(x,z);
-    b.box(w,t,len,[x/2,y,z/2],Math.atan2(-x,z),col); };
-  const motor=(x,z,col=dark,r=0.013+d.mass*0.0035,h=Math.max(H*0.45,0.018))=>{
-    b.cyl(r,r*0.9,h,[x,pY-h,z],8,col);
-    b.cyl(r*0.9,r*0.5,h*0.28,[x,pY-h*0.1,z],8,silver);
+  // Motorglocke: Sockel + überstehende Glocke + Kappe
+  const motor=(x,z,col=dark,r=0.011+d.mass*0.003)=>{
+    b.tube([x,pY-H*0.42,z],[x,pY-H*0.12,z],r*0.65,r*0.75,10,col);
+    b.tube([x,pY-H*0.14,z],[x,pY-0.001,z],r,r*0.96,12,col);
+    b.cyl(r*0.96,r*0.35,0.004,[x,pY-0.002,z],10,silver);
   };
   const gimbal=(y,z,s,col=[0.09,0.09,0.11])=>{
-    b.box(s*0.35,s*0.75,s*0.3,[0,y+s*0.35,z],0,[0.2,0.2,0.22]);   // Aufhängung
-    b.ellipsoid(s*0.55,s*0.48,s*0.5,[0,y,z],12,8,col);            // runde Kamerakugel
-    b.ellipsoid(s*0.24,s*0.24,s*0.14,[0,y,z-s*0.48],10,6,[0.04,0.05,0.1]); // Objektiv
+    b.tube([0,y+s*0.7,z],[0,y+s*0.1,z],s*0.16,s*0.16,8,[0.2,0.2,0.22]);
+    b.ellipsoid(s*0.55,s*0.48,s*0.5,[0,y,z],14,9,col);
+    b.ellipsoid(s*0.26,s*0.26,s*0.15,[0,y,z-s*0.48],10,6,[0.04,0.05,0.1]);
+    b.ellipsoid(s*0.13,s*0.13,s*0.05,[0,y,z-s*0.62],8,5,[0.3,0.35,0.5]);
   };
   const leds=()=>{ for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]])
-    b.box(0.013,0.013,0.013,[sx*arm,pY-H*0.6,sz*arm],0,sz<0?[0.2,1,0.3]:[1,0.2,0.2]); };
+    b.ellipsoid(0.007,0.005,0.007,[sx*arm,pY-H*0.45,sz*arm],6,4,sz<0?[0.2,1,0.3]:[1,0.2,0.2]); };
   let bladeCol=[0.16,0.17,0.19], tipCol=null, hubCol=st.c2;
 
   switch(d.id){
     case 'mini1': case 'mini4': case 'air': case 'pro': {
-      // Faltdrohnen-Familie: runder Keil-Rumpf, Gimbal vorn, schlanke Arme
+      // Faltdrohnen-Familie: gelofteter Rumpf mit Nase, Gimbal vorn, konische Faltarme
       const c1=st.c1;
-      b.ellipsoid(W*0.55,H*0.62,L*0.55,[0,0,0],16,10,c1);          // Rumpf
-      b.ellipsoid(W*0.44,H*0.45,L*0.34,[0,H*0.18,-L*0.26],14,8,c1); // Nasenwulst
-      b.ellipsoid(W*0.42,H*0.4,L*0.3,[0,-H*0.12,L*0.36],12,8,[0.3,0.31,0.34]); // Akku/Heck
-      if(d.id==='air'){ b.ellipsoid(W*0.38,H*0.32,L*0.3,[0,H*0.45,L*0.14],12,8,[0.5,0.51,0.54]);
-        b.ellipsoid(W*0.3,H*0.18,L*0.16,[0,H*0.4,-L*0.3],10,6,[0.22,0.23,0.26]); }
-      if(d.id==='mini4'){ for(const s of [-1,1])                   // Sensoraugen
-        b.ellipsoid(0.009,0.008,0.006,[s*W*0.24,H*0.3,-L*0.46],8,5,[0.08,0.08,0.1]); }
-      if(d.id==='pro'){                                            // großer Dreifach-Kamera-Block
-        b.ellipsoid(W*0.34,H*0.5,L*0.18,[0,-H*0.28,-L*0.42],12,8,[0.14,0.14,0.16]);
-        for(const [ox,oy] of [[-0.012,0.012],[0.014,0.012],[0.001,-0.014]])
-          b.ellipsoid(0.008,0.008,0.005,[ox,-H*0.28+oy,-L*0.42-L*0.16],8,5,[0.35,0.37,0.42]);
-      } else gimbal(-H*0.62,-L*0.42,0.028+d.mass*0.02);
+      b.loft([
+        {z:-L*0.52,y:-H*0.08,w:W*0.14,h:H*0.16,e:2.2},
+        {z:-L*0.44,y:-H*0.02,w:W*0.62,h:H*0.62,e:2.5},
+        {z:-L*0.28,y:H*0.04,w:W*0.9,h:H*0.9,e:2.8},
+        {z:-L*0.02,y:H*0.07,w:W,h:H,e:3.0},
+        {z:L*0.26,y:H*0.03,w:W*0.94,h:H*0.9,e:2.8},
+        {z:L*0.44,y:-H*0.04,w:W*0.6,h:H*0.58,e:2.4},
+        {z:L*0.52,y:-H*0.1,w:W*0.12,h:H*0.12,e:2.2},
+      ],18,c1);
+      // Akku-Deckel hinten (dunkler Einsatz)
+      b.loft([
+        {z:L*0.18,y:H*0.32,w:W*0.62,h:H*0.34,e:2.6},
+        {z:L*0.42,y:H*0.22,w:W*0.5,h:H*0.3,e:2.4},
+        {z:L*0.5,y:H*0.12,w:W*0.1,h:H*0.1,e:2.2},
+      ],14,[c1[0]*0.72,c1[1]*0.72,c1[2]*0.74]);
+      if(d.id==='air')
+        b.loft([{z:-L*0.34,y:H*0.42,w:W*0.4,h:H*0.3,e:2.4},
+                {z:-L*0.1,y:H*0.5,w:W*0.56,h:H*0.42,e:2.6},
+                {z:L*0.12,y:H*0.44,w:W*0.5,h:H*0.36,e:2.4},
+                {z:L*0.24,y:H*0.3,w:W*0.12,h:H*0.1,e:2.2}],14,[0.5,0.51,0.54]);
+      if(d.id==='mini4'){ for(const s of [-1,1])
+        b.ellipsoid(0.009,0.008,0.006,[s*W*0.24,H*0.3,-L*0.44],8,5,[0.08,0.08,0.1]); }
+      if(d.id==='pro'){
+        b.loft([{z:-L*0.6,y:-H*0.24,w:W*0.2,h:H*0.24,e:2.4},
+                {z:-L*0.52,y:-H*0.26,w:W*0.62,h:H*0.9,e:3.2},
+                {z:-L*0.36,y:-H*0.24,w:W*0.66,h:H*0.95,e:3.2},
+                {z:-L*0.28,y:-H*0.2,w:W*0.2,h:H*0.3,e:2.4}],14,[0.13,0.13,0.15]);
+        for(const [ox,oy] of [[-0.013,0.012],[0.014,0.012],[0.001,-0.015]])
+          b.ellipsoid(0.008,0.008,0.004,[ox,-H*0.24+oy,-L*0.6],8,5,[0.35,0.37,0.42]);
+      } else gimbal(-H*0.6,-L*0.4,0.026+d.mass*0.02);
       for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
         const ax=sx*arm, az=sz*arm;
-        armTo(ax,az,0.014+d.mass*0.008,H*0.26,c1);
+        // konische Faltarme von der Rumpfschulter zum Motor
+        b.tube([sx*W*0.42,H*0.05,sz*L*0.3],[ax,pY-H*0.2,az],0.008+d.mass*0.004,0.006+d.mass*0.003,8,c1);
         motor(ax,az);
-        // Beinchen: Mini/Pro hinten, Air/Pro auch vorn
         if(sz>0||d.id==='air'||d.id==='pro')
-          b.box(0.012,H*0.8,0.016,[ax,pY-H*1.1,az],0,c1);
+          b.tube([ax,pY-H*0.2,az],[ax*1.02,pY-H*1.15,az*1.02],0.005+d.mass*0.002,0.004+d.mass*0.002,6,c1);
       }
       leds();
       bladeCol=d.id==='mini1'?[0.35,0.36,0.38]:d.id==='mini4'?[0.42,0.43,0.45]:[0.13,0.13,0.15];
@@ -698,29 +772,34 @@ function buildDroneMesh(d){
       break;
     }
     case 'classic': case 'legacy': {
-      // Klassiker-Silhouette: einteiliger Rumpf, feste Arme, Landekufen
+      // Klassiker: bauchige einteilige Schale, Rundarme, Kufen-Landegestell
       const c1=st.c1, red=[0.85,0.15,0.12];
-      b.ellipsoid(W*0.66,H*1.0,L*0.66,[0,H*0.05,0],20,11,c1);       // runder Rumpf
-      b.ellipsoid(W*0.3,H*0.65,L*0.3,[0,H*0.6,0],14,7,c1,0.5,1);    // Kuppel
+      b.loft([
+        {z:-L*0.52,y:0,w:W*0.2,h:H*0.3,e:2.4},
+        {z:-L*0.32,y:H*0.05,w:W*0.8,h:H*0.85,e:2.8},
+        {z:0,y:H*0.1,w:W*1.05,h:H,e:3.0},
+        {z:L*0.32,y:H*0.05,w:W*0.8,h:H*0.85,e:2.8},
+        {z:L*0.52,y:0,w:W*0.2,h:H*0.3,e:2.4},
+      ],20,c1);
+      b.ellipsoid(W*0.28,H*0.6,L*0.28,[0,H*0.55,0],14,7,c1,0.5,1);   // Kuppel
       for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
         const ax=sx*arm, az=sz*arm;
-        armTo(ax,az,0.042,H*0.4,c1,H*0.12);
-        motor(ax,az,d.id==='legacy'?silver:dark);
-        if(d.id==='legacy')                                        // rote Streifen
-          b.box(0.05,0.012,0.035,[ax*0.72,H*0.35,az*0.72],0,red);
+        b.tube([sx*W*0.4,H*0.25,sz*L*0.4],[ax,pY-H*0.2,az],0.02,0.013,10,c1);
+        motor(ax,az,d.id==='legacy'?silver:dark,0.015);
+        if(d.id==='legacy')
+          b.tube([ax*0.8,H*0.1,az*0.8],[ax*0.66,H*0.17,az*0.66],0.017,0.018,8,red);
       }
-      // Landekufen: 2 Bügel
-      const legH=d.id==='legacy'?H*2.4:H*2.0;
+      const legH=d.id==='legacy'?H*2.5:H*2.1;
       for(const s of [-1,1]){
-        for(const zz of [-L*0.28,L*0.28])
-          b.box(0.015,legH,0.015,[s*W*0.5,-legH/2-H*0.3,zz],0,c1);
-        b.box(0.016,0.015,L*0.85,[s*W*0.5,-legH-H*0.35,0],0,c1);
+        for(const zz of [-L*0.26,L*0.26])
+          b.tube([s*W*0.42,-H*0.2,zz],[s*W*0.52,-legH,zz],0.009,0.008,7,c1);
+        b.tube([s*W*0.52,-legH,-L*0.42],[s*W*0.52,-legH,L*0.42],0.01,0.01,7,c1);
       }
-      if(d.id==='classic') gimbal(-H*1.15,-L*0.05,0.05,[0.55,0.56,0.6]);
-      else{ // Action-Cam an Halterung, kein Gimbal
-        b.box(0.02,H*0.5,0.02,[0,-H*0.85,-L*0.22],0,silver);
-        b.box(0.05,0.045,0.055,[0,-H*1.25,-L*0.22],0,[0.45,0.46,0.5]);
-        b.box(0.02,0.02,0.01,[0,-H*1.25,-L*0.22-0.032],0,[0.06,0.06,0.08]);
+      if(d.id==='classic') gimbal(-H*1.05,-L*0.02,0.05,[0.5,0.51,0.55]);
+      else{
+        b.tube([0,-H*0.55,-L*0.24],[0,-H*1.15,-L*0.24],0.007,0.007,6,silver);
+        b.box(0.05,0.045,0.055,[0,-H*1.35,-L*0.24],0,[0.45,0.46,0.5]);
+        b.ellipsoid(0.012,0.012,0.006,[0,-H*1.35,-L*0.24-0.032],8,5,[0.06,0.06,0.08]);
       }
       leds();
       bladeCol=d.id==='legacy'?[0.85,0.85,0.88]:[0.1,0.1,0.12];
@@ -728,79 +807,103 @@ function buildDroneMesh(d){
       break;
     }
     case 'cine': {
-      // Cinema-Drohne: flacher Rumpf, Karbon-Ausleger, Füße an den Motoren, Gimbal mit Objektiv
-      const c1=st.c1, carbon=[0.15,0.15,0.17];
-      b.ellipsoid(W*0.78,H*0.9,L*0.58,[0,H*0.1,0],18,10,c1);       // runder Rumpf
-      b.ellipsoid(W*0.5,H*0.6,L*0.22,[0,H*0.45,-L*0.32],14,8,c1);  // erhöhte Nase
-      b.ellipsoid(0.016,0.014,0.016,[0,H*0.85,-L*0.36],8,5,dark);  // FPV-Kamera oben
-      b.ellipsoid(W*0.42,H*0.42,L*0.22,[0,H*0.3,L*0.28],12,8,carbon); // Akkus hinten
+      // Cinema-Drohne: schlanker gelofteter Rumpf, Karbon-Röhren, Füße an den Motoren
+      const c1=st.c1, carbon=[0.14,0.14,0.16];
+      b.loft([
+        {z:-L*0.52,y:H*0.55,w:W*0.16,h:H*0.2,e:2.4},
+        {z:-L*0.38,y:H*0.4,w:W*0.6,h:H*0.8,e:2.8},
+        {z:-L*0.16,y:H*0.15,w:W*0.95,h:H*1.05,e:3.0},
+        {z:L*0.12,y:H*0.05,w:W,h:H,e:3.0},
+        {z:L*0.36,y:H*0.1,w:W*0.7,h:H*0.7,e:2.6},
+        {z:L*0.52,y:H*0.22,w:W*0.14,h:H*0.16,e:2.2},
+      ],18,c1);
+      b.ellipsoid(0.015,0.013,0.015,[0,H*0.95,-L*0.42],8,5,dark);   // FPV-Kamera
       for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
         const ax=sx*arm, az=sz*arm;
-        armTo(ax,az,0.042,0.036,carbon,pY-0.02);
-        motor(ax,az,carbon,0.026,0.05);
-        b.box(0.045,H*2.4,0.05,[ax*1.06,pY-H*1.6,az*1.06],0,carbon); // Landefüße
-        b.box(0.085,0.028,0.14,[ax*1.06,pY-H*2.85,az*1.06],0,dark);
+        b.tube([sx*W*0.45,H*0.35,sz*L*0.2],[ax,pY-0.01,az],0.017,0.014,10,carbon);
+        motor(ax,az,carbon,0.024);
+        b.tube([ax,pY-0.02,az],[ax*1.12,pY-H*2.7,az*1.12],0.014,0.01,8,carbon);
+        b.ellipsoid(0.05,0.016,0.075,[ax*1.12,pY-H*2.75,az*1.12],10,5,dark);
       }
-      // Gimbal mit Zylinder-Objektiv unter dem Rumpf
-      b.ellipsoid(0.065,0.055,0.055,[0,-H*1.5,L*0.1],14,8,dark);
-      b.ellipsoid(0.036,0.036,0.07,[0,-H*1.55,L*0.1-0.1],12,8,silver);
-      b.ellipsoid(0.026,0.026,0.012,[0,-H*1.55,L*0.1-0.17],10,6,[0.05,0.05,0.09]);
+      b.ellipsoid(0.065,0.055,0.055,[0,-H*1.1,L*0.05],14,9,dark);
+      b.ellipsoid(0.036,0.036,0.07,[0,-H*1.15,L*0.05-0.1],12,8,silver);
+      b.ellipsoid(0.026,0.026,0.012,[0,-H*1.15,L*0.05-0.17],10,6,[0.05,0.05,0.09]);
       leds();
       bladeCol=[0.35,0.36,0.38]; hubCol=carbon;
       break;
     }
     case 'whoop': {
-      // Cinewhoop: 4 runde Ducts, grauer Rahmen, Akku längs oben
+      // Cinewhoop: 4 Ducts, gerundeter Rahmenkern, Akku längs oben
       const frame=[0.62,0.63,0.67], duct=[0.19,0.19,0.22];
-      b.ellipsoid(W*0.55,H*0.42,L*0.58,[0,0,0],14,8,frame);          // runder Rahmenkern
-      b.ellipsoid(W*0.34,H*0.5,L*0.6,[0,H*0.65,L*0.02],12,8,[0.08,0.08,0.1]); // Akku
-      b.ellipsoid(W*0.26,H*0.32,0.014,[0,H*0.1,-L/2-0.006],10,6,duct); // Kamera-Front
-      b.ellipsoid(0.009,0.009,0.005,[0,H*0.1,-L/2-0.018],8,5,[0.04,0.05,0.1]);
-      b.box(0.012,H*0.9,L*0.3,[0,-H*0.8,L*0.3],0,duct);              // Finne
+      b.loft([
+        {z:-L*0.55,y:0,w:W*0.3,h:H*0.4,e:2.6},
+        {z:-L*0.2,y:0,w:W*0.95,h:H*0.7,e:3.0},
+        {z:L*0.25,y:0,w:W*0.9,h:H*0.65,e:3.0},
+        {z:L*0.55,y:0,w:W*0.25,h:H*0.3,e:2.4},
+      ],14,frame);
+      b.loft([
+        {z:-L*0.35,y:H*0.7,w:W*0.55,h:H*0.6,e:3.2},
+        {z:L*0.5,y:H*0.7,w:W*0.6,h:H*0.7,e:3.2},
+        {z:L*0.62,y:H*0.6,w:W*0.15,h:H*0.2,e:2.4},
+      ],12,[0.08,0.08,0.1]);
+      b.ellipsoid(W*0.24,H*0.3,0.012,[0,H*0.15,-L*0.52],10,6,duct);
+      b.ellipsoid(0.009,0.009,0.005,[0,H*0.15,-L*0.55],8,5,[0.04,0.05,0.1]);
       for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
         const ax=sx*arm, az=sz*arm;
-        armTo(ax,az,0.03,0.014,duct,pY-0.01);
-        motor(ax,az,duct,0.011,0.016);
-        b.cyl(d.propR*1.32,d.propR*1.32,0.035,[ax,pY-0.017,az],14,duct,false);
-        b.cyl(d.propR*1.16,d.propR*1.16,0.035,[ax,pY-0.017,az],14,duct,false);
+        motor(ax,az,duct,0.009);
+        b.cyl(d.propR*1.32,d.propR*1.32,0.035,[ax,pY-0.017,az],16,duct,false);
+        b.cyl(d.propR*1.18,d.propR*1.18,0.035,[ax,pY-0.017,az],16,duct,false);
       }
       bladeCol=[0.78,0.79,0.82]; hubCol=frame;
       break;
     }
     case 'hyfpv': {
-      // Buckliger FPV-Rumpf mit Kamera-Kopf, rote Akzente
+      // FPV-Drohne: bucklige geloftete Silhouette mit Kamera-Kopf, rote Akzente
       const c1=[0.26,0.27,0.3], red=[0.85,0.12,0.12];
-      b.ellipsoid(W*0.55,H*0.4,L*0.55,[0,-H*0.15,0],14,8,c1);       // Basis
-      b.ellipsoid(W*0.48,H*0.6,L*0.44,[0,H*0.3,L*0.08],16,10,c1);   // Buckel
-      b.ellipsoid(W*0.3,H*0.42,L*0.18,[0,H*0.32,-L*0.4],12,8,c1);   // Kopf
-      b.ellipsoid(0.013,0.012,0.008,[0,H*0.38,-L*0.52],8,5,[0.05,0.05,0.08]); // Kamera
+      b.loft([
+        {z:-L*0.55,y:H*0.28,w:W*0.24,h:H*0.3,e:2.4},
+        {z:-L*0.4,y:H*0.3,w:W*0.68,h:H*0.75,e:2.8},
+        {z:-L*0.15,y:H*0.32,w:W,h:H*1.1,e:3.0},
+        {z:L*0.15,y:H*0.24,w:W*0.95,h:H*0.95,e:2.8},
+        {z:L*0.42,y:H*0.1,w:W*0.55,h:H*0.5,e:2.4},
+        {z:L*0.55,y:H*0.05,w:W*0.12,h:H*0.12,e:2.2},
+      ],16,c1);
+      b.loft([{z:-L*0.5,y:-H*0.15,w:W*0.8,h:H*0.35,e:3.0},
+              {z:L*0.4,y:-H*0.15,w:W*0.85,h:H*0.4,e:3.0},
+              {z:L*0.5,y:-H*0.12,w:W*0.2,h:H*0.15,e:2.2}],12,[0.18,0.19,0.21]);
+      b.ellipsoid(0.014,0.013,0.008,[0,H*0.32,-L*0.57],8,5,[0.05,0.05,0.08]);
       for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
         const ax=sx*arm, az=sz*arm;
-        armTo(ax,az,0.028,H*0.22,c1);
+        b.tube([sx*W*0.42,-H*0.1,sz*L*0.32],[ax,pY-H*0.25,az],0.009,0.007,8,c1);
         motor(ax,az);
-        b.box(0.022,0.01,0.022,[ax,pY-H*0.5,az],0,red);            // rote Akzente
+        b.ellipsoid(0.011,0.005,0.011,[ax,pY-H*0.52,az],8,4,red);
       }
-      b.cyl(0.004,0.004,0.08,[0,H*0.9,L*0.4],5,[0.8,0.8,0.82]);
+      b.tube([0,H*0.8,L*0.4],[0,H*0.8+0.07,L*0.44],0.003,0.003,5,[0.8,0.8,0.82]);
       leds();
       bladeCol=[0.18,0.19,0.21]; tipCol=red; hubCol=red;
       break;
     }
     default: {
-      // Race-Quads: Karbon-Platten, Standoffs, farbige Canopy, Antenne
+      // Race-Quads: Karbon-Platten (die sind real flach!), geloftete Canopy, Antenne
       const carbon=[0.11,0.11,0.13];
-      b.box(W+0.02,0.006,L*1.1,[0,-H*0.3,0],0,carbon);             // Bottom-Plate
-      b.box(W,0.006,L*0.85,[0,H*0.55,0],0,carbon);                 // Top-Plate
+      b.box(W+0.02,0.006,L*1.1,[0,-H*0.3,0],0,carbon);
+      b.box(W,0.006,L*0.85,[0,H*0.55,0],0,carbon);
       for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
         const ax=sx*arm, az=sz*arm;
-        armTo(ax,az,0.026,0.007,carbon,-H*0.3);
-        motor(ax,az,carbon,0.011,0.018);
-        b.cyl(0.0035,0.0035,H*0.85,[sx*W*0.4,-H*0.3,sz*L*0.35],5,silver); // Standoffs
+        b.box(0.026,0.007,Math.hypot(ax,az),[ax/2,-H*0.3,az/2],Math.atan2(-ax,az),carbon);
+        motor(ax,az,carbon,0.009);
+        b.tube([sx*W*0.4,-H*0.3,sz*L*0.35],[sx*W*0.4,H*0.55,sz*L*0.35],0.0032,0.0032,6,silver);
       }
-      b.ellipsoid(W*0.55,H*0.75,L*0.42,[0,H*0.6,L*0.05],14,7,st.c2,0.42,1); // runde Canopy
-      b.ellipsoid(W*0.25,W*0.25,0.008,[0,H*0.75,-L*0.48],8,5,[0.05,0.05,0.08]); // Kamera
+      b.loft([
+        {z:-L*0.5,y:H*0.55,w:W*0.5,h:H*0.35,e:2.6},
+        {z:-L*0.2,y:H*0.75,w:W*0.95,h:H*0.8,e:2.8},
+        {z:L*0.25,y:H*0.8,w:W*0.9,h:H*0.85,e:2.8},
+        {z:L*0.5,y:H*0.6,w:W*0.3,h:H*0.3,e:2.4},
+      ],14,st.c2);
+      b.ellipsoid(W*0.24,W*0.24,0.008,[0,H*0.6,-L*0.52],8,5,[0.05,0.05,0.08]);
       const antH=L*0.5;
-      b.cyl(W*0.07,W*0.07,antH,[0,H*1.05,L*0.42],5,st.c2);
-      b.box(W*0.2,W*0.28,W*0.2,[0,H*1.05+antH,L*0.42],0,st.c2);
+      b.tube([0,H*1.0,L*0.42],[0,H*1.0+antH,L*0.44],W*0.06,W*0.05,6,st.c2);
+      b.ellipsoid(W*0.14,W*0.18,W*0.14,[0,H*1.0+antH,L*0.44],8,5,st.c2);
       bladeCol=st.c2; hubCol=carbon;
       break;
     }
@@ -812,7 +915,7 @@ function buildDroneMesh(d){
       if(tipCol)for(const s of [-1,1])
         pb.box(d.propR*0.42,0.0065,d.propR*0.17,[Math.cos(a)*s*d.propR*0.79,0,-Math.sin(a)*s*d.propR*0.79],a,tipCol);
     }
-    pb.box(d.propR*0.28,0.01,d.propR*0.28,[0,0,0],0,hubCol);
+    pb.ellipsoid(d.propR*0.16,0.008,d.propR*0.16,[0,0,0],8,5,hubCol);
   });
   const disc=mesh(pb=>{ pb.cyl(d.propR,d.propR,0.004,[0,0,0],16,bladeCol); });
   return {body,prop,disc,propY:pY};
@@ -2000,12 +2103,12 @@ function render(){
   if(cam.name!=='FPV'&&!DR.crashed){
     const DM=DRONE_MESH[d.id];
     const bodyM=M4.fromQuatPos(DR.q,DR.pos);
-    drawMesh(DM.body,bodyM);
+    drawMesh(DM.body,bodyM,[1,1,1],1,0.55);
     const MOT=[[1,-1],[1,1],[-1,1],[-1,-1]];
     for(let i=0;i<4;i++){
       const [sx,sz]=MOT[i];
       const pm=M4.mul(bodyM,M4.mul(M4.translate(sx*d.arm,DM.propY,sz*d.arm),M4.rotY(DR.propAng[i])));
-      drawMesh(DM.prop,pm,[1,1,1],DR.motors[i]>0.35?0.55:1);
+      drawMesh(DM.prop,pm,[1,1,1],DR.motors[i]>0.35?0.55:1,0.4);
       if(DR.motors[i]>0.25){
         gl.depthMask(false);
         drawMesh(DM.disc,pm,d.style.c2,0.18+DR.motors[i]*0.15);
