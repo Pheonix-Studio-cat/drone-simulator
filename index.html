@@ -108,6 +108,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <div class="grid" id="missionGrid"></div>
   <h2>Wind</h2>
   <div class="rowbtns" id="windRow"></div>
+  <h2>Grafik</h2>
+  <div class="rowbtns" id="gfxRow"></div>
   <h2>Steuerempfindlichkeit</h2>
   <div class="rowbtns" id="sensRow"></div>
   <h2>Foto-Galerie</h2>
@@ -934,8 +936,202 @@ function buildDroneMesh(d){
   const disc=mesh(pb=>{ pb.cyl(d.propR,d.propR,0.004,[0,0,0],16,bladeCol); });
   return {body,prop,disc,propY:pY};
 }
-const DRONE_MESH={};
-for(const d of DRONES) DRONE_MESH[d.id]=buildDroneMesh(d);
+/* --- Blockige (Retro-)Variante der Drohnen-Meshes --- */
+function buildDroneMeshBlocky(d){
+  const st=d.style, L=st.bodyL, W=st.bodyW, H=st.bodyH, arm=d.arm;
+  const dark=[0.1,0.1,0.12], silver=[0.72,0.73,0.76];
+  const pY=st.propY!==undefined?st.propY:H*0.42;
+  const b=new Builder();
+  const armTo=(x,z,w,t,col,y=0)=>{ const len=Math.hypot(x,z);
+    b.box(w,t,len,[x/2,y,z/2],Math.atan2(-x,z),col); };
+  const motor=(x,z,col=dark,r=0.013+d.mass*0.0035,h=Math.max(H*0.45,0.018))=>{
+    b.cyl(r,r*0.9,h,[x,pY-h,z],8,col);
+    b.cyl(r*0.9,r*0.5,h*0.28,[x,pY-h*0.1,z],8,silver);
+  };
+  const gimbal=(y,z,s,col=[0.09,0.09,0.11])=>{
+    b.box(s*0.4,s*0.75,s*0.35,[0,y+s*0.35,z],0,[0.2,0.2,0.22]);   // Aufhängung
+    b.box(s,s*0.8,s*0.8,[0,y,z],0,col);
+    b.box(s*0.5,s*0.5,0.012,[0,y,z-s*0.42],0,[0.04,0.05,0.1]);    // Linse
+  };
+  const leds=()=>{ for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]])
+    b.box(0.013,0.013,0.013,[sx*arm,pY-H*0.6,sz*arm],0,sz<0?[0.2,1,0.3]:[1,0.2,0.2]); };
+  let bladeCol=[0.16,0.17,0.19], tipCol=null, hubCol=st.c2;
+
+  switch(d.id){
+    case 'mini1': case 'mini4': case 'air': case 'pro': {
+      // Faltdrohnen-Familie: Keil-Rumpf, Gimbal vorn, schlanke Arme
+      const c1=st.c1;
+      b.box(W,H,L,[0,0,0],0,c1);
+      b.box(W*0.86,H*0.4,L*0.72,[0,H*0.6,L*0.06],0,c1);           // Rücken
+      b.box(W*0.8,H*0.5,L*0.22,[0,-H*0.1,-L*0.44],0,c1);          // Nase
+      b.box(W*0.55,H*0.35,L*0.3,[0,-H*0.2,L*0.5],0,[0.3,0.31,0.34]); // Akku/Heck
+      if(d.id==='air'){ b.box(W*0.7,H*0.35,L*0.45,[0,H*0.75,L*0.18],0,[0.5,0.51,0.54]);
+        b.box(W*0.5,H*0.2,L*0.25,[0,H*0.55,-L*0.3],0,[0.22,0.23,0.26]); }
+      if(d.id==='mini4'){ for(const s of [-1,1])                   // Sensoraugen
+        b.box(0.018,0.014,0.012,[s*W*0.26,H*0.32,-L*0.48],0,[0.08,0.08,0.1]); }
+      if(d.id==='pro'){                                            // großer Dreifach-Kamera-Block
+        b.box(W*0.62,H*0.95,L*0.3,[0,-H*0.3,-L*0.42],0,[0.14,0.14,0.16]);
+        b.box(W*0.5,H*0.75,0.012,[0,-H*0.3,-L*0.42-L*0.15-0.005],0,[0.07,0.07,0.09]);
+        for(const [ox,oy] of [[-0.012,0.012],[0.014,0.012],[0.001,-0.014]])
+          b.box(0.014,0.014,0.008,[ox,-H*0.3+oy,-L*0.42-L*0.15-0.012],0,[0.35,0.37,0.42]);
+      } else gimbal(-H*0.62,-L*0.42,0.028+d.mass*0.02);
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        armTo(ax,az,0.014+d.mass*0.008,H*0.26,c1);
+        motor(ax,az);
+        // Beinchen: Mini/Pro hinten, Air/Pro auch vorn
+        if(sz>0||d.id==='air'||d.id==='pro')
+          b.box(0.012,H*0.8,0.016,[ax,pY-H*1.1,az],0,c1);
+      }
+      leds();
+      bladeCol=d.id==='mini1'?[0.35,0.36,0.38]:d.id==='mini4'?[0.42,0.43,0.45]:[0.13,0.13,0.15];
+      tipCol=d.id==='mini4'?[1,0.75,0.25]:[1,0.55,0.15];
+      break;
+    }
+    case 'classic': case 'legacy': {
+      // Klassiker-Silhouette: einteiliger Rumpf, feste Arme, Landekufen
+      const c1=st.c1, red=[0.85,0.15,0.12];
+      b.box(W*0.9,H,L*0.9,[0,0,0],0,c1);                            // massiver Rumpf
+      b.box(W*0.68,H*0.45,L*0.68,[0,H*0.65,0],0,c1);
+      b.cyl(W*0.26,W*0.17,H*0.55,[0,H*0.8,0],10,c1);                // Kuppel
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        armTo(ax,az,0.052,H*0.62,c1,H*0.1);
+        motor(ax,az,d.id==='legacy'?silver:dark);
+        if(d.id==='legacy')                                        // rote Streifen
+          b.box(0.05,0.012,0.035,[ax*0.72,H*0.35,az*0.72],0,red);
+      }
+      // Landekufen: 2 Bügel
+      const legH=d.id==='legacy'?H*2.4:H*2.0;
+      for(const s of [-1,1]){
+        for(const zz of [-L*0.28,L*0.28])
+          b.box(0.015,legH,0.015,[s*W*0.5,-legH/2-H*0.3,zz],0,c1);
+        b.box(0.016,0.015,L*0.85,[s*W*0.5,-legH-H*0.35,0],0,c1);
+      }
+      if(d.id==='classic') gimbal(-H*1.15,-L*0.05,0.05,[0.55,0.56,0.6]);
+      else{ // Action-Cam an Halterung, kein Gimbal
+        b.box(0.02,H*0.5,0.02,[0,-H*0.85,-L*0.22],0,silver);
+        b.box(0.05,0.045,0.055,[0,-H*1.25,-L*0.22],0,[0.45,0.46,0.5]);
+        b.box(0.02,0.02,0.01,[0,-H*1.25,-L*0.22-0.032],0,[0.06,0.06,0.08]);
+      }
+      leds();
+      bladeCol=d.id==='legacy'?[0.85,0.85,0.88]:[0.1,0.1,0.12];
+      hubCol=d.id==='legacy'?silver:[0.2,0.2,0.22];
+      break;
+    }
+    case 'cine': {
+      // Cinema-Drohne: flacher Rumpf, Karbon-Ausleger, Füße an den Motoren, Gimbal mit Objektiv
+      const c1=st.c1, carbon=[0.15,0.15,0.17];
+      b.box(W,H,L,[0,0,0],0,c1);
+      b.box(W*0.72,H*0.55,L*0.25,[0,H*0.55,-L*0.34],0,c1);         // erhöhte Nase
+      b.box(0.03,0.025,0.03,[0,H*0.9,-L*0.4],0,dark);              // FPV-Kamera oben
+      b.box(W*0.8,H*0.5,L*0.3,[0,H*0.4,L*0.3],0,carbon);           // Akkus hinten
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        armTo(ax,az,0.042,0.036,carbon,pY-0.02);
+        motor(ax,az,carbon,0.026,0.05);
+        b.box(0.045,H*2.4,0.05,[ax*1.06,pY-H*1.6,az*1.06],0,carbon); // Landefüße
+        b.box(0.085,0.028,0.14,[ax*1.06,pY-H*2.85,az*1.06],0,dark);
+      }
+      // Gimbal mit Zylinder-Objektiv unter dem Rumpf
+      b.box(0.13,0.11,0.11,[0,-H*1.5,L*0.1],0,dark);
+      b.cyl(0.038,0.038,0.1,[0,-H*1.5-0.05,L*0.1-0.11],8,silver,true);
+      b.box(0.05,0.05,0.01,[0,-H*1.5,L*0.1-0.17],0,[0.05,0.05,0.09]);
+      leds();
+      bladeCol=[0.35,0.36,0.38]; hubCol=carbon;
+      break;
+    }
+    case 'whoop': {
+      // Cinewhoop: 4 runde Ducts, grauer Rahmen, Akku längs oben
+      const frame=[0.62,0.63,0.67], duct=[0.19,0.19,0.22];
+      b.box(W,H*0.6,L,[0,0,0],0,frame);
+      b.box(W*0.62,H*0.75,L*1.1,[0,H*0.75,L*0.05],0,[0.08,0.08,0.1]); // Akku
+      b.box(W*0.5,H*0.55,0.02,[0,H*0.1,-L/2-0.008],0,duct);          // Kamera-Front
+      b.box(0.016,0.016,0.008,[0,H*0.1,-L/2-0.02],0,[0.04,0.05,0.1]);
+      b.box(0.012,H*0.9,L*0.3,[0,-H*0.8,L*0.3],0,duct);              // Finne
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        armTo(ax,az,0.03,0.014,duct,pY-0.01);
+        motor(ax,az,duct,0.011,0.016);
+        b.cyl(d.propR*1.32,d.propR*1.32,0.035,[ax,pY-0.017,az],14,duct,false);
+        b.cyl(d.propR*1.16,d.propR*1.16,0.035,[ax,pY-0.017,az],14,duct,false);
+      }
+      bladeCol=[0.78,0.79,0.82]; hubCol=frame;
+      break;
+    }
+    case 'hyfpv': {
+      // Buckliger FPV-Rumpf mit Kamera-Kopf, rote Akzente
+      const c1=[0.26,0.27,0.3], red=[0.85,0.12,0.12];
+      b.box(W,H*0.5,L,[0,-H*0.2,0],0,c1);
+      b.box(W*0.88,H*0.7,L*0.75,[0,H*0.3,L*0.05],0,c1);            // Buckel
+      b.box(W*0.6,H*0.5,L*0.4,[0,H*0.72,L*0.12],0,c1);
+      b.box(W*0.5,H*0.65,L*0.22,[0,H*0.35,-L*0.42],0,c1);          // Kopf
+      b.box(0.024,0.022,0.014,[0,H*0.4,-L*0.54],0,[0.05,0.05,0.08]); // Kamera
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        armTo(ax,az,0.028,H*0.22,c1);
+        motor(ax,az);
+        b.box(0.022,0.01,0.022,[ax,pY-H*0.5,az],0,red);            // rote Akzente
+      }
+      b.cyl(0.004,0.004,0.08,[0,H*0.9,L*0.4],5,[0.8,0.8,0.82]);
+      leds();
+      bladeCol=[0.18,0.19,0.21]; tipCol=red; hubCol=red;
+      break;
+    }
+    default: {
+      // Race-Quads: Karbon-Platten, Standoffs, farbige Canopy, Antenne
+      const carbon=[0.11,0.11,0.13];
+      b.box(W+0.02,0.006,L*1.1,[0,-H*0.3,0],0,carbon);             // Bottom-Plate
+      b.box(W,0.006,L*0.85,[0,H*0.55,0],0,carbon);                 // Top-Plate
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        armTo(ax,az,0.026,0.007,carbon,-H*0.3);
+        motor(ax,az,carbon,0.011,0.018);
+        b.cyl(0.0035,0.0035,H*0.85,[sx*W*0.4,-H*0.3,sz*L*0.35],5,silver); // Standoffs
+      }
+      b.box(W*0.9,H*0.55,L*0.6,[0,H*0.85,L*0.08],0,st.c2);         // Canopy
+      b.box(W*0.7,H*0.35,L*0.3,[0,H*1.1,-L*0.12],0,st.c2);
+      b.box(W*0.45,W*0.45,0.012,[0,H*0.75,-L*0.5],0,[0.05,0.05,0.08]); // Kamera
+      const antH=L*0.5;
+      b.cyl(W*0.07,W*0.07,antH,[0,H*1.05,L*0.42],5,st.c2);
+      b.box(W*0.2,W*0.28,W*0.2,[0,H*1.05+antH,L*0.42],0,st.c2);
+      bladeCol=st.c2; hubCol=carbon;
+      break;
+    }
+  }
+  const body=b.build();
+  const prop=mesh(pb=>{
+    for(const a of [0,Math.PI/2]){
+      pb.box(d.propR*1.5,0.006,d.propR*0.16,[0,0,0],a,bladeCol);
+      if(tipCol)for(const s of [-1,1])
+        pb.box(d.propR*0.42,0.0065,d.propR*0.17,[Math.cos(a)*s*d.propR*0.79,0,-Math.sin(a)*s*d.propR*0.79],a,tipCol);
+    }
+    pb.box(d.propR*0.28,0.01,d.propR*0.28,[0,0,0],0,hubCol);
+  });
+  const disc=mesh(pb=>{ pb.cyl(d.propR,d.propR,0.004,[0,0,0],16,bladeCol); });
+  return {body,prop,disc,propY:pY};
+}
+
+/* --- Grafik-Modus: 'real' (geloftet) oder 'blocky' (Retro) --- */
+let GFX = (function(){ try{ return localStorage.getItem('ds_gfx')||'real'; }catch(e){ return 'real'; } })();
+let DRONE_MESH={};
+function rebuildDroneMeshes(){
+  // alte GL-Buffer freigeben
+  for(const id in DRONE_MESH){ const m=DRONE_MESH[id];
+    for(const part of ['body','prop','disc']) if(m[part]){
+      gl.deleteBuffer(m[part].vb); gl.deleteBuffer(m[part].nb); gl.deleteBuffer(m[part].cb);
+    }
+  }
+  DRONE_MESH={};
+  const fn = GFX==='blocky' ? buildDroneMeshBlocky : buildDroneMesh;
+  for(const d of DRONES) DRONE_MESH[d.id]=fn(d);
+}
+function setGfx(mode){
+  GFX = (mode==='blocky')?'blocky':'real';
+  try{ localStorage.setItem('ds_gfx',GFX); }catch(e){}
+  rebuildDroneMeshes();
+}
+rebuildDroneMeshes();
 
 /* ---------------- Karten: Terrain & Szenengeneratoren ---------------- */
 let SCENE=null;
@@ -2117,12 +2313,13 @@ function render(){
   if(cam.name!=='FPV'&&!DR.crashed){
     const DM=DRONE_MESH[d.id];
     const bodyM=M4.fromQuatPos(DR.q,DR.pos);
-    drawMesh(DM.body,bodyM,[1,1,1],1,0.55);
+    const bodySpec=GFX==='blocky'?0.1:0.55, propSpec=GFX==='blocky'?0.08:0.4;
+    drawMesh(DM.body,bodyM,[1,1,1],1,bodySpec);
     const MOT=[[1,-1],[1,1],[-1,1],[-1,-1]];
     for(let i=0;i<4;i++){
       const [sx,sz]=MOT[i];
       const pm=M4.mul(bodyM,M4.mul(M4.translate(sx*d.arm,DM.propY,sz*d.arm),M4.rotY(DR.propAng[i])));
-      drawMesh(DM.prop,pm,[1,1,1],DR.motors[i]>0.35?0.55:1,0.4);
+      drawMesh(DM.prop,pm,[1,1,1],DR.motors[i]>0.35?0.55:1,propSpec);
       if(DR.motors[i]>0.25){
         gl.depthMask(false);
         drawMesh(DM.disc,pm,d.style.c2,0.18+DR.motors[i]*0.15);
@@ -2390,6 +2587,15 @@ function buildMenu(){
     b.onclick=()=>{APP.windLevel=i;buildMenu();};
     wr.appendChild(b);
   });
+  const gr=$('gfxRow');
+  gr.innerHTML='';
+  for(const [mode,label] of [['real','✨ Realistisch'],['blocky','🧱 Blockig (Retro)']]){
+    const b=document.createElement('button');
+    b.textContent=label;
+    if(mode===GFX)b.className='sel';
+    b.onclick=()=>{setGfx(mode);buildMenu();};
+    gr.appendChild(b);
+  }
   const sr=$('sensRow');
   sr.innerHTML='';
   for(const s of Object.keys(SENS_LEVELS)){
@@ -2513,6 +2719,9 @@ window.T={
   get PHOTOS(){return PHOTOS;},
   rescue:startRescue,
   photo:takePhoto,
+  setGfx,
+  get gfx(){return GFX;},
+  meshTris(id){const m=DRONE_MESH[id];return m?m.body.n:0;},
   start(droneId,missionId,mapId){
     if(droneId)APP.model=DRONES.find(d=>d.id===droneId)||APP.model;
     if(missionId)APP.missionId=missionId;
