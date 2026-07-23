@@ -42,6 +42,9 @@ Bei einem Absturz zerlegt sich die Drohne in Einzelteile (Propeller, Arme, Akku,
 ### Foto-Modus
 Foto-Button 📷 (Taste `F`): Schnappschüsse landen in einer **Galerie** im Menü (mit Download). Die Foto-Mission speichert ihre Bilder ebenfalls dort.
 
+### Grafik-Umschalter
+Im Menü zwischen **✨ Realistisch** (glatte, produktnahe Rümpfe mit Glanzlicht) und **🧱 Blockig (Retro)** wählen. Die Auswahl wird gespeichert.
+
 ### Steuerempfindlichkeit
 Drei Stufen (Langsam/Normal/Schnell) – wie die Cine-/Normal-/Sport-Modi echter Drohnen. Auf Touch-Geräten (iPad/Smartphone) startet der Simulator automatisch auf **Langsam**.
 
