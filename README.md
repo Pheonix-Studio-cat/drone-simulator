@@ -26,12 +26,13 @@ Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffn
 ### 12 Drohnenmodelle
 Von der winzigen Tiny-Whoop-Klasse (**Typhoon20**) über die 249-g-Ultraleichtdrohne und klassische/professionelle Kameradrohnen bis zu Cinewhoop und 5-Zoll-Racer – jedes Modell mit eigenen, realen Vorbildern nachempfundenen Kennwerten. Die Modelle sind zudem **unterschiedlich stabil**: leichte, agile Drohnen (Whoops, Micros) tanzen im Wind spürbar, schwere Kameraplattformen liegen wie festgenagelt in der Luft.
 
-### 🌍 7 echte Orte (reale Geodaten)
+### 🌍 8 echte Orte (reale Geodaten)
 Karten aus **echten Geländedaten** dieser Welt – kein erfundenes Terrain:
 
 | Karte | Was dich erwartet |
 |---|---|
 | 🇨🇭 **Zürich** | Echte Innenstadt mit ~2600 realen Gebäudegrundrissen und Höhen, Limmat und Seebecken |
+| 🏞️ **Glarus · Klöntal** | 17,5 km Glarnerland: Start am Klöntalersee (838 m, 4,3 km lang), dahinter Glärnisch (2910 m), Fronalpstock und Wiggis-Kette, dazu Glarus und Netstal im Linthtal mit echten Gebäuden |
 | 🏔️ **Matterhorn** | Das echte Massiv über Zermatt, Start am Schwarzsee auf 2568 m |
 | 🪂 **Lauterbrunnental** | Echtes Trogtal mit fast senkrechten Wänden – der Proximity-Spot |
 | 🗻 **Mount Everest** | Start am Basislager auf 5304 m, Gipfelregion bis 8748 m |
