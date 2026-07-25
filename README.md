@@ -26,7 +26,26 @@ Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffn
 ### 12 Drohnenmodelle
 Von der winzigen Tiny-Whoop-Klasse (**Typhoon20**) über die 249-g-Ultraleichtdrohne und klassische/professionelle Kameradrohnen bis zu Cinewhoop und 5-Zoll-Racer – jedes Modell mit eigenen, realen Vorbildern nachempfundenen Kennwerten. Die Modelle sind zudem **unterschiedlich stabil**: leichte, agile Drohnen (Whoops, Micros) tanzen im Wind spürbar, schwere Kameraplattformen liegen wie festgenagelt in der Luft.
 
-### 6 Karten mit echtem Höhen-Terrain
+### 🌍 7 echte Orte (reale Geodaten)
+Karten aus **echten Geländedaten** dieser Welt – kein erfundenes Terrain:
+
+| Karte | Was dich erwartet |
+|---|---|
+| 🇨🇭 **Zürich** | Echte Innenstadt mit ~2600 realen Gebäudegrundrissen und Höhen, Limmat und Seebecken |
+| 🏔️ **Matterhorn** | Das echte Massiv über Zermatt, Start am Schwarzsee auf 2568 m |
+| 🪂 **Lauterbrunnental** | Echtes Trogtal mit fast senkrechten Wänden – der Proximity-Spot |
+| 🗻 **Mount Everest** | Start am Basislager auf 5304 m, Gipfelregion bis 8748 m |
+| 🏜️ **Grand Canyon** | South Rim mit ~1400 m senkrechtem Abbruch zum Colorado |
+| 🌋 **Island** | Isländisches Hochland mit Vulkankegeln |
+| 🇳🇴 **Geirangerfjord** | Steilwände fallen über 1600 m direkt ins Meer |
+
+Dazu **dünne Luft nach echter Höhenformel**: auf dem Everest liefert dieselbe Drohne nur noch rund die Hälfte des Schubs und steigt merklich zäher – wie in echt.
+
+**🌍 Beliebigen Ort laden (Alpha):** Koordinaten ins Menü eingeben und das Geländeprofil wird live aus offenen Höhendaten geholt (nur Gelände, keine Gebäude; braucht Internet).
+
+**Datenquellen:** Geländehöhen aus offenen Terrain-Tiles (SRTM u. a.), Gebäudegrundrisse © **Overture Maps / OpenStreetMap-Mitwirkende** (ODbL). Bewusst **keine** Satellitenbilder – die sind proprietär; der Boden wird stattdessen aus echter Höhe, Hangneigung und Wasserlinie eingefärbt.
+
+### 6 erfundene Karten mit prozeduralem Terrain
 - 🌳 **Standard** – Wiesen, Wälder, sanfte Hügel
 - 🏚️ **Lostplace** – verlassenes Industriegelände mit 60-m-Schornstein, offener Halle und Bürogerippe (perfekt für FPV-Dives)
 - 🧊 **Antarktis** – Eiswüste mit Forschungsstation
