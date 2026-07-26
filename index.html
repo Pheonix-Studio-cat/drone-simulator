@@ -244,6 +244,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
       <input id="eName" maxlength="24" placeholder="Name deiner Drohne">
       <button id="eSaveBtn">💾 Speichern</button>
     </div>
+    <div style="display:none">
+      <h3>🥚 Gefundene Easter Eggs – als Vorlage laden</h3>
+      <div class="ediy" id="eEggList"></div>
+    </div>
     <h3>Meine DIY-Drohnen</h3>
     <div class="ediy" id="eDiyList"></div>
     <button id="eClose">← Zurück zum Menü</button>
@@ -475,6 +479,7 @@ function finalizeDrone(d){
       ? d.tmax*0.85*Math.sin(55*deg)/(d.maxSpeed>30? d.maxSpeed*1.35 : d.maxSpeed*1.3)**2
       : d.mass*G*Math.tan(tilt)/(d.maxSpeed**2);
     if(d.style.ducts) d.dragH*=2.2;
+    if(d.dragF) d.dragH*=d.dragF;     // Rahmen mit besonderem Windschlupf
   }
   d.dragV = d.dragH*1.6;
   d.dragL = d.dragH*2.5;
@@ -511,6 +516,14 @@ const PARTS={
     {id:'speedy', name:'Speedy-Rahmen (3D-Druck)', kind:'speedy', cls:'fpv', arm:0.09, mass:0.19,
      bodyL:.155,bodyW:.038,bodyH:.062, feat:{canopy:1,ant:1,propY:-0.008},
      desc:'Eigenbau: hoher Druckrumpf mit Keilnase ★neu'},
+    // Erst nach dem Freischalten des passenden Easter Eggs sichtbar
+    {id:'bomber', name:'Transportrahmen mit Abwurfschacht', kind:'bomber', cls:'cam',
+     arm:0.26, mass:2.3, bodyL:.42,bodyW:.2,bodyH:.11, feat:{legs:1,propY:.075},
+     bombs:6, egg:'egg_bomber', desc:'Schwere Plattform, 6 Bomben an Bord 💣'},
+    {id:'rocket', name:'Raketenrahmen', kind:'rocket', cls:'fpv',
+     arm:0.11, mass:0.72, bodyL:.2,bodyW:.055,bodyH:.05, feat:{canopy:1,ant:1,propY:-0.004},
+     twrF:1.4, speedF:6.8, dragF:0.755, maxTilt:75, range:750, egg:'egg_rocket',
+     desc:'Vier Feststoffraketen – irre schnell, aber nur 750 m Funk 🚀'},
   ],
   motor:[
     {id:'eco', name:'Eco-Motoren', twr:2.0, tau:0.12, mass:0.014, ampF:0.85, desc:'Sparsam, ruhig'},
@@ -568,14 +581,15 @@ function buildDIYDrone(sel,name,id){
   const fpv=F.cls==='fpv';
   const mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0));
   // Schub/Gewicht sinkt leicht mit schwerem Akku, steigt mit großen Props
-  const twr=Math.max(1.6, M.twr*(0.85+P.propR*1.6)*(fpv?1.05:1.0));
-  const maxSpeed = fpv ? 9+twr*3.6 : 6+twr*5.5;
+  const twr=Math.max(1.6, M.twr*(0.85+P.propR*1.6)*(fpv?1.05:1.0)*(F.twrF||1));
+  const maxSpeed = (fpv ? 9+twr*3.6 : 6+twr*5.5)*(F.speedF||1);
   const agility = clamp((fpv?1.0:0.55) + (0.09-F.arm)*3 + (twr-2.5)*0.06, 0.4, 1.9);
   const d={
     id:id||('diy_'+Date.now().toString(36)), name:name||'Meine Drohne', cls:F.cls, diy:true,
     meshKind:F.kind, sel:{...sel},
     mass, arm:F.arm, twr, tauUp:M.tau, tauDn:M.tau*1.45, propR:P.propR,
-    maxTilt: fpv?55:35, maxSpeed,
+    maxTilt: F.maxTilt||(fpv?55:35), maxSpeed, dragF:F.dragF,
+    ...(F.bombs?{bombs:F.bombs}:{}), ...(F.range?{range:F.range}:{}),
     climb: (fpv?3.5:2.6)*(twr-1)+2, desc_:(fpv?3:2)*(twr-1)+2,
     yawRate: fpv?200+agility*40:100+agility*30,
     batt:{cells:B.cells, mah:B.mah, min:B.min},
@@ -593,14 +607,17 @@ function buildDIYDrone(sel,name,id){
 }
 function stabLabel(s){ return s>0.85?'felsenfest':s>0.65?'stabil':s>0.45?'ausgewogen':s>0.3?'wackelig':'sehr nervös'; }
 function diySpecs(d){
-  return [['⚖ Gewicht',(d.mass*1000).toFixed(0)+' g'],
+  const extra=[];
+  if(d.bombs) extra.push(['💣 Bomben',d.bombs+' an Bord']);
+  if(d.range) extra.push(['📡 Funkreichweite','nur '+d.range+' m']);
+  return extra.concat([['⚖ Gewicht',(d.mass*1000).toFixed(0)+' g'],
     ['🚀 Topspeed',(d.maxSpeed*3.6).toFixed(0)+(d.cls==='fpv'?'+':'')+' km/h'],
     ['⚡ Schub/Gew.',d.twr.toFixed(1)+':1'],
     ['🔋 Flugzeit','~'+d.batt.min+' min · '+d.batt.cells+'S'],
     ['🎥 Kamera', partBy('cam',d.sel.cam).name],
     ['🎯 Agilität', d.agility>1.3?'sehr hoch':d.agility>0.9?'hoch':d.agility>0.6?'mittel':'ruhig'],
     ['🪶 Stabilität', stabLabel(d.stab)],
-    ['🦵 Fahrwerk', d.style.floats?'Schwimmer – wasserfest':partBy('gear',d.sel.gear).name]];
+    ['🦵 Fahrwerk', d.style.floats?'Schwimmer – wasserfest':partBy('gear',d.sel.gear).name]]);
 }
 /* DIY-Drohnen laden/speichern */
 let DIY_DRONES=[];
@@ -620,6 +637,7 @@ function saveDIYList(){
    und liegen danach dauerhaft im Flugmenü. */
 const EGG_SPECS=[
  {id:'egg_bomber', name:'Brummer B-4', egg:'bomb', badge:'💣 EASTER EGG',
+  sel:{frame:'bomber',motor:'std',prop:'xl',batt:'6s',cam:'gimbal',gear:'skids',color:'green'},
   desc:'Schwere Transportplattform mit vier Abwurfschächten. Ruhig wie ein Lastkahn – und legt Bäume, Autos und ganze Gebäude um. Abwurf mit 💣 oder Taste X.',
   cls:'cam', mass:3.2, arm:0.26, twr:2.7, tauUp:0.12, tauDn:0.17, propR:0.165,
   maxTilt:32, maxSpeed:17, climb:6, desc_:5, yawRate:95,
@@ -627,6 +645,7 @@ const EGG_SPECS=[
   rates:{max:280,expo:.6}, camAngle:0, fovFpv:76, meshKind:'bomber', bombs:6,
   style:{c1:[.30,.33,.28],c2:[.16,.17,.15],bodyL:.42,bodyW:.2,bodyH:.11,gimbal:1,legs:1,propY:.075}},
  {id:'egg_rocket', name:'Raketen-Drohne R-1000', egg:'rocket', badge:'🚀 EASTER EGG',
+  sel:{frame:'rocket',motor:'race',prop:'m',batt:'6sr',cam:'fpv',gear:'none',color:'white'},
   desc:'Vier Feststoffraketen an den Auslegern: 1000 km/h Spitze – aber die Funkstrecke reicht nur 750 m. Zwei Sekunden Vollgas und du bist an der Grenze.',
   cls:'fpv', mass:1.1, arm:0.11, twr:9.0, tauUp:0.03, tauDn:0.05, propR:0.065,
   maxTilt:75, maxSpeed:278, climb:60, desc_:40, yawRate:200,
@@ -1449,7 +1468,8 @@ function buildDroneMesh(d){
         b.tube([ax,pY-0.02,az],[ax*1.1,pY-H*2.4,az*1.1],0.013,0.009,8,carbon);
         b.ellipsoid(0.048,0.015,0.07,[ax*1.1,pY-H*2.45,az*1.1],10,5,dark);
       }
-      gimbal(-H*1.05,-L*0.34,0.055);
+      if(st.gimbal) gimbal(-H*1.05,-L*0.34,0.055);
+      else b.ellipsoid(W*0.14,H*0.22,L*0.06,[0,-H*0.62,-L*0.36],12,8,[0.09,0.09,0.11]);
       leds();
       bladeCol=[0.2,0.21,0.2]; tipCol=warn; hubCol=carbon;
       break;
@@ -4124,7 +4144,8 @@ function buildEditorUI(){
     const h=document.createElement('h3'); h.textContent=label; host.appendChild(h);
     const row=document.createElement('div');
     row.className = cat==='color'?'echips':'echips';
-    for(const p of PARTS[cat]){
+    // Teile aus Easter Eggs erscheinen erst, wenn das Ei gefunden wurde
+    for(const p of PARTS[cat].filter(p=>!p.egg||EGGS_FOUND.includes(p.egg))){
       if(cat==='color'){
         const sw=document.createElement('div');
         sw.className='eswatch'+(EDIT.sel[cat]===p.id?' sel':'');
@@ -4168,6 +4189,23 @@ function buildEditorUI(){
       host.appendChild(pick);
     }
   }
+  // Freigeschaltete Easter Eggs als Vorlage zum Umbauen
+  const eggs=eggDrones();
+  const eggHost=$('eEggList');
+  eggHost.parentElement.style.display=eggs.length?'block':'none';
+  eggHost.innerHTML='';
+  for(const e of eggs){
+    const c=document.createElement('div');c.className='card';
+    const nm=document.createElement('span');nm.className='nm';
+    nm.textContent=(e.egg==='bomb'?'💣 ':'🚀 ')+e.name;
+    nm.onclick=()=>{ EDIT.sel={...e.sel}; EDIT.editId=null;
+      $('eName').value=e.name+' Umbau';
+      $('ePromptMsg').textContent='Vorlage „'+e.name+'" geladen – jetzt umbauen und speichern.';
+      $('ePromptMsg').style.color='var(--acc2)';
+      editorRebuild(); buildEditorUI(); };
+    c.appendChild(nm);
+    eggHost.appendChild(c);
+  }
   // DIY-Liste
   const list=$('eDiyList');
   list.innerHTML='';
@@ -4192,9 +4230,16 @@ function onPrompt(){
     const spec=unlockEgg(r.egg);
     ensureDroneMesh(spec);
     APP.model=spec; APP.modeIdx=0;
-    msg.innerHTML='🥚 <b>Easter Egg gefunden:</b> '+spec.name+' – liegt jetzt im Flugmenü bereit.';
+    // gleich als Bauvorlage laden – ab jetzt lässt sie sich umbauen
+    EDIT.sel={...spec.sel}; EDIT.editId=null;
+    // Name übernehmen, solange der Nutzer keinen eigenen vergeben hat
+    const cur=$('eName').value.trim();
+    if(!cur||EGG_SPECS.some(e=>cur===e.name+' Umbau')) $('eName').value=spec.name+' Umbau';
+    editorRebuild(); buildEditorUI();
+    msg.innerHTML='🥚 <b>Easter Egg gefunden:</b> '+spec.name+
+      ' – liegt im Flugmenü bereit <i>und</i> ist hier als Vorlage geladen. Bau sie um, wie du willst.';
     msg.style.color='var(--acc2)';
-    toast('🥚 Easter Egg freigeschaltet: '+spec.name,4000);
+    toast('🥚 Easter Egg freigeschaltet: '+spec.name+'<br><small>Im Editor als Vorlage umbaubar</small>',4500);
     buildMenu();
     return;
   }
