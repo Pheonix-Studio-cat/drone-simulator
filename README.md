@@ -94,6 +94,12 @@ Was einmal gefunden ist, bleibt: Die freigeschalteten Bauten stehen danach unter
 | 🎆 **Feuerwerks-Magazin** | 140 g | Drei Leuchtkugeln, die bunt am Himmel zerplatzen – Taste `V`. Reine Deko, zerstört nichts |
 | 📦 **Pakethaken mit Kiste** | 90 g | Kiste am Seil: mit Taste `P` abwerfen, drüber hovern und wieder aufnehmen. Der **Inhalt** ist wählbar – Luftpolster (200 g), Werkzeug (800 g) oder Ziegelsteine (1,8 kg). Die Last ist in der Flugphysik deutlich zu spüren, abwerfen macht sofort leichter |
 | 🎥 **Action-Cam** | 12 g | Winzige Frontkamera als Kameraersatz – deutlich leichter als FPV-Kamera (20 g) und Gimbal (90 g), gibt trotzdem eine FPV-Sicht |
+| 🎇 **Feuerwerks-Kanone** | 220 g | Drei Geschosse **nach vorn** – Taste `G`. Sie zerplatzen am Ziel und reißen im Umkreis von 14 m Bäume, Masten, Zäune und Schornsteine weg. Häuser und Hallen bleiben stehen |
+| 🐝 **Hornissennest** | 340 g | Dreimal Schwarm – Taste `H`. Die Hornissen suchen sich die nächste **fremde Drohne im Umkreis von 300 m** und holen sie vom Himmel. Ohne Ziel in Reichweite bleiben sie im Nest |
+| 🛰️ **Mini-Andockdrohne** | 50 g | Klinkt sich mit Taste `K` aus, fliegt allein eine Erkundungsschleife, **fotografiert unterwegs aus ihrer eigenen Sicht** (die Bilder landen in der Galerie) und dockt danach wieder an. Ein zweiter Druck ruft sie sofort zurück |
+
+### 📡 Fremde Drohnen
+Ab und zu – selten, frühestens nach gut einer halben Minute und höchstens zu zweit – taucht eine **fremde KI-Drohne** über der Karte auf, zieht ihre Bahn und blinkt dabei rot. Man erwischt sie mit dem Hornissenschwarm, mit einem Kanonentreffer daneben, mit einer Bombe oder einer Atombombe. Getroffen trudelt sie zu Boden und zerschellt.
 
 **🛟 Wasser-Landefüße:** Im Abschnitt *Fahrwerk / Landefüße* gibt es neben Landekufen auch **Schwimmer** – damit landet die Drohne sanft auf dem See, treibt dort (sie wippt und rutscht mit dem Wind) und startet wieder. Ohne Schwimmer bleibt Wasser weiterhin ein Totalverlust; und wer mit Karacho aufschlägt, macht sie auch mit Schwimmern kaputt.
 
@@ -140,6 +146,9 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 | `N` | Nuklearrakete starten (nur mit Tarnkappen-Nurflügler) |
 | `V` | Feuerwerk abschießen (mit Feuerwerks-Magazin) |
 | `P` | Kiste abwerfen / wieder aufnehmen (mit Pakethaken) |
+| `G` | Feuerwerks-Kanone nach vorn (mit Kanone) |
+| `H` | Hornissenschwarm loslassen (mit Hornissennest) |
+| `K` | Mini-Andockdrohne ausklinken / zurückrufen |
 | `R` | Zurücksetzen |
 | `1`–`4` | Windstärke |
 | `Esc` | Menü |
