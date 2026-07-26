@@ -44,7 +44,14 @@ Karten aus **echten Geländedaten** dieser Welt – kein erfundenes Terrain:
 
 Dazu **dünne Luft nach echter Höhenformel**: auf dem Everest liefert dieselbe Drohne nur noch rund die Hälfte des Schubs und steigt merklich zäher – wie in echt.
 
-**🌍 Beliebigen Ort laden (Alpha):** Koordinaten ins Menü eingeben und das Geländeprofil wird live aus offenen Höhendaten geholt (nur Gelände, keine Gebäude; braucht Internet).
+### 🗺️ Jeden Ort der Welt fliegen
+Über **„Weltkarte öffnen"** im Menü einen Punkt auf der Weltkarte anklicken (oder eine der 16 vorgemerkten Städte wählen, oder Koordinaten eintippen) – und der Simulator lädt daraus live eine spielbare Karte:
+
+- **Echtes Geländeprofil** über 6 km aus offenen Höhendaten
+- **Echte Gebäudegrundrisse mit ihren echten Höhen** aus OpenStreetMap, im Umkreis von 2,4 km – inklusive **Wahrzeichen** wie Türmen, Leuchttürmen und Kirchen, die ihre wirkliche Höhe behalten (steht keine Höhe in den Daten, wird sie aus Stockwerkzahl oder Grundfläche geschätzt)
+- Die Weltkarte selbst ist ebenfalls aus echten Höhendaten gezeichnet: Meer blau, Land nach Höhe, Hochgebirge weiß
+
+Braucht Internet. Klappt der Abruf nicht, sagt der Simulator das klar und die eingebauten Karten funktionieren weiterhin.
 
 **Datenquellen:** Geländehöhen aus offenen Terrain-Tiles (SRTM u. a.), Gebäudegrundrisse © **Overture Maps / OpenStreetMap-Mitwirkende** (ODbL). Bewusst **keine** Satellitenbilder – die sind proprietär; der Boden wird stattdessen aus echter Höhe, Hangneigung und Wasserlinie eingefärbt.
 
@@ -65,6 +72,8 @@ Bei einem Absturz zerlegt sich die Drohne in Einzelteile (Propeller, Arme, Akku,
 Foto-Button 📷 (Taste `F`): Schnappschüsse landen in einer **Galerie** im Menü (mit Download). Die Foto-Mission speichert ihre Bilder ebenfalls dort.
 
 ### 🔧 DIY-Drohnen-Editor
+**💬 Einfach hinschreiben, was sie können soll:** Ganz oben im Editor gibt es ein Feld für deinen Wunsch – „schnell und wendig", „lange Flugzeit", „zum Filmen in Rot", „klein für drinnen", „schwere Lasten tragen", „Freestyle". Der Baukasten stellt Rahmen, Motoren, Propeller, Akku, Kamera und Farbe passend ein. *Manche Wünsche schalten etwas frei, das sonst nirgends im Menü steht …*
+
 Baue im Menü über **„Eigene Drohne bauen"** deine eigene Drohne aus vorgegebenen Teilen: **Gehäuse/Rahmen** (inkl. exklusiver Frames wie Deadcat, Toothpick und Tiny-Whoop), **Motoren, Propeller, Akku, Kamera** und **Farbe** – mit Farbpaletten *und* freiem **Farbwähler im Spektrum** für Haupt- und Akzentfarbe. Eine drehende **Live-3D-Vorschau** und laufend aktualisierte Kennwerte (Gewicht, Topspeed, Schub/Gewicht, Flugzeit, Agilität, Stabilität) zeigen sofort, was deine Wahl bewirkt. Gespeicherte Drohnen landen als **DIY** im Flugmenü und fliegen mit der echten Physik – gespeichert bleibt alles lokal im Browser.
 
 ### Grafik-Umschalter
@@ -96,6 +105,7 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 | `C` | Kamera wechseln |
 | `F` | Foto aufnehmen |
 | `B` | Bergungsdrohne starten (nach Crash) |
+| `X` | Bombe abwerfen (nur mit Abwurfschacht) |
 | `R` | Zurücksetzen |
 | `1`–`4` | Windstärke |
 | `Esc` | Menü |

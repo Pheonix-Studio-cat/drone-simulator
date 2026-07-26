@@ -26,7 +26,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #btnbar button:active{background:var(--panel2)}
 #btnbar button.armed{background:#67251f;border-color:#c25047;color:#ffd9d5}
 #btnbar button.attn{background:#0f4a2d;border-color:#2fae6b;color:#c9ffe0}
-#bRescue{display:none}
+#bRescue,#bBomb{display:none}
 /* ---------- Toast ---------- */
 #toast{position:absolute;left:50%;top:16%;transform:translateX(-50%);z-index:15;
   background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 18px;
@@ -62,6 +62,25 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #buildBtn{display:block;width:100%;max-width:420px;margin:10px auto 0;padding:13px;font-size:15px;font-weight:700;
   color:#e8f0f8;background:var(--panel);border:1px solid var(--acc);border-radius:12px;cursor:pointer}
 #buildBtn:active{background:var(--panel2)}
+/* ---------- Weltkarte ---------- */
+#world{position:absolute;inset:0;z-index:34;display:none;background:#0b0f14;overflow-y:auto;
+  padding:16px 16px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+#world .wrap{max-width:1000px;margin:0 auto}
+#world h2{font-size:15px;color:var(--acc);text-transform:uppercase;letter-spacing:1.5px;margin:16px 0 9px}
+#wmapWrap{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0d1a26}
+/* die globale canvas-Regel (absolut, bildschirmfüllend) gilt hier nicht */
+#wmap{position:static;inset:auto;display:block;width:100%;height:auto;aspect-ratio:2/1;
+  cursor:crosshair;touch-action:manipulation}
+#wPins{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+#wPins button{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:20px;
+  padding:7px 13px;font-size:12.5px;cursor:pointer}
+#wPins button:hover{border-color:var(--acc)}
+#wSel{margin-top:11px;font-size:13.5px;color:var(--txt)}
+#wMsg{margin-top:8px;font-size:12.5px;color:var(--dim);min-height:18px}
+#world .wbtns{display:flex;gap:9px;margin-top:13px;flex-wrap:wrap}
+#world .wbtns button{flex:1 1 190px;padding:13px;font-size:14.5px;font-weight:700;border-radius:12px;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);color:var(--txt)}
+#world .wbtns button.go{background:linear-gradient(180deg,#5fd4ff,#25a9e0);color:#03202e;border:none}
 /* ---------- Editor ---------- */
 #editor{position:absolute;inset:0;z-index:32;display:none;pointer-events:none}
 #editor .epreview{position:absolute;top:0;left:0;right:0;height:42%;pointer-events:none}
@@ -127,6 +146,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 <div id="btnbar">
   <button id="bFoto" title="Foto (F)">📷</button>
   <button id="bRescue" title="Bergungsdrohne (B)">BERGEN</button>
+  <button id="bBomb" title="Bombe abwerfen (X)">💣 0</button>
   <button id="bArm">ARM</button>
   <button id="bMode">GPS</button>
   <button id="bCam">KAM</button>
@@ -139,9 +159,13 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <h2>Karte</h2>
   <div class="grid" id="mapGrid"></div>
   <div class="help" id="geoBox" style="margin-top:10px">
-    <b>🌍 Beliebigen Ort laden <span style="color:var(--warn)">(Alpha)</span></b><br>
-    Koordinaten eingeben – das Geländeprofil wird live aus offenen Höhendaten geladen (nur Gelände, keine Gebäude).
-    Braucht Internet und kann je nach Browser blockiert werden.
+    <b>🌍 Echten Ort der Welt fliegen</b><br>
+    Ort auf der Weltkarte anklicken oder Koordinaten eingeben – Gelände <b>und echte Gebäude</b>
+    (inklusive Wahrzeichen) werden live aus offenen Daten geladen. Braucht Internet.
+    <div class="wbtns" style="display:flex;gap:9px;margin:10px 0 4px">
+      <button id="worldBtn" style="flex:1;padding:11px;font-size:14px;font-weight:700;border-radius:11px;
+        background:var(--panel2);border:1px solid var(--acc);color:var(--acc);cursor:pointer">🗺️ Weltkarte öffnen</button>
+    </div>
     <div class="esave" style="margin-top:9px">
       <input id="geoInp" maxlength="40" placeholder="z. B. 46.5590, 7.9080">
       <button id="geoBtn">Laden</button>
@@ -172,6 +196,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     <span class="k">Leertaste</span> Arm/Disarm ·
     <span class="k">M</span> Flugmodus · <span class="k">C</span> Kamera ·
     <span class="k">F</span> Foto · <span class="k">B</span> Bergungsdrohne (nach Crash) ·
+    <span class="k">X</span> Bombe abwerfen (nur mit Abwurfschacht) ·
     <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
     <b>Gamepad:</b> Linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2) – wird automatisch erkannt.<br>
     <b>Touch:</b> Virtuelle Sticks unten links (Gas/Yaw) und rechts (Nick/Roll), Buttons oben rechts.
@@ -179,11 +204,40 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <button id="startBtn">ABHEBEN</button>
   <button id="buildBtn">🔧 Eigene Drohne bauen (DIY-Editor)</button>
 </div></div>
+<div id="world"><div class="wrap">
+  <h2>🗺️ Ort auf der Weltkarte wählen</h2>
+  <div style="font-size:13px;color:var(--dim);margin-bottom:10px">
+    Klick auf die Karte oder wähle unten eine bekannte Stadt. Geladen werden das echte Geländeprofil
+    und die echten Gebäudegrundrisse mit ihren Höhen – also auch Wahrzeichen wie Türme und Kirchen.
+  </div>
+  <div id="wmapWrap"><canvas id="wmap" width="1024" height="512"></canvas></div>
+  <div id="wPins"></div>
+  <div id="wSel">Noch kein Ort gewählt.</div>
+  <div id="wMsg"></div>
+  <div class="wbtns">
+    <button id="wClose">Zurück</button>
+    <button id="wGo" class="go">Ort laden</button>
+  </div>
+  <div style="margin-top:12px;font-size:11.5px;color:var(--dim)">
+    Gelände: offene Terrain-Kacheln (SRTM u. a.) · Gebäude: © OpenStreetMap-Mitwirkende (ODbL) über die
+    Overpass-API. Keine Satellitenbilder – der Boden wird aus Höhe, Hangneigung und Wasserlinie eingefärbt.
+  </div>
+</div></div>
 <div id="editor">
   <div class="epreview"></div>
   <div class="ehint">🔧 DIY-Editor · Vorschau dreht sich</div>
   <div class="epanel"><div class="wrap">
     <div class="especs" id="eSpecs"></div>
+    <div class="help" id="ePromptBox" style="margin:2px 0 14px">
+      <b>💬 Was soll deine Drohne können?</b><br>
+      Schreib es einfach hin – der Baukasten stellt die Teile passend ein.
+      Zum Beispiel „schnell und wendig", „lange Flugzeit", „zum Filmen in Rot", „klein für drinnen".
+      <div class="esave" style="margin-top:9px">
+        <input id="ePrompt" maxlength="120" placeholder="z. B. schneller Racer in Blau">
+        <button id="ePromptBtn">Bauen</button>
+      </div>
+      <div id="ePromptMsg" style="margin-top:7px;color:var(--dim)"></div>
+    </div>
     <div id="eParts"></div>
     <h3>Name &amp; Speichern</h3>
     <div class="esave">
@@ -553,7 +607,85 @@ function saveDIYList(){
   try{ localStorage.setItem('ds_diy',
     JSON.stringify(DIY_DRONES.map(d=>({id:d.id,name:d.name,sel:d.sel})))); }catch(e){}
 }
-function allDrones(){ return DRONES.concat(DIY_DRONES); }
+/* ---------------- Versteckte Bauten (Easter Eggs) ----------------
+   Werden nicht angezeigt, sondern über das Prompt-Feld im Editor freigeschaltet
+   und liegen danach dauerhaft im Flugmenü. */
+const EGG_SPECS=[
+ {id:'egg_bomber', name:'Brummer B-4', egg:'bomb', badge:'💣 EASTER EGG',
+  desc:'Schwere Transportplattform mit vier Abwurfschächten. Ruhig wie ein Lastkahn – und legt Bäume, Autos und ganze Gebäude um. Abwurf mit 💣 oder Taste X.',
+  cls:'cam', mass:3.2, arm:0.26, twr:2.7, tauUp:0.12, tauDn:0.17, propR:0.165,
+  maxTilt:32, maxSpeed:17, climb:6, desc_:5, yawRate:95,
+  batt:{cells:6, mah:5200, min:22}, modes:['GPS','ATTI'], gpsQ:1.0, agility:.5,
+  rates:{max:280,expo:.6}, camAngle:0, fovFpv:76, meshKind:'bomber', bombs:6,
+  style:{c1:[.30,.33,.28],c2:[.16,.17,.15],bodyL:.42,bodyW:.2,bodyH:.11,gimbal:1,legs:1,propY:.075}},
+ {id:'egg_rocket', name:'Raketen-Drohne R-1000', egg:'rocket', badge:'🚀 EASTER EGG',
+  desc:'Vier Feststoffraketen an den Auslegern: 1000 km/h Spitze – aber die Funkstrecke reicht nur 750 m. Zwei Sekunden Vollgas und du bist an der Grenze.',
+  cls:'fpv', mass:1.1, arm:0.11, twr:9.0, tauUp:0.03, tauDn:0.05, propR:0.065,
+  maxTilt:75, maxSpeed:278, climb:60, desc_:40, yawRate:200,
+  batt:{cells:6, mah:1200, min:2.5}, modes:['GPS','ANGLE','ACRO'], gpsQ:0.85, agility:1.3,
+  rates:{max:640,expo:.62}, camAngle:20, fovFpv:125, dragH:0.000357, range:750,
+  meshKind:'rocket',
+  style:{c1:[.90,.91,.93],c2:[.90,.22,.10],bodyL:.2,bodyW:.055,bodyH:.05,canopy:1,ant:1,propY:-0.004}},
+];
+let EGGS_FOUND=[];
+function loadEggs(){
+  try{ EGGS_FOUND=JSON.parse(localStorage.getItem('ds_eggs')||'[]'); }catch(e){ EGGS_FOUND=[]; }
+  if(!Array.isArray(EGGS_FOUND)) EGGS_FOUND=[];
+}
+function saveEggs(){ try{ localStorage.setItem('ds_eggs',JSON.stringify(EGGS_FOUND)); }catch(e){} }
+function eggDrones(){ return EGG_SPECS.filter(e=>EGGS_FOUND.includes(e.id)); }
+function unlockEgg(id){
+  const spec=EGG_SPECS.find(e=>e.id===id);
+  if(!spec) return null;
+  if(!EGGS_FOUND.includes(id)){ EGGS_FOUND.push(id); saveEggs(); }
+  return spec;
+}
+for(const e of EGG_SPECS) finalizeDrone(e);
+loadEggs();
+
+/* ---------------- Prompt: „Was soll deine Drohne können?" ----------------
+   Wertet freie Eingaben nach Schlagwörtern aus und stellt die Teile passend
+   ein. Bestimmte Wünsche schalten versteckte Bauten frei. */
+const PROMPT_RULES=[
+  {k:['bombe','bomben','bomber','bomb','sprengen','zerstör','zerstor','destroy','explos'], egg:'egg_bomber'},
+  {k:['rakete','raketen','rocket','düse','duese','turbo','überschall','ueberschall'], egg:'egg_rocket'},
+  {k:['schnell','speed','rennen','race','racing','tempo','fast','flott'],
+   sel:{motor:'race',prop:'s',batt:'6sr',frame:'race5',cam:'fpv'}, say:'Rennaufbau: Rennmotoren, kleine Props, leichter Race-Akku'},
+  {k:['lange flugzeit','ausdauer','lang fliegen','long range','longrange','weit','endurance','sparsam'],
+   sel:{motor:'eco',prop:'l',batt:'6s',frame:'fold'}, say:'Auf Ausdauer getrimmt: Eco-Motoren, große Props, 6S-Akku'},
+  {k:['film','kino','cinema','video','kamera','foto','aufnahme','luftbild'],
+   sel:{frame:'cine',motor:'sport',prop:'xl',batt:'6s',cam:'gimbal'}, say:'Filmplattform mit Gimbal und viel Schub'},
+  {k:['klein','winzig','indoor','drinnen','tiny','mini','leicht'],
+   sel:{frame:'tinywhoop',motor:'eco',prop:'s',batt:'2s',cam:'fpv'}, say:'Winziger Indoor-Aufbau'},
+  {k:['stabil','ruhig','windfest','sicher','anfänger','anfaenger','beginner'],
+   sel:{frame:'quad',motor:'std',prop:'l',batt:'6s',cam:'gimbal'}, say:'Großer, ruhiger Rahmen mit Gimbal'},
+  {k:['schwer','tragen','last','transport','liefer','paket','heben'],
+   sel:{frame:'cine',motor:'race',prop:'xl',batt:'6s',cam:'none'}, say:'Hebt schwere Lasten: Riesen-Props und Rennmotoren'},
+  {k:['freestyle','acro','kunstflug','tricks','flip'],
+   sel:{frame:'deadcat',motor:'sport',prop:'m',batt:'6sr',cam:'fpv'}, say:'Freestyle-Aufbau mit freier Kamerasicht'},
+  {k:['eigenbau','3d-druck','3d druck','gedruckt','selbstbau','speedy'],
+   sel:{frame:'speedy',motor:'race',prop:'m',batt:'6sr',cam:'fpv'}, say:'Eigenbau-Rahmen aus dem 3D-Drucker'},
+  {k:['enge','tunnel','innen','schutz','duct','cinewhoop','sanft'],
+   sel:{frame:'whoop',motor:'sport',prop:'s',batt:'4s',cam:'fpv'}, say:'Cinewhoop mit Propellerschutz'},
+];
+const PROMPT_COLORS=[['rot','red'],['blau','blue'],['grün','green'],['gruen','green'],['green','green'],
+  ['weiß','white'],['weiss','white'],['white','white'],['schwarz','dark'],['dunkel','dark'],['black','dark'],
+  ['orange','orange'],['violett','purple'],['lila','purple'],['purple','purple'],['grau','grey'],['silber','grey']];
+function parsePrompt(text){
+  const t=(text||'').toLowerCase();
+  if(!t.trim()) return {empty:true};
+  for(const r of PROMPT_RULES) if(r.egg && r.k.some(k=>t.includes(k))) return {egg:r.egg};
+  const sel={}, said=[];
+  for(const r of PROMPT_RULES){
+    if(r.egg) continue;
+    if(r.k.some(k=>t.includes(k))){ Object.assign(sel,r.sel); said.push(r.say); }
+  }
+  for(const [w,c] of PROMPT_COLORS) if(t.includes(w)){ sel.color=c; said.push('Farbe: '+partBy('color',c).name); break; }
+  if(!said.length) return {none:true};
+  return {sel, say:said.join(' · ')};
+}
+
+function allDrones(){ return DRONES.concat(eggDrones(),DIY_DRONES); }
 function droneById(id){ return allDrones().find(d=>d.id===id); }
 loadDIY();
 
@@ -924,10 +1056,14 @@ Builder.prototype.ellipsoid=function(rx,ry,rz,p=[0,0,0],segU=14,segV=9,col=null,
     }
   }
 };
-Builder.prototype.build=function(){
+// keepPos: Positionen zusätzlich auf der CPU behalten (nötig, um später
+// einzelne Objekte wieder aus der Geometrie zu löschen – siehe Bomben)
+Builder.prototype.build=function(keepPos){
   const m={n:this.pos.length/3};
+  const pa=new Float32Array(this.pos);
+  if(keepPos) m.posArr=pa;
   m.vb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,m.vb);
-  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.pos),gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER,pa,gl.STATIC_DRAW);
   m.nb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,m.nb);
   gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(this.nrm),gl.STATIC_DRAW);
   m.cb=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,m.cb);
@@ -978,6 +1114,16 @@ const markerMesh=mesh(b=>{ b.cyl(0.0,0.7,0.9,[0,-0.9,0],6); b.cyl(0.7,0.0,0.9,[0
 const pkgMesh=mesh(b=>{ b.box(0.34,0.26,0.3,[0,0.13,0],0,[0.75,0.55,0.3]); b.box(0.36,0.06,0.32,[0,0.13,0],0,[0.5,0.35,0.2]); });
 const shadowMesh=mesh(b=>{ b.cyl(1,1,0.001,[0,0,0],20); });
 const padWpMesh=mesh(b=>{ b.cyl(1,1,0.02,[0,0,0],20); });
+// Bombe (Nase in -z, Leitwerk hinten) und Kugel für Feuerball/Rauch
+const bombMesh=mesh(b=>{
+  const body=[0.19,0.2,0.18];
+  b.ellipsoid(0.05,0.05,0.1,[0,0,0],12,8,body);
+  b.tube([0,0,0.06],[0,0,0.15],0.05,0.028,10,body);
+  b.ellipsoid(0.028,0.028,0.02,[0,0,-0.1],10,6,[0.7,0.28,0.15]);
+  for(const a of [0,Math.PI/2])
+    b.box(0.004+0.055*Math.cos(a),0.004+0.055*Math.sin(a),0.05,[0,0,0.14],0,[0.28,0.29,0.27]);
+});
+const blastMesh=mesh(b=>{ b.ellipsoid(1,1,1,[0,0,0],12,8,[1,1,1]); });
 
 /* --- Menschen (verschiedene Varianten) --- */
 function personMesh(shirt,pants,parka){
@@ -1241,6 +1387,71 @@ function buildDroneMesh(d){
       bladeCol=st.c2; hubCol=carbon;
       break;
     }
+    case 'bomber': {
+      // Schwere Transportplattform in Olivgrün mit Abwurfschächten unter dem Bauch
+      const c1=st.c1, carbon=[0.13,0.13,0.14], warn=[0.85,0.62,0.1];
+      b.loft([
+        {z:-L*0.5,y:H*0.4,w:W*0.3,h:H*0.3,e:2.6},
+        {z:-L*0.34,y:H*0.28,w:W*0.72,h:H*0.8,e:3.0},
+        {z:-L*0.1,y:H*0.12,w:W,h:H*1.05,e:3.2},
+        {z:L*0.18,y:H*0.1,w:W,h:H,e:3.2},
+        {z:L*0.4,y:H*0.16,w:W*0.66,h:H*0.66,e:2.8},
+        {z:L*0.5,y:H*0.24,w:W*0.16,h:H*0.18,e:2.3},
+      ],18,c1);
+      b.box(W*0.9,H*0.1,L*0.5,[0,H*0.62,L*0.02],0,[c1[0]*0.7,c1[1]*0.7,c1[2]*0.7]);
+      // Abwurfschacht: Rahmen mit Warnstreifen und drei Bomben am Schloss
+      b.box(W*0.66,H*0.14,L*0.62,[0,-H*0.5,L*0.02],0,carbon);
+      b.box(W*0.7,H*0.05,L*0.12,[0,-H*0.58,-L*0.2],0,warn);
+      b.box(W*0.7,H*0.05,L*0.12,[0,-H*0.58,L*0.24],0,warn);
+      for(let i=0;i<3;i++){
+        const bz=(i-1)*L*0.21;
+        b.ellipsoid(0.032,0.032,0.075,[0,-H*0.78,bz],10,7,[0.2,0.21,0.19]);
+        b.cyl(0.022,0.0,0.05,[0,-H*0.78,bz],8,[0.2,0.21,0.19]);
+        b.box(0.006,0.03,0.03,[0,-H*0.62,bz+0.055],0,carbon);
+      }
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        b.tube([sx*W*0.44,H*0.32,sz*L*0.22],[ax,pY-0.012,az],0.016,0.013,10,carbon);
+        motor(ax,az,carbon,0.022);
+        b.tube([ax,pY-0.02,az],[ax*1.1,pY-H*2.4,az*1.1],0.013,0.009,8,carbon);
+        b.ellipsoid(0.048,0.015,0.07,[ax*1.1,pY-H*2.45,az*1.1],10,5,dark);
+      }
+      gimbal(-H*1.05,-L*0.34,0.055);
+      leds();
+      bladeCol=[0.2,0.21,0.2]; tipCol=warn; hubCol=carbon;
+      break;
+    }
+    case 'rocket': {
+      // Vier Feststoffraketen an den Auslegern, weißer Rumpf mit rotem Leitwerk
+      const c1=st.c1, red=st.c2, carbon=[0.1,0.1,0.12];
+      b.loft([
+        {z:-L*0.5,y:0,w:W*0.2,h:H*0.24,e:2.6},
+        {z:-L*0.36,y:0,w:W*0.76,h:H*0.8,e:3.0},
+        {z:-L*0.05,y:0,w:W,h:H,e:3.2},
+        {z:L*0.28,y:0,w:W*0.92,h:H*0.92,e:3.0},
+        {z:L*0.5,y:0,w:W*0.2,h:H*0.22,e:2.5},
+      ],16,c1);
+      b.ellipsoid(W*0.3,H*0.28,L*0.09,[0,0,-L*0.44],12,8,red);       // rote Nase
+      b.ellipsoid(W*0.16,W*0.16,0.008,[0,-H*0.05,-L*0.5],10,6,[0.05,0.06,0.11]);
+      // Seitenleitwerk hinten
+      b.box(W*0.1,H*1.2,L*0.16,[0,H*0.7,L*0.4],0,red);
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        b.tube([sx*W*0.4,0,sz*L*0.22],[ax,pY-H*0.2,az],0.009,0.007,8,carbon);
+        motor(ax,az,carbon,0.011);
+        // Rakete unter dem Ausleger: Rohr, Nase, Düse, Finnen
+        const ry=pY-H*1.5;
+        b.tube([ax,ry,az-0.055],[ax,ry,az+0.05],0.014,0.014,10,c1);
+        b.ellipsoid(0.014,0.014,0.03,[ax,ry,az-0.075],10,7,red);
+        b.tube([ax,ry,az+0.05],[ax,ry,az+0.072],0.014,0.019,10,carbon);
+        for(const fa of [0,Math.PI/2])
+          b.box(0.003+0.02*Math.cos(fa),0.003+0.02*Math.sin(fa),0.03,[ax,ry,az+0.05],0,red);
+        b.tube([ax,pY-H*0.3,az],[ax,ry+0.014,az],0.005,0.005,6,carbon);
+      }
+      leds();
+      bladeCol=[0.16,0.17,0.2]; tipCol=red; hubCol=red;
+      break;
+    }
     case 'speedy': {
       // Eigenbau aus dem 3D-Drucker: hoher, schmaler Kastenrumpf mit Keilnase,
       // rotem Nasenstreifen, Kamera und Kufen vorn, flache dunkle Arme.
@@ -1359,7 +1570,8 @@ function buildDroneMeshBlocky(d){
 
   let bmk=d.meshKind||d.id;
   if(bmk==='tinywhoop')bmk='whoop';
-  else if(bmk==='deadcat'||bmk==='toothpick')bmk='race5';
+  else if(bmk==='deadcat'||bmk==='toothpick'||bmk==='rocket')bmk='race5';
+  else if(bmk==='bomber')bmk='cine';
   switch(bmk){
     case 'mini1': case 'mini4': case 'air': case 'pro': {
       // Faltdrohnen-Familie: Keil-Rumpf, Gimbal vorn, schlanke Arme
@@ -1728,8 +1940,9 @@ const GEN={};
 /* --- Echte Orte: Gebäude aus echten Grundrissen extrudieren --- */
 GEN.real=(map,B,obs,terH,rnd)=>{
   const dat=map.data;
-  if(dat.bld){
-    const blds=decodeBuildings(dat.bld,dat.cstep||0.5);
+  // Gebäude entweder eingebacken (bld) oder live geladen (polys)
+  if(dat.bld||dat.polys){
+    const blds=dat.polys||decodeBuildings(dat.bld,dat.cstep||0.5);
     for(const b of blds){
       const pts=b.pts, n=pts.length;
       let cx=0,cz=0;
@@ -2026,12 +2239,13 @@ function buildScene(mapId){
       }
     }
   }
-  const stat=B.build();
+  const stat=B.build(true);            // Positionen behalten -> Objekte löschbar
   // Weiche Schattenflecken unter Bäumen/Gebäuden (Richtung Sonne versetzt)
   const S=new Builder();
   S.curCol=[0,0,0];
   const sox=SUN[0]/SUN[1], soz=SUN[2]/SUN[1];
   for(const o of obs){
+    o.s0=S.pos.length/3;
     const hh=Math.max(0.5,o.h-terH(o.x,o.z));
     const r=clamp(o.r*1.5+0.4,0.7,Math.min(o.r*1.3+2.5,14));
     const off=Math.min(hh*0.4,7);
@@ -2043,6 +2257,7 @@ function buildScene(mapId){
       const p1=[cx2+Math.cos(a1)*r, terH(cx2+Math.cos(a1)*r,cz2+Math.sin(a1)*r)+0.045, cz2+Math.sin(a1)*r];
       S.tri([cx2,cy2,cz2],p1,p0);
     }
+    o.s1=S.pos.length/3;
   }
   const shadow=S.pos.length?S.build():null;
   const terMesh=buildTerrainMesh(map,terH);
@@ -2241,6 +2456,7 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.q=Q.fromYaw(0); DR.w=[0,0,0];
   DR.motors=[0,0,0,0]; DR.armed=false; DR.onGround=true; DR.crashed=false;
   DR.groundTimer=0; DR.iTerm=[0,0,0]; DR.flightTime=0; DR.pkg=false; DR.driftV=[0,0];
+  DR.bombs=d.bombs||0; BOMBS=[]; BLASTS=[]; APP.shake=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; }
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
   IN.thr=APP.springThr?0:-1; IN.yaw=IN.pit=IN.rol=0;
@@ -2565,7 +2781,9 @@ function groundAndCollisions(dt,m){
       }
     }
   }
-  const RMAX=(SCENE&&SCENE.map.range)||500;
+  // Reichweite: Karte gibt das Maximum vor, manche Drohnen funken kürzer
+  let RMAX=(SCENE&&SCENE.map.range)||500;
+  if(d.range) RMAX=Math.min(RMAX,d.range);
   const R=Math.hypot(DR.pos[0],DR.pos[2]);
   if(R>RMAX){ const s=RMAX/R; DR.pos[0]*=s; DR.pos[2]*=s; toast('Reichweitengrenze erreicht'); }
 }
@@ -2608,6 +2826,164 @@ function stepDebris(dt){
       else { p.rest=true; }
     }
   }
+}
+/* --- Bomben (Easter Egg „Brummer B-4") ---------------------------------
+   Abgeworfene Bomben fallen ballistisch, beim Aufschlag verschwindet alles
+   Getroffene aus dem Szenen-Mesh: die Dreiecke werden auf einen Punkt
+   zusammengezogen und die Hitbox entfernt. */
+let BOMBS=[], BLASTS=[];
+function bombsLeft(){ return DR.bombs===undefined?0:DR.bombs; }
+function dropBomb(){
+  if(!APP.model.bombs||DR.crashed||DR.onGround||APP.state!=='fly')return false;
+  if(bombsLeft()<=0){ toast('Keine Bomben mehr an Bord – R/RESET lädt neu'); return false; }
+  DR.bombs--;
+  const fwd=Q.rot(DR.q,[0,0,-1]);
+  BOMBS.push({pos:[DR.pos[0],DR.pos[1]-0.12,DR.pos[2]],
+    vel:[DR.vel[0]+fwd[0]*0.4, DR.vel[1]-0.5, DR.vel[2]+fwd[2]*0.4],
+    ang:0, t:0});
+  updateButtons();
+  return true;
+}
+// Ballistische Vorhersage: wo landet eine jetzt abgeworfene Bombe?
+function bombImpact(){
+  let p=[DR.pos[0],DR.pos[1],DR.pos[2]], v=[...DR.vel];
+  for(let i=0;i<600;i++){
+    v[1]-=G*0.02;
+    const sp=V3.len(v), k=0.0016*sp*0.02;
+    v=[v[0]*(1-k),v[1]*(1-k),v[2]*(1-k)];
+    p=[p[0]+v[0]*0.02,p[1]+v[1]*0.02,p[2]+v[2]*0.02];
+    const gy=Math.max(SCENE.terH(p[0],p[2]), SCENE.water?SCENE.water.level:-1e9);
+    if(p[1]<=gy) return [p[0],gy,p[2]];
+  }
+  return null;
+}
+// Dreiecke aus einem gebauten Mesh löschen (auf einen Punkt zusammenziehen)
+function eraseRange(m,v0,v1){
+  if(!m||!(v1>v0))return;
+  gl.bindBuffer(gl.ARRAY_BUFFER,m.vb);
+  gl.bufferSubData(gl.ARRAY_BUFFER,v0*12,new Float32Array((v1-v0)*3));
+}
+// Alles löschen, was innerhalb der Grundfläche der getroffenen Objekte liegt –
+// unabhängig davon, in welcher Reihenfolge der Generator gezeichnet hat.
+function eraseFootprints(list){
+  const m=SCENE.stat;
+  if(!m||!m.posArr||!list.length)return;
+  const P=m.posArr;
+  const covers=(cx,cz)=>{
+    for(const o of list){
+      const dx=cx-o.x, dz=cz-o.z;
+      if(o.box){
+        const c=Math.cos(-o.box.yaw), s=Math.sin(-o.box.yaw);
+        const lx=dx*c-dz*s, lz=dx*s+dz*c;
+        if(Math.abs(lx)<=o.box.hw+1.4&&Math.abs(lz)<=o.box.hd+1.4)return true;
+      }else{
+        const rr=o.r+2.4;
+        if(dx*dx+dz*dz<=rr*rr)return true;
+      }
+    }
+    return false;
+  };
+  let lo=Infinity, hi=-Infinity;
+  for(let t=0;t<m.n;t+=3){
+    const i=t*3;
+    if(P[i]===0&&P[i+1]===0&&P[i+2]===0)continue;             // schon zerstört
+    const cx=(P[i]+P[i+3]+P[i+6])/3, cz=(P[i+2]+P[i+5]+P[i+8])/3;
+    if(!covers(cx,cz))continue;
+    for(let k=0;k<9;k++)P[i+k]=0;
+    if(i<lo)lo=i;
+    if(i+9>hi)hi=i+9;
+  }
+  if(lo<hi){
+    gl.bindBuffer(gl.ARRAY_BUFFER,m.vb);
+    gl.bufferSubData(gl.ARRAY_BUFFER,lo*4,P.subarray(lo,hi));
+  }
+}
+function objectDebris(o,y){
+  const big=Math.min(3,Math.max(0.8,o.r*0.5));
+  for(let i=0;i<7;i++){
+    const a=Math.random()*7, s=big*(0.3+Math.random()*0.7);
+    BLASTS.push({pos:[o.x+(Math.random()-0.5)*o.r*2, y+Math.random()*3, o.z+(Math.random()-0.5)*o.r*2],
+      vel:[Math.cos(a)*(3+Math.random()*9), 4+Math.random()*11, Math.sin(a)*(3+Math.random()*9)],
+      r:s, t:0, life:2.2+Math.random(), kind:'chunk',
+      col:[0.34+Math.random()*0.16,0.31+Math.random()*0.14,0.27+Math.random()*0.12],
+      ax:V3.norm([Math.random()-0.5,Math.random()-0.5,Math.random()-0.5]),
+      ang:Math.random()*6, spin:(Math.random()*9+3)*(Math.random()<0.5?-1:1)});
+  }
+}
+// Alles im Umkreis zerlegen. Gibt die Zahl der zerstörten Objekte zurück.
+function destroyAt(x,z,R){
+  const hit=SCENE.obstacles.filter(o=>Math.hypot(o.x-x,o.z-z)<R+o.r*0.5);
+  if(!hit.length)return 0;
+  eraseFootprints(hit);
+  for(const o of hit){ eraseRange(SCENE.shadow,o.s0,o.s1); objectDebris(o,SCENE.terH(o.x,o.z)); }
+  const dead=new Set(hit);
+  SCENE.obstacles=SCENE.obstacles.filter(o=>!dead.has(o));
+  return hit.length;
+}
+function explode(x,y,z){
+  const R=15;
+  const n=destroyAt(x,z,R);
+  // Feuerball und Rauch
+  BLASTS.push({pos:[x,y+2,z],vel:[0,2.2,0],r:2.6,t:0,life:0.8,kind:'fire'});
+  for(let i=0;i<5;i++){
+    const a=Math.random()*7, sp=3+Math.random()*7;
+    BLASTS.push({pos:[x+Math.cos(a)*2,y+1+Math.random()*3,z+Math.sin(a)*2],
+      vel:[Math.cos(a)*sp,3+Math.random()*5,Math.sin(a)*sp],
+      r:1.2+Math.random()*1.4,t:0,life:0.5+Math.random()*0.4,kind:'fire'});
+  }
+  for(let i=0;i<16;i++){
+    const a=Math.random()*7, sp=2+Math.random()*10;
+    BLASTS.push({pos:[x,y+0.6,z],vel:[Math.cos(a)*sp,1.5+Math.random()*7,Math.sin(a)*sp],
+      r:1+Math.random()*1.9,t:0,life:1.6+Math.random()*1.6,kind:'smoke',col:[0.3,0.29,0.28]});
+  }
+  APP.shake=Math.max(APP.shake||0, 1);
+  // Menschen in der Nähe erschrecken (sie rennen weg, kommen aber nicht zu Schaden)
+  for(const p of SCENE.people){
+    if(Math.hypot(p.x-x,p.z-z)<R*2.2) p.spd=Math.abs(p.spd)*2.6;
+  }
+  // Die eigene Drohne hält den Druck nicht aus, wenn sie zu tief drüber steht
+  if(!DR.crashed&&Math.hypot(DR.pos[0]-x,DR.pos[1]-y,DR.pos[2]-z)<9)
+    crash('Zu tief über der eigenen Bombe!');
+  if(n>0) toast('💥 '+n+(n===1?' Objekt':' Objekte')+' zerlegt',1500);
+  return n;
+}
+function stepBombs(dt){
+  for(let i=BOMBS.length-1;i>=0;i--){
+    const b=BOMBS[i];
+    b.t+=dt;
+    b.vel[1]-=G*dt;
+    const sp=V3.len(b.vel), k=0.0016*sp*dt;
+    b.vel=[b.vel[0]*(1-k),b.vel[1]*(1-k),b.vel[2]*(1-k)];
+    b.pos=V3.add(b.pos,V3.scale(b.vel,dt));
+    b.ang=Math.atan2(Math.hypot(b.vel[0],b.vel[2]),-b.vel[1]);
+    b.yaw=Math.atan2(b.vel[0],b.vel[2]);
+    const gy=Math.max(SCENE.terH(b.pos[0],b.pos[2]), SCENE.water?SCENE.water.level:-1e9);
+    let hit=b.pos[1]<=gy+0.2;
+    if(!hit) for(const o of SCENE.obstacles){
+      if(b.pos[1]>o.h)continue;
+      if(Math.hypot(b.pos[0]-o.x,b.pos[2]-o.z)<o.r+0.4){ hit=true; break; }
+    }
+    if(hit||b.t>25){
+      BOMBS.splice(i,1);
+      explode(b.pos[0],Math.max(b.pos[1],gy),b.pos[2]);
+    }
+  }
+  for(let i=BLASTS.length-1;i>=0;i--){
+    const p=BLASTS[i];
+    p.t+=dt;
+    if(p.t>=p.life){ BLASTS.splice(i,1); continue; }
+    if(p.kind==='fire'){ p.r+=5*dt; p.pos=V3.add(p.pos,V3.scale(p.vel,dt)); p.vel[1]+=3*dt; continue; }
+    if(p.kind==='smoke'){
+      p.vel=[p.vel[0]*(1-1.6*dt), p.vel[1]*(1-0.8*dt)+1.1*dt, p.vel[2]*(1-1.6*dt)];
+      p.pos=V3.add(p.pos,V3.scale(p.vel,dt)); p.r+=1.7*dt; continue;
+    }
+    p.vel[1]-=G*dt;
+    p.pos=V3.add(p.pos,V3.scale(p.vel,dt));
+    p.ang+=p.spin*dt;
+    const gy=SCENE.terH(p.pos[0],p.pos[2]);
+    if(p.pos[1]<gy+p.r*0.5){ p.pos[1]=gy+p.r*0.5; p.vel=[p.vel[0]*0.4,-p.vel[1]*0.25,p.vel[2]*0.4]; p.spin*=0.5; }
+  }
+  if(APP.shake) APP.shake=Math.max(0,APP.shake-dt*1.6);
 }
 function crash(msg){
   if(DR.crashed)return;
@@ -2804,7 +3180,7 @@ function computeCamera(){
   const cams=['FPV','CHASE','BODEN'];
   const cm=cams[APP.camera%3];
   const motorAvg=(DR.motors[0]+DR.motors[1]+DR.motors[2]+DR.motors[3])/4;
-  const vib=motorAvg*0.006+APP.windLevel*0.001;
+  const vib=motorAvg*0.006+APP.windLevel*0.001+(APP.shake||0)*0.5;
   const jit=()=>[(Math.random()-0.5)*vib,(Math.random()-0.5)*vib,(Math.random()-0.5)*vib];
   if(cm==='FPV'){
     const eye=V3.add(V3.add(p,Q.rot(q,[0,d.style.bodyH*0.4,-d.style.bodyL*0.55])),jit());
@@ -2829,7 +3205,7 @@ function computeCamera(){
     const want=V3.add(p,V3.add(V3.scale(h,-dist),[0,dist*0.42,0]));
     chasePos=chasePos?V3.lerp(chasePos,want,0.08):want;
     chasePos[1]=Math.max(chasePos[1],groundHeightAt(chasePos[0],chasePos[2])+0.4);
-    return {eye:[...chasePos],at:V3.add(p,[0,0.2,0]),up:[0,1,0],fov:62*deg,name:cm};
+    return {eye:V3.add([...chasePos],jit()),at:V3.add(p,[0,0.2,0]),up:[0,1,0],fov:62*deg,name:cm};
   }
   const gy=groundHeightAt(4,7);
   const eye=[4,gy+1.8,7];
@@ -2967,6 +3343,37 @@ function render(){
     }else{
       const mm=M4.mul(rot,M4.scale(p.size[0],p.size[1],p.size[2]));
       drawMesh(unitBox,mm,p.col);
+    }
+  }
+  // Bomben in der Luft + Zielmarkierung, solange welche an Bord sind
+  for(const b of BOMBS){
+    const m=M4.mul(M4.fromQuatPos(Q.mul(Q.fromYaw(b.yaw||0),Q.axisAngle([1,0,0],(b.ang||0)-Math.PI/2)),b.pos),
+      M4.scale(1,1,1));
+    drawMesh(bombMesh,m);
+  }
+  if(APP.model.bombs&&DR.bombs>0&&!DR.crashed&&!DR.onGround&&APP.state==='fly'){
+    const t=bombImpact();
+    if(t){
+      gl.depthMask(false);
+      drawMesh(padWpMesh,M4.mul(M4.translate(t[0],t[1]+0.12,t[2]),M4.scale(3.2,1,3.2)),[1,0.42,0.15],0.4);
+      drawMesh(padWpMesh,M4.mul(M4.translate(t[0],t[1]+0.14,t[2]),M4.scale(1.1,1,1.1)),[1,0.85,0.3],0.55);
+      gl.depthMask(true);
+    }
+  }
+  // Explosionen: Feuerball, Rauch, weggesprengte Brocken
+  for(const p of BLASTS){
+    const f=p.t/p.life;
+    if(p.kind==='chunk'){
+      const rot=M4.fromQuatPos(Q.axisAngle(p.ax,p.ang),p.pos);
+      drawMesh(unitBox,M4.mul(rot,M4.scale(p.r,p.r*0.8,p.r)),p.col,1-f*f*0.3);
+    }else{
+      gl.depthMask(false);
+      const a=p.kind==='fire'?(1-f*f)*0.95:(1-f)*0.4;
+      // Feuer wird überstrahlt gezeichnet (Werte über 1), damit es auch auf der
+      // Schattenseite leuchtet statt grau zu wirken
+      const col=p.kind==='fire'?[3.2,2.0-f*1.4,0.5-f*0.4]:p.col;
+      drawMesh(blastMesh,M4.mul(M4.translate(p.pos[0],p.pos[1],p.pos[2]),M4.scale(p.r,p.r,p.r)),col,a);
+      gl.depthMask(true);
     }
   }
   // Drohnenschatten (Richtung Sonne versetzt)
@@ -3187,13 +3594,15 @@ function buildMenu(){
   dg.innerHTML='';
   for(const d of allDrones()){
     const c=document.createElement('div');c.className='card'+(d.id===APP.model.id?' sel':'');
-    c.innerHTML=`<div class="nm">${d.name}<span class="chip ${d.cls}">${d.diy?'DIY':(d.cls==='cam'?'KAMERA':'FPV')}</span></div>
+    c.innerHTML=`<div class="nm">${d.name}<span class="chip ${d.cls}">${d.egg?d.badge:(d.diy?'DIY':(d.cls==='cam'?'KAMERA':'FPV'))}</span></div>
       <div class="ds">${d.diy?'Selbstgebaut · '+partBy('frame',d.sel.frame).name:d.desc}</div>
       <div class="sp"><span>⚖ <b>${(d.mass*1000).toFixed(0)} g</b></span>
       <span>🚀 <b>${(d.maxSpeed*3.6).toFixed(0)}${d.cls==='fpv'?'+':''} km/h</b></span>
       <span>🔋 <b>${d.batt.min} min · ${d.batt.cells}S</b></span>
       <span>⚡ <b>${d.twr.toFixed(1)}:1</b></span>
-      <span>🪶 <b>${stabLabel(d.stab)}</b></span></div>`;
+      <span>🪶 <b>${stabLabel(d.stab)}</b></span>
+      ${d.range?`<span>📡 <b>nur ${d.range} m</b></span>`:''}
+      ${d.bombs?`<span>💣 <b>${d.bombs} Bomben</b></span>`:''}</div>`;
     c.onclick=()=>{APP.model=d;APP.modeIdx=0;buildMenu();};
     dg.appendChild(c);
   }
@@ -3261,6 +3670,10 @@ function updateButtons(){
   $('bMode').textContent=APP.mode;
   $('bRescue').style.display=(DR.crashed&&WRECK)?'block':'none';
   $('bRescue').classList.add('attn');
+  const bb=$('bBomb');
+  bb.style.display=APP.model.bombs?'block':'none';
+  bb.textContent='💣 '+(DR.bombs||0);
+  bb.classList.toggle('attn',!!(DR.bombs>0));
 }
 function tryArm(){
   if(APP.state!=='fly'||APP.paused)return;
@@ -3290,6 +3703,7 @@ function cycleMode(){
 function handleKey(code){
   if(code==='Escape'){
     if($('pview').style.display==='block'){$('pview').style.display='none';return;}
+    if($('world').style.display==='block'){closeWorld();return;}
     if(APP.state==='editor'){closeEditor();return;}
     if(APP.state==='fly'){ if(APP.paused)closeMenuAndStart(); else openMenu(); }
     return;
@@ -3300,6 +3714,7 @@ function handleKey(code){
   else if(code==='KeyC'){APP.camera=(APP.camera+1)%3;}
   else if(code==='KeyF'){takePhoto();}
   else if(code==='KeyB'){if(DR.crashed&&WRECK)startRescue();}
+  else if(code==='KeyX'){dropBomb();}
   else if(code==='KeyR'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}
   else if(/^Digit[1-4]$/.test(code)){APP.windLevel=+code.slice(5)-1;toast('💨 '+WIND_NAMES[APP.windLevel]);}
 }
@@ -3308,6 +3723,7 @@ $('bMode').onclick=cycleMode;
 $('bCam').onclick=()=>{if(APP.state==='fly')APP.camera=(APP.camera+1)%3;};
 $('bFoto').onclick=()=>takePhoto();
 $('bRescue').onclick=()=>{if(DR.crashed&&WRECK)startRescue();};
+$('bBomb').onclick=()=>dropBomb();
 $('bReset').onclick=()=>{if(APP.state==='fly'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}};
 $('bMenu').onclick=()=>{if(APP.paused)closeMenuAndStart();else openMenu();};
 $('startBtn').onclick=closeMenuAndStart;
@@ -3367,7 +3783,7 @@ async function loadGeoMap(lat,lon){
   const seaish=lo2<1.5;
   const m={
     id:'r_geo', name:'Eigener Ort', icon:'🌍', real:true, gen:'real',
-    desc:'Live geladenes Geländeprofil – nur Gelände, keine Gebäude.',
+    desc:'Live geladener echter Ort.',
     ter:{seed:999}, range:Math.round(span*0.42), trees:60,
     data:{span, elev:{n:N}, water:seaish?0:undefined},
     land:{grass:[0.29,0.44,0.22], forest:[0.16,0.32,0.16], rock:[0.42,0.40,0.38],
@@ -3378,6 +3794,63 @@ async function loadGeoMap(lat,lon){
   if(seaish) m.water={level:0,col:[0.07,0.21,0.30]};
   m._geoGrid=g;                                  // fertig dekodiert
   return {map:m, lo:lo2, hi};
+}
+/* ---------------- Echte Gebäude von OpenStreetMap ----------------
+   Overpass liefert Grundrisse mit Höhen-Tags. Fehlt die Höhe, wird sie aus
+   Stockwerken oder der Grundfläche geschätzt (wie bei den gebackenen Karten). */
+const OVERPASS=['https://overpass-api.de/api/interpreter',
+                'https://overpass.kumi.systems/api/interpreter'];
+function estHeight(tags,area){
+  const h=parseFloat(tags.height||tags['building:height']);
+  if(isFinite(h)&&h>1&&h<900) return h;
+  const lv=parseFloat(tags['building:levels']||tags['levels']);
+  if(isFinite(lv)&&lv>0) return Math.min(lv*3.2+1.4,900);
+  if(area<50)return 3.6;
+  if(area<150)return 7.6;
+  if(area<400)return 10.5;
+  if(area<1200)return 13;
+  return 16;
+}
+async function fetchBuildings(lat,lon,span,onMsg){
+  const mLat=111320, mLon=111320*Math.cos(lat*deg), half=span/2;
+  const s=(lat-half/mLat).toFixed(6), n=(lat+half/mLat).toFixed(6);
+  const w=(lon-half/mLon).toFixed(6), e=(lon+half/mLon).toFixed(6);
+  const bb=`${s},${w},${n},${e}`;
+  const q=`[out:json][timeout:45];(way["building"](${bb});way["building:part"](${bb});`+
+          `way["man_made"~"^(tower|lighthouse|water_tower)$"](${bb}););out geom;`;
+  let js=null, lastErr=null;
+  for(const url of OVERPASS){
+    try{
+      const ctl=new AbortController();
+      const to=setTimeout(()=>ctl.abort(),50000);
+      const res=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(q),
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctl.signal});
+      clearTimeout(to);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      js=await res.json();
+      break;
+    }catch(err){ lastErr=err; if(onMsg)onMsg('Gebäudeserver antwortet nicht, versuche Ausweichserver …'); }
+  }
+  if(!js) throw lastErr||new Error('keine Antwort');
+  const polys=[];
+  for(const el of (js.elements||[])){
+    const g=el.geometry;
+    if(!g||g.length<4)continue;
+    const pts=[];
+    for(let i=0;i<g.length-1;i++)                       // letzter Punkt = erster
+      pts.push([(g[i].lon-lon)*mLon, (lat-g[i].lat)*mLat]);
+    if(pts.length<3)continue;
+    let a=0;
+    for(let i=0;i<pts.length;i++){ const p=pts[i],c=pts[(i+1)%pts.length];
+      a+=p[0]*c[1]-c[0]*p[1]; }
+    const area=Math.abs(a)/2;
+    if(area<6||area>400000)continue;
+    polys.push({pts, h:estHeight(el.tags||{},area), area,
+      name:(el.tags&&el.tags.name)||null});
+  }
+  // Bei sehr dichten Städten die größten behalten, damit es flüssig bleibt
+  polys.sort((p,q2)=>q2.area-p.area);
+  return polys.slice(0,5000);
 }
 function geoStatus(t,col){ const e=$('geoMsg'); if(e){ e.textContent=t; e.style.color=col||'var(--dim)'; } }
 async function onGeoLoad(){
@@ -3399,6 +3872,177 @@ async function onGeoLoad(){
     geoStatus('Ort konnte nicht geladen werden ('+e.message+'). Die eingebauten echten Karten funktionieren immer.','var(--bad)');
   }
 }
+
+/* ---------------- Weltkarte zur Ortswahl ----------------
+   Die Karte wird aus denselben offenen Höhenkacheln gezeichnet wie das Gelände:
+   Wasser blau, Land nach Höhe eingefärbt. Ohne Netz bleibt ein Gitter mit den
+   bekannten Orten – auswählen geht dann trotzdem. */
+const WORLD_PINS=[
+  ['Zürich',47.3745,8.5410],['Paris',48.8584,2.2945],['London',51.5007,-0.1246],
+  ['Rom',41.8902,12.4922],['Barcelona',41.4036,2.1744],['Berlin',52.5163,13.3777],
+  ['New York',40.7484,-73.9857],['San Francisco',37.8199,-122.4783],['Chicago',41.8789,-87.6359],
+  ['Rio de Janeiro',-22.9519,-43.2105],['Kapstadt',-33.9249,18.4241],['Dubai',25.1972,55.2744],
+  ['Tokio',35.6586,139.7454],['Singapur',1.2834,103.8607],['Sydney',-33.8568,151.2153],
+  ['Hongkong',22.2783,114.1747],
+];
+const WMAP={lat:null,lon:null,ready:false,drawn:false};
+function wmapProj(lat,lon,W,H){
+  // Web-Mercator, auf ±85° beschnitten (wie die Kacheln)
+  const la=clamp(lat,-85,85)*deg;
+  const y=(1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2;
+  return [ (lon+180)/360*W, y*H ];
+}
+function wmapUnproj(px,py,W,H){
+  const lon=px/W*360-180;
+  const n=Math.PI*(1-2*py/H);
+  const lat=Math.atan(Math.sinh(n))/deg;
+  return [lat,lon];
+}
+function wmapDecorate(){
+  const cv=$('wmap'), cx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  cx.save();
+  cx.strokeStyle='rgba(255,255,255,.10)'; cx.lineWidth=1;
+  for(let lo=-180;lo<=180;lo+=30){ const [x]=wmapProj(0,lo,W,H);
+    cx.beginPath(); cx.moveTo(x,0); cx.lineTo(x,H); cx.stroke(); }
+  for(const la of [-60,-30,0,30,60]){ const [,y]=wmapProj(la,0,W,H);
+    cx.beginPath(); cx.moveTo(0,y); cx.lineTo(W,y); cx.stroke(); }
+  cx.font='bold 13px system-ui,sans-serif'; cx.textBaseline='middle';
+  for(const [nm,la,lo] of WORLD_PINS){
+    const [x,y]=wmapProj(la,lo,W,H);
+    cx.fillStyle='rgba(0,0,0,.55)';
+    cx.fillText(nm,x+9,y+1);
+    cx.fillStyle='#ffd45f';
+    cx.fillText(nm,x+8,y);
+    cx.beginPath(); cx.arc(x,y,3.6,0,7); cx.fill();
+    cx.strokeStyle='rgba(0,0,0,.6)'; cx.lineWidth=1.2; cx.stroke();
+  }
+  if(WMAP.lat!==null){
+    const [x,y]=wmapProj(WMAP.lat,WMAP.lon,W,H);
+    cx.strokeStyle='#37c6ff'; cx.lineWidth=2.5;
+    cx.beginPath(); cx.arc(x,y,10,0,7); cx.stroke();
+    cx.beginPath(); cx.moveTo(x-15,y); cx.lineTo(x+15,y);
+    cx.moveTo(x,y-15); cx.lineTo(x,y+15); cx.stroke();
+  }
+  cx.restore();
+}
+async function wmapDraw(){
+  const cv=$('wmap'), cx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  cx.fillStyle='#12212e'; cx.fillRect(0,0,W,H);
+  if(!WMAP.ready){
+    // Versuch, die Weltkarte aus Höhenkacheln (Zoom 2 = 16 Kacheln) zu bauen
+    try{
+      const z=2, n=4, tmp=document.createElement('canvas');
+      tmp.width=tmp.height=256;
+      const tc=tmp.getContext('2d',{willReadFrequently:true});
+      const img=cx.createImageData(W,H);
+      for(let ty=0;ty<n;ty++)for(let tx=0;tx<n;tx++){
+        const im=await loadTileImg(z,tx,ty);
+        tc.clearRect(0,0,256,256); tc.drawImage(im,0,0);
+        const d=tc.getImageData(0,0,256,256).data;
+        const sx=tx*(W/n), sy=ty*(H/n), sw=W/n, sh=H/n;
+        for(let py=0;py<sh;py++)for(let px=0;px<sw;px++){
+          const s=((py*256/sh|0)*256+(px*256/sw|0))*4;
+          const h=(d[s]*256+d[s+1]+d[s+2]/256)-32768;
+          const o=(((sy+py)|0)*W+((sx+px)|0))*4;
+          let r,g,b;
+          if(h<=0){ const t=clamp(-h/4000,0,1); r=12+t*4; g=40-t*22; b=78-t*30; }
+          else{
+            const t=clamp(h/3200,0,1);
+            r=52+t*150; g=94+t*70; b=48+t*70;
+            if(h>2600){ const s2=clamp((h-2600)/1800,0,1); r=r+(240-r)*s2; g=g+(244-g)*s2; b=b+(250-b)*s2; }
+          }
+          img.data[o]=r; img.data[o+1]=g; img.data[o+2]=b; img.data[o+3]=255;
+        }
+      }
+      cx.putImageData(img,0,0);
+      WMAP.ready=true;
+    }catch(e){
+      cx.fillStyle='#12212e'; cx.fillRect(0,0,W,H);
+      cx.fillStyle='#7fa0bb'; cx.font='15px system-ui,sans-serif'; cx.textAlign='center';
+      cx.fillText('Weltkarte konnte nicht geladen werden – die Orte unten funktionieren trotzdem.',W/2,H/2);
+      cx.textAlign='left';
+    }
+  }
+  WMAP.base=cx.getImageData(0,0,W,H);      // Kartenbild ohne Beschriftung merken
+  wmapDecorate();
+}
+function wmapPick(lat,lon,name){
+  WMAP.lat=lat; WMAP.lon=lon; WMAP.name=name||null;
+  $('wSel').innerHTML=(name?'📍 <b>'+name+'</b> · ':'📍 ')+
+    lat.toFixed(4)+', '+lon.toFixed(4);
+  const cv=$('wmap'), cx=cv.getContext('2d');
+  if(WMAP.base) cx.putImageData(WMAP.base,0,0);
+  wmapDecorate();
+}
+function openWorld(){
+  $('menu').style.display='none';
+  $('world').style.display='block';
+  $('wMsg').textContent='';
+  const pins=$('wPins');
+  if(!pins.childElementCount){
+    for(const [nm,la,lo] of WORLD_PINS){
+      const b=document.createElement('button');
+      b.textContent='📍 '+nm;
+      b.onclick=()=>wmapPick(la,lo,nm);
+      pins.appendChild(b);
+    }
+  }
+  if(!WMAP.drawn){ WMAP.drawn=true; wmapDraw(); }
+  else wmapPick2();
+}
+function wmapPick2(){ const cv=$('wmap'), cx=cv.getContext('2d');
+  if(WMAP.base) cx.putImageData(WMAP.base,0,0); wmapDecorate(); }
+function closeWorld(){ $('world').style.display='none'; openMenu(); }
+function wStatus(t,col){ const e=$('wMsg'); e.textContent=t; e.style.color=col||'var(--dim)'; }
+async function loadWorldPlace(){
+  if(WMAP.lat===null){ wStatus('Erst einen Ort auf der Karte oder unten auswählen.','var(--warn)'); return; }
+  const lat=WMAP.lat, lon=WMAP.lon, nm=WMAP.name;
+  $('wGo').disabled=true;
+  try{
+    wStatus('Lade Geländeprofil …');
+    const {map,lo,hi}=await loadGeoMap(lat,lon);
+    if(nm){ map.name=nm; map.icon='📍'; }
+    wStatus('Gelände da ('+lo.toFixed(0)+'–'+hi.toFixed(0)+' m). Lade echte Gebäude …');
+    let nb=0;
+    try{
+      const polys=await fetchBuildings(lat,lon,2400,t=>wStatus(t,'var(--warn)'));
+      map.data.polys=polys; nb=polys.length;
+    }catch(e){
+      wStatus('Gelände geladen, aber die Gebäude kamen nicht durch ('+e.message+'). Du fliegst über das echte Relief.','var(--warn)');
+    }
+    map.desc=(nm?nm+': ':'')+'echtes Gelände '+lo.toFixed(0)+'–'+hi.toFixed(0)+' m'+
+      (nb?' mit '+nb+' echten Gebäuden':' (ohne Gebäude)');
+    const i=MAPS.findIndex(x=>x.id==='r_geo');
+    if(i>=0) MAPS[i]=map; else MAPS.push(map);
+    APP.mapId='r_geo';
+    SCENE=null;
+    buildMenu();
+    if(nb) wStatus('✔ Fertig: '+nb+' echte Gebäude geladen. Zurück ins Menü und abheben!','var(--acc2)');
+    else if(!/Gebäude kamen nicht durch/.test($('wMsg').textContent))
+      wStatus('✔ Gelände geladen – hier gibt es keine erfassten Gebäude.','var(--acc2)');
+    geoStatus('Geladen: '+(nm||lat.toFixed(4)+', '+lon.toFixed(4))+(nb?' · '+nb+' Gebäude':''),'var(--acc2)');
+  }catch(e){
+    wStatus('Ort konnte nicht geladen werden ('+e.message+'). Die eingebauten echten Karten funktionieren immer.','var(--bad)');
+  }
+  $('wGo').disabled=false;
+}
+$('worldBtn').onclick=openWorld;
+$('wClose').onclick=closeWorld;
+$('wGo').onclick=loadWorldPlace;
+$('wmap').addEventListener('click',e=>{
+  const cv=$('wmap'), r=cv.getBoundingClientRect();
+  const px=(e.clientX-r.left)/r.width*cv.width, py=(e.clientY-r.top)/r.height*cv.height;
+  // In der Nähe eines bekannten Ortes einrasten
+  let best=null,bd=1e9;
+  for(const [nm,la,lo] of WORLD_PINS){
+    const [x,y]=wmapProj(la,lo,cv.width,cv.height);
+    const dd=Math.hypot(x-px,y-py);
+    if(dd<bd){bd=dd;best=[nm,la,lo];}
+  }
+  if(bd<14){ wmapPick(best[1],best[2],best[0]); return; }
+  const [lat,lon]=wmapUnproj(px,py,cv.width,cv.height);
+  wmapPick(lat,lon);
+});
 
 /* ---------------- DIY-Editor ---------------- */
 const EDIT={sel:{...DIY_DEFAULT}, drone:null, editId:null, spin:0, propAng:0};
@@ -3475,11 +4119,39 @@ function buildEditorUI(){
     c.appendChild(nm);c.appendChild(del);list.appendChild(c);
   }
 }
+/* Prompt-Feld: freie Wunschbeschreibung -> Teileauswahl (oder Easter Egg) */
+function onPrompt(){
+  const txt=($('ePrompt').value||'').trim();
+  const msg=$('ePromptMsg');
+  const r=parsePrompt(txt);
+  if(r.empty){ msg.textContent='Schreib erst, was die Drohne können soll.'; msg.style.color='var(--warn)'; return; }
+  if(r.egg){
+    const spec=unlockEgg(r.egg);
+    ensureDroneMesh(spec);
+    APP.model=spec; APP.modeIdx=0;
+    msg.innerHTML='🥚 <b>Easter Egg gefunden:</b> '+spec.name+' – liegt jetzt im Flugmenü bereit.';
+    msg.style.color='var(--acc2)';
+    toast('🥚 Easter Egg freigeschaltet: '+spec.name,4000);
+    buildMenu();
+    return;
+  }
+  if(r.none){
+    msg.textContent='Damit kann ich nichts anfangen. Versuch Wörter wie schnell, Ausdauer, filmen, klein, stabil, tragen, Freestyle – oder eine Farbe.';
+    msg.style.color='var(--warn)'; return;
+  }
+  Object.assign(EDIT.sel,r.sel);
+  if(r.sel.color){ delete EDIT.sel.c1; delete EDIT.sel.c2; }
+  if(!$('eName').value.trim()) $('eName').value=txt.slice(0,24);
+  editorRebuild(); buildEditorUI();
+  msg.textContent='✔ '+r.say;
+  msg.style.color='var(--acc2)';
+}
 function openEditor(){
   EDIT.prevState=(APP.state==='fly')?'fly':'menu';
   APP.paused=true; APP.state='editor'; EDIT.editId=null;
   $('menu').style.display='none'; $('editor').style.display='block';
   EDIT.sel={...DIY_DEFAULT}; $('eName').value='';
+  $('ePrompt').value=''; $('ePromptMsg').textContent='';
   EDIT.spin=0.7;
   editorRebuild(); buildEditorUI();
 }
@@ -3550,6 +4222,8 @@ $('buildBtn').onclick=openEditor;
 $('eClose').onclick=closeEditor;
 $('eSaveBtn').onclick=saveDIY;
 $('eName').addEventListener('input',()=>{ if(EDIT.drone)EDIT.drone.name=$('eName').value; });
+$('ePromptBtn').onclick=onPrompt;
+$('ePrompt').addEventListener('keydown',e=>{if(e.key==='Enter')onPrompt();});
 
 /* ---------------- Hauptschleife ---------------- */
 let lastT=0,acc=0;
@@ -3565,6 +4239,7 @@ function frame(t){
     stepPeople(dt);
     stepDebris(dt);
     rescueStep(dt);
+    stepBombs(dt);
     updateAudio((DR.motors[0]+DR.motors[1]+DR.motors[2]+DR.motors[3])/4,DR.armed,dt);
   } else updateAudio(0,false,dt);
   if(APP.state==='fly'){render();drawHUD();}
@@ -3606,7 +4281,7 @@ window.T={
     for(let i=0;i<steps;i++){
       physStep(DT);
       if(APP.mission)APP.mission.step(DT);
-      stepDebris(DT);rescueStep(DT);
+      stepDebris(DT);rescueStep(DT);stepBombs(DT);
     }
   },
   st(){return {pos:[...DR.pos],vel:[...DR.vel],mode:APP.mode,armed:DR.armed,
