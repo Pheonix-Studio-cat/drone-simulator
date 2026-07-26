@@ -535,6 +535,12 @@ const PARTS={
     {id:'fpv', name:'FPV-Kamera', mass:0.02, gimbal:0, fpvcam:1, desc:'Feste Frontkamera'},
     {id:'gimbal', name:'3-Achs-Gimbal', mass:0.09, gimbal:1, desc:'Stabilisierte Kamerakugel'},
   ],
+  gear:[
+    {id:'none', name:'Ohne Fahrwerk', mass:0, desc:'Leichteste Wahl, setzt auf dem Rumpf auf'},
+    {id:'skids', name:'Landekufen', mass:0.035, legs:1, desc:'Hoher Stand, schont Kamera & Props'},
+    {id:'floats', name:'Wasser-Landefüße', mass:0.075, legs:1, floats:1,
+     desc:'Schwimmer: landet und treibt auf dem Wasser ★neu'},
+  ],
   color:[
     {id:'grey', name:'Hellgrau', c1:[.72,.73,.76], c2:[.2,.22,.26]},
     {id:'dark', name:'Anthrazit', c1:[.22,.23,.26], c2:[.5,.51,.55]},
@@ -546,7 +552,7 @@ const PARTS={
     {id:'purple',name:'Violett',c1:[.45,.24,.7], c2:[.9,.85,.4]},
   ],
 };
-const DIY_DEFAULT={frame:'fold',motor:'std',prop:'m',batt:'4s',cam:'gimbal',color:'grey'};
+const DIY_DEFAULT={frame:'fold',motor:'std',prop:'m',batt:'4s',cam:'gimbal',gear:'none',color:'grey'};
 function partBy(cat,id){ return PARTS[cat].find(p=>p.id===id)||PARTS[cat][0]; }
 function hexToRgb(h){ h=(h||'').replace('#',''); if(h.length!==6)return null;
   return [parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255]; }
@@ -554,13 +560,13 @@ function rgbToHex(c){ return '#'+c.map(x=>Math.round(clamp(x,0,1)*255).toString(
 
 function buildDIYDrone(sel,name,id){
   const F=partBy('frame',sel.frame), M=partBy('motor',sel.motor), P=partBy('prop',sel.prop),
-        B=partBy('batt',sel.batt), C=partBy('cam',sel.cam);
+        B=partBy('batt',sel.batt), C=partBy('cam',sel.cam), Gr=partBy('gear',sel.gear);
   // Farbe: Preset ODER frei gewählte Custom-Farben (Hex)
   let c1,c2;
   if(sel.c1 && sel.c2 && sel.color==='custom'){ c1=hexToRgb(sel.c1)||[.7,.7,.7]; c2=hexToRgb(sel.c2)||[.15,.15,.15]; }
   else { const COL=partBy('color',sel.color); c1=COL.c1; c2=COL.c2; }
   const fpv=F.cls==='fpv';
-  const mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0));
+  const mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0));
   // Schub/Gewicht sinkt leicht mit schwerem Akku, steigt mit großen Props
   const twr=Math.max(1.6, M.twr*(0.85+P.propR*1.6)*(fpv?1.05:1.0));
   const maxSpeed = fpv ? 9+twr*3.6 : 6+twr*5.5;
@@ -577,7 +583,8 @@ function buildDIYDrone(sel,name,id){
     rates:{max: fpv?560+agility*120:340, expo:fpv?.68:.6},
     camAngle: fpv?(C.fpvcam?22:0):0, fovFpv: fpv?112:74,
     style:{c1, c2, bodyL:F.bodyL, bodyW:F.bodyW, bodyH:F.bodyH,
-      ...(F.feat||{}), gimbal:C.gimbal?1:0, canopy:(C.fpvcam||(F.feat&&F.feat.canopy))?1:0},
+      ...(F.feat||{}), gimbal:C.gimbal?1:0, canopy:(C.fpvcam||(F.feat&&F.feat.canopy))?1:0,
+      legs:(Gr.legs||(F.feat&&F.feat.legs))?1:0, floats:Gr.floats?1:0},
   };
   // Amp-Verbrauch an Motorklasse koppeln (beeinflusst Flugzeit spürbar)
   finalizeDrone(d);
@@ -592,7 +599,8 @@ function diySpecs(d){
     ['🔋 Flugzeit','~'+d.batt.min+' min · '+d.batt.cells+'S'],
     ['🎥 Kamera', partBy('cam',d.sel.cam).name],
     ['🎯 Agilität', d.agility>1.3?'sehr hoch':d.agility>0.9?'hoch':d.agility>0.6?'mittel':'ruhig'],
-    ['🪶 Stabilität', stabLabel(d.stab)]];
+    ['🪶 Stabilität', stabLabel(d.stab)],
+    ['🦵 Fahrwerk', d.style.floats?'Schwimmer – wasserfest':partBy('gear',d.sel.gear).name]];
 }
 /* DIY-Drohnen laden/speichern */
 let DIY_DRONES=[];
@@ -665,6 +673,8 @@ const PROMPT_RULES=[
    sel:{frame:'deadcat',motor:'sport',prop:'m',batt:'6sr',cam:'fpv'}, say:'Freestyle-Aufbau mit freier Kamerasicht'},
   {k:['eigenbau','3d-druck','3d druck','gedruckt','selbstbau','speedy'],
    sel:{frame:'speedy',motor:'race',prop:'m',batt:'6sr',cam:'fpv'}, say:'Eigenbau-Rahmen aus dem 3D-Drucker'},
+  {k:['wasser','see','schwimm','boot','fluss','meer','strand','landen auf dem wasser'],
+   sel:{gear:'floats',frame:'quad',motor:'std',prop:'l',batt:'6s'}, say:'Wasser-Landefüße: landet und treibt auf dem See'},
   {k:['enge','tunnel','innen','schutz','duct','cinewhoop','sanft'],
    sel:{frame:'whoop',motor:'sport',prop:'s',batt:'4s',cam:'fpv'}, say:'Cinewhoop mit Propellerschutz'},
 ];
@@ -1144,6 +1154,29 @@ const PERSON_MESHES={
   parka:[personMesh([0.95,0.45,0.1],[0.2,0.22,0.28],1),personMesh([0.9,0.2,0.15],[0.18,0.2,0.25],1)],
 };
 
+/* --- Wasser-Landefüße: zwei Schwimmer unter dem Rumpf ---
+   Wird an jeden Rahmen angehängt, egal welcher Bauart (auch blockig). */
+function floatGeom(d,st,L,W,H,arm){
+  const fl=Math.max(L*1.25,arm*2.0);                 // Länge
+  const fr=Math.max(0.02,arm*0.15);                  // Radius
+  const fx=Math.max(W*0.75,arm*0.5);                 // seitlicher Abstand
+  const fy=-Math.max(H*1.9,arm*0.8)-fr;              // Höhe unter dem Rumpf
+  return {fl,fr,fx,fy};
+}
+function addFloats(b,d,st,L,W,H,arm){
+  const {fl,fr,fx,fy}=floatGeom(d,st,L,W,H,arm);
+  const hull=[0.94,0.95,0.97], strut=[0.34,0.35,0.39];
+  for(const s of [-1,1]){
+    const x=s*fx;
+    b.tube([x,fy,-fl*0.36],[x,fy,fl*0.4],fr,fr*0.92,12,hull);          // Schwimmerkörper
+    b.tube([x,fy,-fl*0.36],[x,fy+fr*0.5,-fl*0.5],fr,fr*0.22,12,hull);  // hochgezogene Nase
+    b.ellipsoid(fr*0.92,fr*0.92,fr*0.5,[x,fy,fl*0.4],12,7,hull);       // Heck
+    b.tube([x,fy-fr*0.55,-fl*0.3],[x,fy-fr*0.55,fl*0.36],fr*0.5,fr*0.5,8,st.c2); // Kiel in Akzentfarbe
+    for(const sz of [-1,1])
+      b.tube([s*Math.max(W*0.4,arm*0.28),-H*0.3,sz*fl*0.24],[x,fy+fr*0.7,sz*fl*0.24],
+        Math.max(0.0035,arm*0.032),Math.max(0.003,arm*0.026),7,strut);
+  }
+}
 /* --- Drohnen-Meshes: Loft-Rümpfe und Röhren-Arme, den realen Vorbildern nah ---
    (vorn = -z; Propeller-Ebene: style.propY bzw. bodyH*0.42) */
 function buildDroneMesh(d){
@@ -1531,6 +1564,8 @@ function buildDroneMesh(d){
       break;
     }
   }
+  // Wasser-Landefüße: zwei Schwimmer längs unter dem Rumpf, an Streben aufgehängt
+  if(st.floats) addFloats(b,d,st,L,W,H,arm);
   const body=b.build();
   // Schlanke Propellerblätter: 2 Blätter bei Kameradrohnen, 3 bei FPV (wie real)
   const prop=mesh(pb=>{
@@ -1736,6 +1771,20 @@ function buildDroneMeshBlocky(d){
       b.box(W*0.2,W*0.28,W*0.2,[0,H*1.05+antH,L*0.42],0,st.c2);
       bladeCol=st.c2; hubCol=carbon;
       break;
+    }
+  }
+  // Wasser-Landefüße, hier als Klötze passend zum Retro-Look
+  if(st.floats){
+    const {fl,fr,fx,fy}=floatGeom(d,st,L,W,H,arm);
+    const hull=[0.92,0.93,0.96], strut=[0.34,0.35,0.39];
+    for(const s of [-1,1]){
+      const x=s*fx;
+      b.box(fr*1.9,fr*1.7,fl*0.86,[x,fy,0],0,hull);
+      b.box(fr*1.5,fr*1.2,fl*0.12,[x,fy+fr*0.4,-fl*0.47],0,hull);
+      b.box(fr*1.95,fr*0.5,fl*0.7,[x,fy-fr*0.8,0],0,st.c2);
+      for(const sz of [-1,1])
+        b.box(Math.max(0.008,arm*0.06),Math.abs(-H*0.3-fy),Math.max(0.008,arm*0.06),
+          [x,(-H*0.3+fy)/2,sz*fl*0.24],0,strut);
     }
   }
   const body=b.build();
@@ -2464,7 +2513,13 @@ function resetDrone(fullBatt=true,clearWreck=true){
   if(APP.mission) APP.mission.reset();
   updateButtons();
 }
-function groundClear(d){ return d.style.legs? d.style.bodyH*2.4+0.02 : d.style.bodyH*0.8+d.propR*0.15+0.02; }
+function groundClear(d){
+  if(d.style.floats){                       // steht auf den Schwimmern
+    const g=floatGeom(d,d.style,d.style.bodyL,d.style.bodyW,d.style.bodyH,d.arm);
+    return -g.fy+g.fr*1.2;
+  }
+  return d.style.legs? d.style.bodyH*2.4+0.02 : d.style.bodyH*0.8+d.propR*0.15+0.02;
+}
 
 /* --- Wind --- */
 function windAt(t,y){
@@ -2677,6 +2732,8 @@ function batteryStep(dt,Tsum,m){
 /* --- Boden, Wasser, Plattformen, Hindernisse, Menschen --- */
 function groundHeightAt(x,z){
   let g=SCENE?SCENE.terH(x,z):0;
+  // Mit Schwimmern ist die Wasseroberfläche tragfähiger Boden
+  if(SCENE&&SCENE.water&&APP.model.style.floats) g=Math.max(g,SCENE.water.level);
   for(const p of activePlatforms()){
     if(Math.hypot(x-p.x,z-p.z)<p.r) g=Math.max(g,p.top);
   }
@@ -2694,8 +2751,8 @@ function tiltAngle(){
 }
 function groundAndCollisions(dt,m){
   const d=APP.model, clear=groundClear(d);
-  // Wasser: Landung = Totalverlust
-  if(SCENE.water&&!DR.crashed){
+  // Wasser: ohne Schwimmer ist die Landung ein Totalverlust
+  if(SCENE.water&&!DR.crashed&&!d.style.floats){
     const wl=SCENE.water.level;
     if(DR.pos[1]-clear*0.5<=wl&&SCENE.terH(DR.pos[0],DR.pos[2])<wl-0.05){
       DR.pos[1]=wl+clear*0.5;
@@ -2709,12 +2766,18 @@ function groundAndCollisions(dt,m){
   if(bottom<=gh){
     const impact=-DR.vel[1];
     const tilt=tiltAngle();
-    DR.pos[1]=gh+clear;
-    if(!DR.onGround&&(impact>3.6||vh>6||(tilt>55*deg&&DR.armed))){ crash('Zu hart aufgeschlagen'); }
+    // Schwimmt die Drohne? Dann trägt Wasser statt Boden – sie wippt und rutscht
+    const onWater=!!(SCENE.water&&d.style.floats&&
+      SCENE.terH(DR.pos[0],DR.pos[2])<SCENE.water.level-0.05&&
+      gh<=SCENE.water.level+0.001);
+    DR.floating=onWater;
+    DR.pos[1]=gh+clear+(onWater?Math.sin(APP.time*1.7)*0.035:0);
+    if(!DR.onGround&&(impact>(onWater?5.5:3.6)||vh>(onWater?8:6)||(tilt>55*deg&&DR.armed)))
+      crash(onWater?'Zu hart aufs Wasser geknallt':'Zu hart aufgeschlagen');
     DR.vel[1]=Math.max(0,DR.vel[1]);
-    const f=Math.exp(-8*dt);
+    const f=Math.exp((onWater?-1.6:-8)*dt), fa=Math.exp(-8*dt);
     DR.vel[0]*=f; DR.vel[2]*=f;
-    DR.w[0]*=f; DR.w[2]*=f; DR.w[1]*=Math.exp(-4*dt);
+    DR.w[0]*=fa; DR.w[2]*=fa; DR.w[1]*=Math.exp(-4*dt);
     if(tilt<70*deg&&!DR.crashed){
       const upv=Q.rot(DR.q,[0,1,0]);
       const ax=V3.cross(upv,[0,1,0]);
@@ -2727,7 +2790,7 @@ function groundAndCollisions(dt,m){
       else DR.groundTimer=0;
     }
   }else{
-    if(bottom>gh+0.02)DR.onGround=false;
+    if(bottom>gh+0.02){ DR.onGround=false; DR.floating=false; }
     DR.groundTimer=0;
   }
   // Statische Hindernisse
@@ -4054,7 +4117,7 @@ function editorRebuild(){
 }
 function buildEditorUI(){
   const cats=[['frame','Gehäuse / Rahmen'],['motor','Motoren'],['prop','Propeller'],
-    ['batt','Akku'],['cam','Kamera'],['color','Farbe']];
+    ['batt','Akku'],['cam','Kamera'],['gear','Fahrwerk / Landefüße'],['color','Farbe']];
   const host=$('eParts');
   host.innerHTML='';
   for(const [cat,label] of cats){
@@ -4183,7 +4246,8 @@ function renderEditorPreview(){
   const vpH=glc.height*0.46;
   gl.viewport(0,glc.height-vpH,glc.width,vpH);
   const asp=glc.width/vpH;
-  const reach=Math.max(d.arm+d.propR, d.style.bodyL*0.6, (d.style.legs?d.style.bodyH*3:d.style.bodyH*1.5));
+  const reach=Math.max(d.arm+d.propR, d.style.bodyL*0.6,
+    d.style.floats?groundClear(d)*1.15:(d.style.legs?d.style.bodyH*3:d.style.bodyH*1.5));
   const rad=reach*3.1+0.2;
   const a=EDIT.spin;
   const eye=[Math.cos(a)*rad, rad*0.32, Math.sin(a)*rad];
