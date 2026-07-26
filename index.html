@@ -525,7 +525,7 @@ const DRONES=[
   maxTilt:40, maxSpeed:27, climb:15, desc_:10, yawRate:200,
   batt:{cells:6, mah:2000, min:14}, modes:['GPS','ANGLE','ACRO'], gpsQ:.95, agility:1.3,
   rates:{max:640,expo:.65}, camAngle:22, fovFpv:112,
-  style:{c1:[.2,.21,.24],c2:[.4,.75,.4],bodyL:.14,bodyW:.09,bodyH:.06,canopy:1}},
+  style:{c1:[.26,.27,.3],c2:[.85,.12,.12],bodyL:.14,bodyW:.09,bodyH:.06,canopy:1}},
  {id:'race5', name:'Race 5 Zoll', cls:'fpv',
   desc:'Klassischer 5-Zoll-Racer: brutale Beschleunigung, volle manuelle Kontrolle.',
   mass:0.65, arm:0.08, twr:6.5, tauUp:0.035, tauDn:0.06, propR:0.0635,
@@ -599,6 +599,9 @@ const PARTS={
      bodyL:.13,bodyW:.04,bodyH:.035, feat:{canopy:1,ant:1}, desc:'Karbon-Racer, kompromisslos'},
     {id:'race3', name:'Micro-Rahmen 3"', kind:'race3', cls:'fpv', arm:0.055, mass:0.07,
      bodyL:.09,bodyW:.035,bodyH:.03, feat:{canopy:1,ant:1}, desc:'Leicht & nervös'},
+    {id:'hyfpv', name:'Hybrid-FPV-Rahmen', kind:'hyfpv', cls:'fpv', arm:0.09, mass:0.17,
+     bodyL:.14,bodyW:.09,bodyH:.06, feat:{canopy:1},
+     desc:'Breite Haube, GPS-tauglich – schneller FPV-Allrounder ★neu'},
     {id:'deadcat', name:'Deadcat-FPV-Rahmen', kind:'deadcat', cls:'fpv', arm:0.09, mass:0.14,
      bodyL:.15,bodyW:.05,bodyH:.04, feat:{canopy:1,ant:1}, desc:'Breit & flach, freie Kamerasicht ★neu'},
     {id:'toothpick', name:'Toothpick-Rahmen', kind:'toothpick', cls:'fpv', arm:0.06, mass:0.045,
@@ -892,6 +895,9 @@ const PROMPT_RULES=[
    sel:{gear:'floats',frame:'quad',motor:'std',prop:'l',batt:'6s'}, say:'Wasser-Landefüße: landet und treibt auf dem See'},
   {k:['enge','tunnel','innen','schutz','duct','cinewhoop','sanft'],
    sel:{frame:'whoop',motor:'sport',prop:'s',batt:'4s',cam:'fpv'}, say:'Cinewhoop mit Propellerschutz'},
+  {k:['hybrid','hyfpv','fpv mit gps','gps und fpv','schweben auf knopfdruck'],
+   sel:{frame:'hyfpv',motor:'sport',prop:'m',batt:'6s',cam:'fpv'},
+   say:'Hybrid-FPV: schnell wie ein Racer, hält aber im GPS-Modus die Position'},
 ];
 const PROMPT_COLORS=[['rot','red'],['blau','blue'],['grün','green'],['gruen','green'],['green','green'],
   ['weiß','white'],['weiss','white'],['white','white'],['schwarz','dark'],['dunkel','dark'],['black','dark'],
@@ -1807,8 +1813,10 @@ function buildDroneMesh(d){
       break;
     }
     case 'hyfpv': {
-      // FPV-Drohne: bucklige geloftete Silhouette mit Kamera-Kopf, rote Akzente
-      const c1=[0.26,0.27,0.3], red=[0.85,0.12,0.12];
+      // FPV-Drohne: bucklige geloftete Silhouette mit Kamera-Kopf.
+      // Rumpf- und Akzentfarbe kommen aus dem Modell, damit der Rahmen
+      // im Editor auf den Farbwähler reagiert.
+      const c1=st.c1, red=st.c2;
       b.loft([
         {z:-L*0.55,y:H*0.28,w:W*0.24,h:H*0.3,e:2.4},
         {z:-L*0.4,y:H*0.3,w:W*0.68,h:H*0.75,e:2.8},
@@ -2389,8 +2397,8 @@ function buildDroneMeshBlocky(d){
       break;
     }
     case 'hyfpv': {
-      // Buckliger FPV-Rumpf mit Kamera-Kopf, rote Akzente
-      const c1=[0.26,0.27,0.3], red=[0.85,0.12,0.12];
+      // Buckliger FPV-Rumpf mit Kamera-Kopf, Farben aus dem Modell
+      const c1=st.c1, red=st.c2;
       b.box(W,H*0.5,L,[0,-H*0.2,0],0,c1);
       b.box(W*0.88,H*0.7,L*0.75,[0,H*0.3,L*0.05],0,c1);            // Buckel
       b.box(W*0.6,H*0.5,L*0.4,[0,H*0.72,L*0.12],0,c1);
