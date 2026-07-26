@@ -80,7 +80,7 @@ Foto-Button 📷 (Taste `F`): Schnappschüsse landen in einer **Galerie** im Men
 ### 🔧 DIY-Drohnen-Editor
 **💬 Einfach hinschreiben, was sie können soll:** Ganz oben im Editor gibt es ein Feld für deinen Wunsch – „schnell und wendig", „lange Flugzeit", „zum Filmen in Rot", „klein für drinnen", „schwere Lasten tragen", „Freestyle". Der Baukasten stellt Rahmen, Motoren, Propeller, Akku, Kamera und Farbe passend ein. *Manche Wünsche schalten etwas frei, das sonst nirgends im Menü steht …*
 
-Es gibt auch **Zubehör** zu finden, das an *jede* selbstgebaute Drohne passt: einen **Kamikaze-Sprengsatz** (der Aufschlag ist die Zündung) und ein **unsichtbares Atombomben-Magazin** mit 20 Sprengköpfen. Beide tauchen nach dem Fund im Editor unter **Zubehör** auf. Und eine schlanke **Langstreckendrohne** mit Satellitenkuppel, V-Leitwerk und Waffenpylonen – 200 km/h, 10 Bomben und eine Atombombe.
+Es gibt auch **Zubehör** zu finden, das an *jede* selbstgebaute Drohne passt: einen **Kamikaze-Sprengsatz** (der Aufschlag ist die Zündung), ein **unsichtbares Atombomben-Magazin** mit 20 Sprengköpfen und eine **Katze im Tragegurt** 🐱, die unter dem Rumpf hängt und auf Knopfdruck (Taste `Y`) maunzt – der Ton wird im Spiel erzeugt, nachzuladen ist nichts. Ihre 1,6 kg wollen allerdings erst mal gehoben werden. Beide tauchen nach dem Fund im Editor unter **Zubehör** auf. Und eine schlanke **Langstreckendrohne** mit Satellitenkuppel, V-Leitwerk und Waffenpylonen – 200 km/h, 10 Bomben und eine Atombombe.
 
 Der dickste Fund ist ein getarnter **Nurflügler** mit vier in die Fläche versenkten Hubrotoren und zwei **Nuklearraketen**: 100 m Sprengradius, und wer im Umkreis von 200 m steht, wächst hinterher ein paar Gliedmaßen zu viel (Comic-Effekt, je näher desto absurder). Vor dem Abschuss zeigt ein Ring den Sprengradius am Boden – halte selbst Abstand, sonst erwischt dich die Druckwelle.
 
@@ -97,6 +97,9 @@ Was einmal gefunden ist, bleibt: Die freigeschalteten Bauten stehen danach unter
 | 🎇 **Feuerwerks-Kanone** | 220 g | Drei Geschosse **nach vorn** – Taste `G`. Sie zerplatzen am Ziel und reißen im Umkreis von 14 m Bäume, Masten, Zäune und Schornsteine weg. Häuser und Hallen bleiben stehen |
 | 🐝 **Hornissennest** | 340 g | Dreimal Schwarm – Taste `H`. Die Hornissen suchen sich die nächste **fremde Drohne im Umkreis von 300 m** und holen sie vom Himmel. Ohne Ziel in Reichweite bleiben sie im Nest |
 | 🛰️ **Mini-Andockdrohne** | 50 g | Klinkt sich mit Taste `K` aus, fliegt allein eine Erkundungsschleife, **fotografiert unterwegs aus ihrer eigenen Sicht** (die Bilder landen in der Galerie) und dockt danach wieder an. Ein zweiter Druck ruft sie sofort zurück |
+| 🪰 **Wespennest** | 280 g | Dreimal Schwarm – Taste `J`. 40 Wespen gehen auf **alle Menschen im Umkreis von 150 m** los; wer gestochen wird, rennt panisch davon und ist gleich darauf über alle Berge. Ist niemand in Reichweite, bleiben sie im Nest |
+
+Angebautes Zubehör **wiegt wirklich mit**: Der Antrieb wird davon nicht stärker, das Schub/Gewicht im Datenblatt sinkt entsprechend. Ein Kompaktrahmen mit Bomben-Magazin fällt von 2,6:1 auf 1,9:1 – und ein überladener Aufbau kommt gar nicht mehr hoch.
 
 ### 📡 Fremde Drohnen
 Ab und zu – selten, frühestens nach gut einer halben Minute und höchstens zu zweit – taucht eine **fremde KI-Drohne** über der Karte auf, zieht ihre Bahn und blinkt dabei rot. Man erwischt sie mit dem Hornissenschwarm, mit einem Kanonentreffer daneben, mit einer Bombe oder einer Atombombe. Getroffen trudelt sie zu Boden und zerschellt.
@@ -149,6 +152,8 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 | `G` | Feuerwerks-Kanone nach vorn (mit Kanone) |
 | `H` | Hornissenschwarm loslassen (mit Hornissennest) |
 | `K` | Mini-Andockdrohne ausklinken / zurückrufen |
+| `J` | Wespenschwarm loslassen (mit Wespennest) |
+| `Y` | Katze miauen lassen (mit Katze im Tragegurt) |
 | `R` | Zurücksetzen |
 | `1`–`4` | Windstärke |
 | `Esc` | Menü |
