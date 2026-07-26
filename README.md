@@ -86,9 +86,18 @@ Der dickste Fund ist ein getarnter **Nurflügler** mit vier in die Fläche verse
 
 Was einmal gefunden ist, bleibt: Die freigeschalteten Bauten stehen danach unter **„🥚 Gefundene Easter Eggs"** als Vorlage im Editor und ihre Spezialrahmen tauchen im Teilekatalog auf. Du kannst sie also **komplett umbauen** – anderer Antrieb, anderer Akku, Schwimmer, eigene Farbe – und ihre Besonderheit (Abwurfschacht bzw. Raketen samt kurzer Funkreichweite) nimmst du mit. Die Originale bleiben unangetastet im Flugmenü.
 
+**🎒 Zubehör – drei Steckplätze an jeder Drohne:** Unter *Zubehör – Steckplatz 1/2/3* hängst du bis zu **drei Teile** an eine Drohne, gern auch zweimal dasselbe (zwei Bomben-Magazine = 4 Bomben). Alles wiegt mit und ist am Modell zu sehen:
+
+| Teil | Gewicht | Was es tut |
+|---|---|---|
+| 💣 **Bomben-Magazin** | 260 g | Zwei Abwurfbomben unter dem Rumpf – Taste `X` |
+| 🎆 **Feuerwerks-Magazin** | 140 g | Drei Leuchtkugeln, die bunt am Himmel zerplatzen – Taste `V`. Reine Deko, zerstört nichts |
+| 📦 **Pakethaken mit Kiste** | 90 g | Kiste am Seil: mit Taste `P` abwerfen, drüber hovern und wieder aufnehmen. Der **Inhalt** ist wählbar – Luftpolster (200 g), Werkzeug (800 g) oder Ziegelsteine (1,8 kg). Die Last ist in der Flugphysik deutlich zu spüren, abwerfen macht sofort leichter |
+| 🎥 **Action-Cam** | 12 g | Winzige Frontkamera als Kameraersatz – deutlich leichter als FPV-Kamera (20 g) und Gimbal (90 g), gibt trotzdem eine FPV-Sicht |
+
 **🛟 Wasser-Landefüße:** Im Abschnitt *Fahrwerk / Landefüße* gibt es neben Landekufen auch **Schwimmer** – damit landet die Drohne sanft auf dem See, treibt dort (sie wippt und rutscht mit dem Wind) und startet wieder. Ohne Schwimmer bleibt Wasser weiterhin ein Totalverlust; und wer mit Karacho aufschlägt, macht sie auch mit Schwimmern kaputt.
 
-Baue im Menü über **„Eigene Drohne bauen"** deine eigene Drohne aus vorgegebenen Teilen: **Gehäuse/Rahmen** (inkl. exklusiver Frames wie Deadcat, Toothpick und Tiny-Whoop), **Motoren, Propeller, Akku, Kamera, Fahrwerk** und **Farbe** – mit Farbpaletten *und* freiem **Farbwähler im Spektrum** für Haupt- und Akzentfarbe. Eine drehende **Live-3D-Vorschau** und laufend aktualisierte Kennwerte (Gewicht, Topspeed, Schub/Gewicht, Flugzeit, Agilität, Stabilität) zeigen sofort, was deine Wahl bewirkt. Gespeicherte Drohnen landen als **DIY** im Flugmenü und fliegen mit der echten Physik – gespeichert bleibt alles lokal im Browser.
+Baue im Menü über **„Eigene Drohne bauen"** deine eigene Drohne aus vorgegebenen Teilen: **Gehäuse/Rahmen** (inkl. exklusiver Frames wie Deadcat, Toothpick und Tiny-Whoop), **Motoren, Propeller, Akku, Kamera, Fahrwerk**, **drei Zubehör-Steckplätze** und **Farbe** – mit Farbpaletten *und* freiem **Farbwähler im Spektrum** für Haupt- und Akzentfarbe. Eine drehende **Live-3D-Vorschau** und laufend aktualisierte Kennwerte (Gewicht, Topspeed, Schub/Gewicht, Flugzeit, Agilität, Stabilität) zeigen sofort, was deine Wahl bewirkt. Gespeicherte Drohnen landen als **DIY** im Flugmenü und fliegen mit der echten Physik – gespeichert bleibt alles lokal im Browser.
 
 ### 🛠️ Map-Builder: eigene Karten bauen
 Über **„Eigene Karte bauen"** im Menü baust du dir deine eigene Landschaft: **Geländeform** (flach, hügelig, Berge, Wüste), Hügeligkeit, Baumdichte, Zufallszahl und ein **Wasserstand**, der Seen in die Senken legt – der Startplatz liegt immer auf einem trockenen Plateau darüber. In der Draufsicht (800 × 800 m) tippst du dann **Bäume, Häuser, Hochhäuser, Hallen, Mauern, Schornsteine, Felsen und Menschen** hin. Gespeicherte Karten stehen mit dem Abzeichen **EIGENE** im Kartenmenü und bleiben im Browser erhalten.
@@ -129,6 +138,8 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 | `B` | Bergungsdrohne starten (nach Crash) |
 | `X` | Bombe abwerfen (nur mit Abwurfschacht) |
 | `N` | Nuklearrakete starten (nur mit Tarnkappen-Nurflügler) |
+| `V` | Feuerwerk abschießen (mit Feuerwerks-Magazin) |
+| `P` | Kiste abwerfen / wieder aufnehmen (mit Pakethaken) |
 | `R` | Zurücksetzen |
 | `1`–`4` | Windstärke |
 | `Esc` | Menü |

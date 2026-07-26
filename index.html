@@ -26,7 +26,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #btnbar button:active{background:var(--panel2)}
 #btnbar button.armed{background:#67251f;border-color:#c25047;color:#ffd9d5}
 #btnbar button.attn{background:#0f4a2d;border-color:#2fae6b;color:#c9ffe0}
-#bRescue,#bBomb,#bNuke{display:none}
+#bRescue,#bBomb,#bNuke,#bFw,#bCargo{display:none}
+#bFw.attn{background:#4a2060;border-color:#b46fe0;color:#f2dcff}
 #bNuke.armedNuke{background:#5a3a06;border-color:#e0b13c;color:#ffe9b0}
 /* ---------- Toast ---------- */
 #toast{position:absolute;left:50%;top:16%;transform:translateX(-50%);z-index:15;
@@ -176,6 +177,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <button id="bRescue" title="Bergungsdrohne (B)">BERGEN</button>
   <button id="bBomb" title="Bombe abwerfen (X)">💣 0</button>
   <button id="bNuke" title="Nuklearrakete starten (N)">☢ 0</button>
+  <button id="bFw" title="Feuerwerk abschießen (V)">🎆 0</button>
+  <button id="bCargo" title="Kiste abwerfen / aufnehmen (P)">📦</button>
   <button id="bArm">ARM</button>
   <button id="bMode">GPS</button>
   <button id="bCam">KAM</button>
@@ -235,6 +238,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     <span class="k">F</span> Foto · <span class="k">B</span> Bergungsdrohne (nach Crash) ·
     <span class="k">X</span> Bombe abwerfen (nur mit Abwurfschacht) ·
     <span class="k">N</span> Nuklearrakete (nur mit Tarnkappen-Nurflügler) ·
+    <span class="k">V</span> Feuerwerk (mit Feuerwerks-Magazin) ·
+    <span class="k">P</span> Kiste abwerfen/aufnehmen (mit Pakethaken) ·
     <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
     <b>Gamepad:</b> Linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2) – wird automatisch erkannt.<br>
     <b>Touch:</b> Virtuelle Sticks unten links (Gas/Yaw) und rechts (Nick/Roll), Buttons oben rechts.
@@ -611,13 +616,27 @@ const PARTS={
      nukes:1, bombs:10, maxTilt:44, egg:'egg_reaper',
      desc:'Riesenspannweite, V-Leitwerk, Waffenpylone ✈️'},
   ],
-  // Zubehör: unauffällige Zusätze, die es nur über versteckte Wünsche gibt
+  // Zubehör: bis zu drei Teile pro Drohne, auch mehrfach dasselbe
   acc:[
-    {id:'none', name:'Kein Zubehör', mass:0, desc:'Nichts Zusätzliches an Bord'},
+    {id:'none', name:'Leer', mass:0, desc:'Steckplatz frei'},
+    {id:'bombmag', name:'Bomben-Magazin (2 Schuss)', mass:0.26, bombs:2,
+     desc:'Zwei Abwurfbomben unter dem Rumpf'},
+    {id:'firework', name:'Feuerwerks-Magazin (3 Schuss)', mass:0.14, fireworks:3,
+     desc:'Drei Leuchtkugeln, die bunt am Himmel zerplatzen'},
+    {id:'cargo', name:'Pakethaken mit Kiste', mass:0.09, cargo:1,
+     desc:'Kiste zum Beladen – abwerfen und wieder aufnehmen'},
+    {id:'actioncam', name:'Action-Cam', mass:0.012, actionCam:1,
+     desc:'Winzige Frontkamera, leichter als FPV-Cam und Gimbal'},
     {id:'kamikaze', name:'Kamikaze-Sprengsatz', mass:0.12, kamikaze:1, egg:'egg_kamikaze',
      desc:'Die Drohne selbst ist die Bombe – Aufschlag zündet ★Easter Egg'},
     {id:'nukemag', name:'Atombomben-Magazin (unsichtbar)', mass:0.0, nukes:20, egg:'egg_nukemag',
      desc:'20 Nuklearsprengköpfe, von außen nicht zu sehen ★Easter Egg'},
+  ],
+  // Inhalt der Kiste (nur mit Pakethaken)
+  load:[
+    {id:'light', name:'📦 Luftpolster', mass:0.2, desc:'Federleicht, kaum zu spüren'},
+    {id:'tools', name:'🧰 Werkzeug', mass:0.8, desc:'Merklich schwerer, die Drohne sackt beim Start'},
+    {id:'bricks', name:'🧱 Ziegelsteine', mass:1.8, desc:'Richtig schwer – nur für starke Antriebe'},
   ],
   motor:[
     {id:'eco', name:'Eco-Motoren', twr:2.0, tau:0.12, mass:0.014, ampF:0.85, desc:'Sparsam, ruhig'},
@@ -659,22 +678,38 @@ const PARTS={
     {id:'purple',name:'Violett',c1:[.45,.24,.7], c2:[.9,.85,.4]},
   ],
 };
-const DIY_DEFAULT={frame:'fold',motor:'std',prop:'m',batt:'4s',cam:'gimbal',gear:'none',acc:'none',color:'grey'};
-function partBy(cat,id){ return PARTS[cat].find(p=>p.id===id)||PARTS[cat][0]; }
+const DIY_DEFAULT={frame:'fold',motor:'std',prop:'m',batt:'4s',cam:'gimbal',gear:'none',
+  acc1:'none',acc2:'none',acc3:'none',load:'light',color:'grey'};
+const ACC_SLOTS=['acc1','acc2','acc3'];
+// acc1..acc3 greifen alle auf denselben Katalog zu
+function partCat(cat){ return /^acc[123]$/.test(cat)?'acc':cat; }
+function partBy(cat,id){ const c=partCat(cat); return PARTS[c].find(p=>p.id===id)||PARTS[c][0]; }
+// Zubehörliste einer Auswahl (versteht auch alte Speicherstände mit einem Feld „acc")
+function accsOf(sel){
+  if(sel.acc&&!sel.acc1) return [partBy('acc',sel.acc)];
+  return ACC_SLOTS.map(s=>partBy('acc',sel[s])).filter(a=>a.id!=='none');
+}
 function hexToRgb(h){ h=(h||'').replace('#',''); if(h.length!==6)return null;
   return [parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255]; }
 function rgbToHex(c){ return '#'+c.map(x=>Math.round(clamp(x,0,1)*255).toString(16).padStart(2,'0')).join(''); }
 
 function buildDIYDrone(sel,name,id){
   const F=partBy('frame',sel.frame), M=partBy('motor',sel.motor), P=partBy('prop',sel.prop),
-        B=partBy('batt',sel.batt), C=partBy('cam',sel.cam), Gr=partBy('gear',sel.gear),
-        Ac=partBy('acc',sel.acc);
+        B=partBy('batt',sel.batt), C=partBy('cam',sel.cam), Gr=partBy('gear',sel.gear);
+  // Zubehör: bis zu drei Teile, Wirkungen summieren sich
+  const accs=accsOf(sel);
+  const sum=(k)=>accs.reduce((a,p)=>a+(p[k]||0),0);
+  const has=(k)=>accs.some(p=>p[k]);
+  const Ld=partBy('load',sel.load);
+  const cargo=has('cargo');
+  // Die Kiste selbst zählt erst beim Tragen (extraMass) – abwerfen macht leichter
+  const accMass=sum('mass');
   // Farbe: Preset ODER frei gewählte Custom-Farben (Hex)
   let c1,c2;
   if(sel.c1 && sel.c2 && sel.color==='custom'){ c1=hexToRgb(sel.c1)||[.7,.7,.7]; c2=hexToRgb(sel.c2)||[.15,.15,.15]; }
   else { const COL=partBy('color',sel.color); c1=COL.c1; c2=COL.c2; }
   const fpv=F.cls==='fpv';
-  const mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0) + (Ac.mass||0));
+  const mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0) + accMass);
   // Schub/Gewicht sinkt leicht mit schwerem Akku, steigt mit großen Props
   const twr=Math.max(1.6, M.twr*(0.85+P.propR*1.6)*(fpv?1.05:1.0)*(F.twrF||1));
   const maxSpeed = (fpv ? 9+twr*3.6 : 6+twr*5.5)*(F.speedF||1);
@@ -684,18 +719,25 @@ function buildDIYDrone(sel,name,id){
     meshKind:F.kind, sel:{...sel},
     mass, arm:F.arm, twr, tauUp:M.tau, tauDn:M.tau*1.45, propR:P.propR,
     maxTilt: F.maxTilt||(fpv?55:35), maxSpeed, dragF:F.dragF,
-    ...(F.bombs?{bombs:F.bombs}:{}), ...(F.range?{range:F.range}:{}),
-    ...((F.nukes||Ac.nukes)?{nukes:(F.nukes||0)+(Ac.nukes||0)}:{}),
-    ...(Ac.kamikaze?{kamikaze:1}:{}),
+    ...((F.bombs||sum('bombs'))?{bombs:(F.bombs||0)+sum('bombs')}:{}),
+    ...(F.range?{range:F.range}:{}),
+    ...((F.nukes||sum('nukes'))?{nukes:(F.nukes||0)+sum('nukes')}:{}),
+    ...(sum('fireworks')?{fireworks:sum('fireworks')}:{}),
+    ...(has('kamikaze')?{kamikaze:1}:{}),
+    ...(cargo?{cargo:1, cargoMass:Ld.mass, cargoName:Ld.name}:{}),
+    ...(has('actionCam')?{actionCam:1}:{}),
     climb: (fpv?3.5:2.6)*(twr-1)+2, desc_:(fpv?3:2)*(twr-1)+2,
     yawRate: fpv?200+agility*40:100+agility*30,
     batt:{cells:B.cells, mah:B.mah, min:B.min},
     modes: fpv?['GPS','ANGLE','ACRO']:['GPS','ATTI'], gpsQ:C.gimbal?1.0:0.9, agility,
     rates:{max: fpv?560+agility*120:340, expo:fpv?.68:.6},
-    camAngle: fpv?(C.fpvcam?22:0):0, fovFpv: fpv?112:74,
+    // Action-Cam zählt wie eine feste Frontkamera, wiegt aber fast nichts
+    camAngle: (C.fpvcam||has('actionCam'))?(fpv?22:8):0, fovFpv: fpv?112:74,
     style:{c1, c2, bodyL:F.bodyL, bodyW:F.bodyW, bodyH:F.bodyH,
-      ...(F.feat||{}), gimbal:C.gimbal?1:0, canopy:(C.fpvcam||(F.feat&&F.feat.canopy))?1:0,
-      legs:(Gr.legs||(F.feat&&F.feat.legs))?1:0, floats:Gr.floats?1:0},
+      ...(F.feat||{}), gimbal:C.gimbal?1:0,
+      canopy:(C.fpvcam||has('actionCam')||(F.feat&&F.feat.canopy))?1:0,
+      legs:(Gr.legs||(F.feat&&F.feat.legs))?1:0, floats:Gr.floats?1:0,
+      accs:accs.map(a=>a.id), cargo:cargo?1:0},
   };
   // Amp-Verbrauch an Motorklasse koppeln (beeinflusst Flugzeit spürbar)
   finalizeDrone(d);
@@ -707,6 +749,8 @@ function diySpecs(d){
   const extra=[];
   if(d.bombs) extra.push(['💣 Bomben',d.bombs+' an Bord']);
   if(d.nukes) extra.push(['☢️ Nuklearraketen',d.nukes+' · 100 m Radius']);
+  if(d.fireworks) extra.push(['🎆 Feuerwerk',d.fireworks+' Schuss']);
+  if(d.cargo) extra.push(['📦 Kiste',d.cargoName+' · '+(d.cargoMass*1000).toFixed(0)+' g']);
   if(d.kamikaze) extra.push(['💥 Kamikaze','Aufschlag zündet']);
   if(d.range) extra.push(['📡 Funkreichweite','nur '+d.range+' m']);
   return extra.concat([['⚖ Gewicht',(d.mass*1000).toFixed(0)+' g'],
@@ -716,7 +760,8 @@ function diySpecs(d){
     ['🎥 Kamera', partBy('cam',d.sel.cam).name],
     ['🎯 Agilität', d.agility>1.3?'sehr hoch':d.agility>0.9?'hoch':d.agility>0.6?'mittel':'ruhig'],
     ['🪶 Stabilität', stabLabel(d.stab)],
-    ['🦵 Fahrwerk', d.style.floats?'Schwimmer – wasserfest':partBy('gear',d.sel.gear).name]]);
+    ['🦵 Fahrwerk', d.style.floats?'Schwimmer – wasserfest':partBy('gear',d.sel.gear).name],
+    ['🎒 Zubehör', accsOf(d.sel).length?accsOf(d.sel).map(a=>a.name.replace(/\s*\(.*\)/,'')).join(' + '):'keins']]);
 }
 /* DIY-Drohnen laden/speichern */
 let DIY_DRONES=[];
@@ -1441,6 +1486,85 @@ function addFloats(b,d,st,L,W,H,arm){
         Math.max(0.0035,arm*0.032),Math.max(0.003,arm*0.026),7,strut);
   }
 }
+/* --- Zubehör am Rumpf: Magazine, Haken, Action-Cam ---
+   Bis zu drei Teile, sie sitzen nebeneinander unter dem Rumpf (Mitte, links, rechts).
+   Das Atombomben-Magazin bleibt absichtlich unsichtbar. */
+// Die Transportkiste wird zur Drohnengröße skaliert – sonst erschlägt sie kleine Quads
+function cargoScale(d){ return Math.min(1.3,Math.max(0.5,d.arm*7)); }
+function cargoTopY(d){ return -d.style.bodyH*2.2; }
+function addAccessories(b,d,st,L,W,H,arm,bk){
+  const list=st.accs||[];
+  if(!list.length)return;
+  const blob=(rx,ry,rz,p,col)=> bk? b.box(rx*2,ry*2,rz*2,p,0,col) : b.ellipsoid(rx,ry,rz,p,10,7,col);
+  const rod=(a,c,r0,r1,col)=> b.tube(a,c,r0,r1,bk?4:9,col);
+  const dark=[0.13,0.13,0.15], steel=[0.56,0.58,0.62];
+  const S=Math.max(0.03,Math.min(arm*0.45,L*0.3,0.12));   // Baugröße des Zubehörs
+  const off=Math.min(W*0.5,arm*0.4);                       // seitlicher Versatz der Plätze
+  // Ober-, Unterkante und Nase des Rumpfs aus der bisher gebauten Geometrie ablesen,
+  // damit das Zubehör bei jedem Rahmen wirklich anliegt statt daneben zu schweben.
+  // Statt der äußersten Punkte nehmen wir Quantile – so ziehen dünne Antennen,
+  // Kufen oder Kamerakugeln die gemessene Rumpfhülle nicht in die Länge.
+  const ys=[], zs=[];
+  const rx=Math.max(W*0.9,arm*0.3), rz=Math.max(L*0.8,arm*0.3), ix=W*0.2;
+  for(let i=0;i<b.pos.length;i+=3){
+    const x=b.pos[i], y=b.pos[i+1], z=b.pos[i+2];
+    // Der schmale Streifen um die Mittellinie fällt weg: dort steht die Antenne
+    if(Math.abs(x)>rx||Math.abs(x)<ix||Math.abs(z)>rz)continue;
+    ys.push(y); zs.push(z);
+  }
+  ys.sort((p,q)=>p-q); zs.sort((p,q)=>p-q);
+  const q=(a,f,dflt)=>a.length?a[Math.min(a.length-1,Math.floor(a.length*f))]:dflt;
+  const uy=q(ys,0.08,-H);                                  // Unterkante des Rumpfs
+  const ty=q(ys,0.92,H);                                   // Oberkante des Rumpfs
+  const nz=q(zs,0.04,-L*0.5);                              // Nasenspitze
+  const lo=uy, hi=ty;
+  list.forEach((id,i)=>{
+    const sx=[0,-1,1][i%3]*off;
+    switch(id){
+      case 'bombmag': {                    // Schiene mit zwei kleinen Abwurfbomben
+        b.box(S*0.5,S*0.26,S*1.5,[sx,uy-S*0.13,0],0,dark);
+        for(const z of [-S*0.45,S*0.45]){
+          blob(S*0.19,S*0.19,S*0.4,[sx,uy-S*0.42,z],[0.38,0.4,0.33]);
+          rod([sx,uy-S*0.42,z+S*0.3],[sx,uy-S*0.42,z+S*0.58],S*0.15,S*0.05,[0.24,0.26,0.3]);
+          for(const fa of [0,Math.PI/2])   // Leitwerk hinten am Geschoss
+            b.box(S*0.02+S*0.17*Math.cos(fa),S*0.02+S*0.17*Math.sin(fa),S*0.2,
+              [sx,uy-S*0.42,z+S*0.44],0,[0.2,0.22,0.26]);
+        }
+        break;
+      }
+      case 'firework': {                   // drei Rohre, leicht nach hinten geneigt, auf dem Rücken
+        const tz=L*0.16;
+        b.box(S*0.5,S*0.2,S*0.95,[sx,ty+S*0.09,tz],0,dark);
+        for(let k=0;k<3;k++){
+          const z=tz+(k-1)*S*0.34;
+          rod([sx,ty+S*0.14,z],[sx,ty+S*0.74,z+S*0.14],S*0.13,S*0.12,[0.72,0.18,0.16]);
+          blob(S*0.11,S*0.05,S*0.11,[sx,ty+S*0.74,z+S*0.14],[1,0.86,0.35]);
+        }
+        break;
+      }
+      case 'cargo': {                      // Seilwinde mit Haken (die Kiste hängt beim Fliegen dran)
+        b.box(S*0.42,S*0.3,S*0.42,[sx,uy-S*0.15,0],0,dark);
+        const hookY=cargoTopY(d);
+        rod([sx,uy-S*0.28,0],[sx,hookY,0],S*0.05,S*0.05,steel);
+        rod([sx,hookY,0],[sx+S*0.18,hookY+S*0.2,0],S*0.045,S*0.045,steel);
+        break;
+      }
+      case 'kamikaze': {                   // Sprengkopf, der beim Aufschlag zündet
+        blob(S*0.26,S*0.26,S*0.5,[sx,uy-S*0.3,-L*0.05],[0.6,0.16,0.13]);
+        b.box(S*0.06,S*0.4,S*0.4,[sx,uy-S*0.3,L*0.22],0,[0.2,0.2,0.22]);
+        blob(S*0.09,S*0.09,S*0.09,[sx,uy-S*0.3,-L*0.05-S*0.5],[0.95,0.85,0.2]);
+        break;
+      }
+      case 'actioncam': {                  // winzige Frontkamera vorn an der Nase
+        const cy=lo+(hi-lo)*0.62, cz=nz+S*0.1;
+        b.box(S*0.34,S*0.38,S*0.3,[0,cy,cz],0,[0.12,0.12,0.14]);
+        blob(S*0.1,S*0.1,S*0.04,[0,cy,cz-S*0.16],[0.05,0.06,0.13]);
+        blob(S*0.05,S*0.05,S*0.02,[0,cy+S*0.22,cz],[0.9,0.25,0.2]);
+        break;
+      }
+    }
+  });
+}
 /* --- Drohnen-Meshes: Loft-Rümpfe und Röhren-Arme, den realen Vorbildern nah ---
    (vorn = -z; Propeller-Ebene: style.propY bzw. bodyH*0.42) */
 function buildDroneMesh(d){
@@ -1970,6 +2094,7 @@ function buildDroneMesh(d){
       break;
     }
   }
+  addAccessories(b,d,st,L,W,H,arm,false);
   // Wasser-Landefüße: zwei Schwimmer längs unter dem Rumpf, an Streben aufgehängt
   if(st.floats) addFloats(b,d,st,L,W,H,arm);
   const body=b.build();
@@ -2245,6 +2370,7 @@ function buildDroneMeshBlocky(d){
       break;
     }
   }
+  addAccessories(b,d,st,L,W,H,arm,true);
   // Wasser-Landefüße, hier als Klötze passend zum Retro-Look
   if(st.floats){
     const {fl,fr,fx,fy}=floatGeom(d,st,L,W,H,arm);
@@ -3102,7 +3228,8 @@ const DR={
 let WRECK=null;          // {modelId, mass, pos} – gecrashte Drohne, kann geborgen werden
 let RESCUE=null;         // {carrying:bool, hover:0} – laufende Bergung
 let DEBRIS=[];           // Trümmerteile nach Crash
-function extraMass(){ return (DR.pkg?PKG_MASS:0)+(RESCUE&&RESCUE.carrying&&WRECK?WRECK.mass:0); }
+function extraMass(){ return (DR.pkg?PKG_MASS:0)+(RESCUE&&RESCUE.carrying&&WRECK?WRECK.mass:0)
+  +(DR.cargoOn&&APP.model.cargoMass?APP.model.cargoMass:0); }
 
 function resetDrone(fullBatt=true,clearWreck=true){
   const d=APP.model;
@@ -3111,7 +3238,9 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.q=Q.fromYaw(0); DR.w=[0,0,0];
   DR.motors=[0,0,0,0]; DR.armed=false; DR.onGround=true; DR.crashed=false;
   DR.groundTimer=0; DR.iTerm=[0,0,0]; DR.flightTime=0; DR.pkg=false; DR.driftV=[0,0];
-  DR.bombs=d.bombs||0; DR.nukes=d.nukes||0; BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
+  DR.bombs=d.bombs||0; DR.nukes=d.nukes||0; DR.fireworks=d.fireworks||0;
+  DR.cargoOn=!!d.cargo; CRATE=null;
+  BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; }
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
   IN.thr=APP.springThr?0:-1; IN.yaw=IN.pit=IN.rol=0;
@@ -3500,7 +3629,7 @@ function stepDebris(dt){
    Abgeworfene Bomben fallen ballistisch, beim Aufschlag verschwindet alles
    Getroffene aus dem Szenen-Mesh: die Dreiecke werden auf einen Punkt
    zusammengezogen und die Hitbox entfernt. */
-let BOMBS=[], BLASTS=[];
+let BOMBS=[], BLASTS=[], CRATE=null;
 function bombsLeft(){ return DR.bombs===undefined?0:DR.bombs; }
 function dropBomb(){
   if(!APP.model.bombs||DR.crashed||DR.onGround||APP.state!=='fly')return false;
@@ -3516,6 +3645,65 @@ function dropBomb(){
 /* --- Nuklearrakete (Easter Egg „Schattenflügel") ---
    Fliegt angetrieben nach vorn-unten, Sprengradius 100 m. Wer im Umkreis von
    200 m steht, bekommt hinterher ein paar Gliedmaßen zu viel. */
+/* --- Feuerwerks-Magazin: Leuchtkugeln, die bunt zerplatzen (zerstören nichts) --- */
+const FW_COLORS=[[1,0.35,0.35],[0.4,0.75,1],[1,0.85,0.35],[0.65,0.45,1],[0.45,1,0.6],[1,0.55,0.2]];
+function fireFirework(){
+  if(!APP.model.fireworks||DR.crashed||APP.state!=='fly')return false;
+  if((DR.fireworks||0)<=0){ toast('Feuerwerk leer – R/RESET lädt neu'); return false; }
+  DR.fireworks--;
+  const up=Q.rot(DR.q,[0,1,0]);
+  BOMBS.push({kind:'fw', pos:[DR.pos[0],DR.pos[1]+0.15,DR.pos[2]],
+    vel:[DR.vel[0]+up[0]*26, DR.vel[1]+up[1]*26, DR.vel[2]+up[2]*26],
+    col:FW_COLORS[Math.floor(Math.random()*FW_COLORS.length)],
+    fuse:1.1+Math.random()*0.5, t:0, trail:0});
+  updateButtons();
+  return true;
+}
+function fireworkBurst(x,y,z,col){
+  BLASTS.push({pos:[x,y,z],vel:[0,0,0],r:2.2,t:0,life:0.35,kind:'fire'});
+  for(let i=0;i<48;i++){
+    const a=Math.random()*Math.PI*2, e=Math.acos(2*Math.random()-1), sp=9+Math.random()*13;
+    BLASTS.push({pos:[x,y,z],
+      vel:[Math.sin(e)*Math.cos(a)*sp, Math.cos(e)*sp*0.8, Math.sin(e)*Math.sin(a)*sp],
+      r:0.34+Math.random()*0.22, t:0, life:1.5+Math.random()*1.1, kind:'spark',
+      col:[col[0]*(0.75+Math.random()*0.35),col[1]*(0.75+Math.random()*0.35),col[2]*(0.75+Math.random()*0.35)]});
+  }
+  toast('🎆',900);
+}
+/* --- Pakethaken: Kiste abwerfen und wieder aufnehmen --- */
+function toggleCargo(){
+  const d=APP.model;
+  if(!d.cargo||APP.state!=='fly')return false;
+  if(DR.crashed){ toast('Erst zurücksetzen'); return false; }
+  if(DR.cargoOn){
+    DR.cargoOn=false;
+    CRATE={pos:[DR.pos[0],DR.pos[1]-groundClear(d)*0.9,DR.pos[2]],vel:[...DR.vel],rest:false,
+      s:cargoScale(d), mass:d.cargoMass, name:d.cargoName};
+    toast('📦 Kiste abgeworfen');
+  }else{
+    if(!CRATE){ toast('Keine Kiste in der Nähe'); return false; }
+    const dd=Math.hypot(DR.pos[0]-CRATE.pos[0],DR.pos[2]-CRATE.pos[2]);
+    const dy=DR.pos[1]-CRATE.pos[1];
+    if(dd>3||dy<0||dy>7){ toast('Zum Aufnehmen dicht über die Kiste'); return false; }
+    DR.cargoOn=true; CRATE=null;
+    toast('📦 Kiste aufgenommen');
+  }
+  updateButtons();
+  return true;
+}
+function stepCrate(dt){
+  if(!CRATE||CRATE.rest)return;
+  CRATE.vel[1]-=G*dt;
+  CRATE.vel=V3.scale(CRATE.vel,1-0.25*dt);
+  CRATE.pos=V3.add(CRATE.pos,V3.scale(CRATE.vel,dt));
+  const gy=Math.max(SCENE.terH(CRATE.pos[0],CRATE.pos[2]),SCENE.water?SCENE.water.level:-1e9);
+  const half=0.13*(CRATE.s||1);
+  if(CRATE.pos[1]<=gy+half){
+    CRATE.pos[1]=gy+half;
+    if(Math.abs(CRATE.vel[1])>1.5){ CRATE.vel[1]=-CRATE.vel[1]*0.25; CRATE.vel[0]*=0.5; CRATE.vel[2]*=0.5; }
+    else CRATE.rest=true;
+  }
+}
 // Startgeschwindigkeit der Rakete: kräftig nach vorn-unten aus dem Schacht
 function nukeLaunchVel(){
   const fwd=Q.rot(DR.q,[0,0,-1]);
@@ -3692,6 +3880,22 @@ function stepBombs(dt){
     const b=BOMBS[i];
     b.t+=dt;
     b.vel[1]-=G*dt;
+    if(b.kind==='fw'){
+      // Leuchtkugel: steigt, zieht Funken, zerplatzt nach der Brennzeit
+      b.vel=V3.scale(b.vel,1-0.45*dt);
+      b.trail=(b.trail||0)+dt;
+      if(b.trail>0.03){
+        b.trail=0;
+        BLASTS.push({pos:[...b.pos],vel:[0,0.4,0],r:0.16,t:0,life:0.5,kind:'spark',col:b.col});
+      }
+      b.pos=V3.add(b.pos,V3.scale(b.vel,dt));
+      const gyf=Math.max(SCENE.terH(b.pos[0],b.pos[2]),SCENE.water?SCENE.water.level:-1e9);
+      if(b.t>=b.fuse||b.pos[1]<=gyf+0.3){
+        BOMBS.splice(i,1);
+        fireworkBurst(b.pos[0],Math.max(b.pos[1],gyf+0.4),b.pos[2],b.col);
+      }
+      continue;
+    }
     if(b.kind==='nuke'){
       // Rauchfahne hinter der Rakete
       b.trail=(b.trail||0)+dt;
@@ -3721,6 +3925,12 @@ function stepBombs(dt){
     const p=BLASTS[i];
     p.t+=dt;
     if(p.t>=p.life){ BLASTS.splice(i,1); continue; }
+    if(p.kind==='spark'){
+      p.vel[1]-=G*0.42*dt;
+      p.vel=V3.scale(p.vel,1-1.5*dt);
+      p.pos=V3.add(p.pos,V3.scale(p.vel,dt));
+      continue;
+    }
     if(p.kind==='fire'){ p.r+=5*dt; p.pos=V3.add(p.pos,V3.scale(p.vel,dt)); p.vel[1]+=3*dt; continue; }
     if(p.kind==='smoke'){
       p.vel=[p.vel[0]*(1-1.6*dt), p.vel[1]*(1-0.8*dt)+1.1*dt, p.vel[2]*(1-1.6*dt)];
@@ -3732,6 +3942,7 @@ function stepBombs(dt){
     const gy=SCENE.terH(p.pos[0],p.pos[2]);
     if(p.pos[1]<gy+p.r*0.5){ p.pos[1]=gy+p.r*0.5; p.vel=[p.vel[0]*0.4,-p.vel[1]*0.25,p.vel[2]*0.4]; p.spin*=0.5; }
   }
+  stepCrate(dt);
   if(APP.shake) APP.shake=Math.max(0,APP.shake-dt*1.6);
   if(APP.flashT) APP.flashT=Math.max(0,APP.flashT-dt*1.1);
 }
@@ -4084,6 +4295,12 @@ function render(){
       }
     }
     if(DR.pkg) drawMesh(pkgMesh,M4.mul(bodyM,M4.translate(0,-d.style.bodyH*2.2-0.26,0)));
+    // Transportkiste am Pakethaken, zur Drohnengröße skaliert
+    if(DR.cargoOn&&d.cargo){
+      const cs=cargoScale(d);
+      drawMesh(pkgMesh,M4.mul(bodyM,M4.mul(M4.translate(0,cargoTopY(d)-0.26*cs,0),
+        M4.scale(cs,cs,cs))));
+    }
     if(RESCUE&&RESCUE.carrying&&WRECK){
       const wd=droneById(WRECK.modelId);
       const wm=M4.mul(bodyM,M4.mul(M4.translate(0,-d.style.bodyH*2-0.35,0),M4.rotZ(0.5)));
@@ -4126,9 +4343,23 @@ function render(){
       gl.depthMask(true);
     }
   }
+  // Abgeworfene Kiste liegt in der Landschaft
+  if(CRATE){
+    const cs=CRATE.s||1;
+    drawMesh(pkgMesh,M4.mul(M4.translate(CRATE.pos[0],CRATE.pos[1]-0.13*cs,CRATE.pos[2]),
+      M4.scale(cs,cs,cs)));
+  }
   // Explosionen: Feuerball, Rauch, weggesprengte Brocken
   for(const p of BLASTS){
     const f=p.t/p.life;
+    if(p.kind==='spark'){
+      gl.depthMask(false);
+      const a=(1-f*f)*0.95;
+      drawMesh(blastMesh,M4.mul(M4.translate(p.pos[0],p.pos[1],p.pos[2]),M4.scale(p.r,p.r,p.r)),
+        [p.col[0]*2.6,p.col[1]*2.6,p.col[2]*2.6],a);
+      gl.depthMask(true);
+      continue;
+    }
     if(p.kind==='chunk'){
       const rot=M4.fromQuatPos(Q.axisAngle(p.ax,p.ang),p.pos);
       drawMesh(unitBox,M4.mul(rot,M4.scale(p.r,p.r*0.8,p.r)),p.col,1-f*f*0.3);
@@ -4485,6 +4716,14 @@ function updateButtons(){
   nb.style.display=APP.model.nukes?'block':'none';
   nb.textContent='☢ '+(DR.nukes||0);
   nb.classList.toggle('armedNuke',!!(DR.nukes>0));
+  const fb=$('bFw');
+  fb.style.display=APP.model.fireworks?'block':'none';
+  fb.textContent='🎆 '+(DR.fireworks||0);
+  fb.classList.toggle('attn',!!(DR.fireworks>0));
+  const cb=$('bCargo');
+  cb.style.display=APP.model.cargo?'block':'none';
+  cb.textContent=DR.cargoOn?'📦 ab':'📦 auf';
+  cb.classList.toggle('attn',!DR.cargoOn&&!!CRATE);
 }
 function tryArm(){
   if(APP.state!=='fly'||APP.paused)return;
@@ -4528,6 +4767,8 @@ function handleKey(code){
   else if(code==='KeyB'){if(DR.crashed&&WRECK)startRescue();}
   else if(code==='KeyX'){dropBomb();}
   else if(code==='KeyN'){fireNuke();}
+  else if(code==='KeyV'){fireFirework();}
+  else if(code==='KeyP'){toggleCargo();}
   else if(code==='KeyR'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}
   else if(/^Digit[1-4]$/.test(code)){APP.windLevel=+code.slice(5)-1;toast('💨 '+WIND_NAMES[APP.windLevel]);}
 }
@@ -4538,6 +4779,8 @@ $('bFoto').onclick=()=>takePhoto();
 $('bRescue').onclick=()=>{if(DR.crashed&&WRECK)startRescue();};
 $('bBomb').onclick=()=>dropBomb();
 $('bNuke').onclick=()=>fireNuke();
+$('bFw').onclick=()=>fireFirework();
+$('bCargo').onclick=()=>toggleCargo();
 $('bReset').onclick=()=>{if(APP.state==='fly'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}};
 $('bMenu').onclick=()=>{if(APP.paused)closeMenuAndStart();else openMenu();};
 $('startBtn').onclick=closeMenuAndStart;
@@ -5194,9 +5437,19 @@ function editorRebuild(){
   sp.innerHTML=diySpecs(EDIT.drone).map(([k,v])=>`<span class="sp">${k}: <b>${v}</b></span>`).join('');
 }
 function buildEditorUI(){
+  // Alte Speicherstände hatten nur einen Zubehörplatz – auf drei umschreiben
+  if(EDIT.sel.acc!==undefined&&EDIT.sel.acc1===undefined){
+    EDIT.sel.acc1=EDIT.sel.acc; EDIT.sel.acc2='none'; EDIT.sel.acc3='none';
+    delete EDIT.sel.acc;
+  }
+  for(const s of ACC_SLOTS) if(!EDIT.sel[s]) EDIT.sel[s]='none';
+  if(!EDIT.sel.load) EDIT.sel.load='light';
   const cats=[['frame','Gehäuse / Rahmen'],['motor','Motoren'],['prop','Propeller'],
     ['batt','Akku'],['cam','Kamera'],['gear','Fahrwerk / Landefüße'],
-    ['acc','Zubehör'],['color','Farbe']];
+    ['acc1','Zubehör – Steckplatz 1'],['acc2','Zubehör – Steckplatz 2'],
+    ['acc3','Zubehör – Steckplatz 3'],
+    ...(accsOf(EDIT.sel).some(a=>a.cargo)?[['load','Inhalt der Kiste']]:[]),
+    ['color','Farbe']];
   const host=$('eParts');
   host.innerHTML='';
   for(const [cat,label] of cats){
@@ -5204,7 +5457,7 @@ function buildEditorUI(){
     const row=document.createElement('div');
     row.className = cat==='color'?'echips':'echips';
     // Teile aus Easter Eggs erscheinen erst, wenn das Ei gefunden wurde
-    for(const p of PARTS[cat].filter(p=>!p.egg||EGGS_FOUND.includes(p.egg))){
+    for(const p of PARTS[partCat(cat)].filter(p=>!p.egg||EGGS_FOUND.includes(p.egg))){
       if(cat==='color'){
         const sw=document.createElement('div');
         sw.className='eswatch'+(EDIT.sel[cat]===p.id?' sel':'');
@@ -5289,7 +5542,9 @@ function onPrompt(){
     // Versteckte Bauteile: gleich anlegen und im Editor auswählen
     const u=unlockEgg(r.egg);
     const part=PARTS.acc.find(p=>p.egg===r.egg);
-    if(part){ EDIT.sel.acc=part.id; editorRebuild(); }
+    // in den ersten freien Steckplatz stecken, sonst den ersten überschreiben
+    if(part){ const slot=ACC_SLOTS.find(s=>!EDIT.sel[s]||EDIT.sel[s]==='none')||ACC_SLOTS[0];
+      EDIT.sel[slot]=part.id; editorRebuild(); }
     buildEditorUI();
     msg.innerHTML='🥚 <b>Easter Egg gefunden:</b> '+u.name+' – '+u.hint;
     msg.style.color='var(--acc2)';
