@@ -47,10 +47,14 @@ Dazu **dünne Luft nach echter Höhenformel**: auf dem Everest liefert dieselbe 
 ### 🗺️ Jeden Ort der Welt fliegen
 **Adresse eintippen und dort starten:** Ins Feld im Menü (oder in die Suche der Weltkarte) schreibst du eine ganz normale Adresse – „Bahnhofstrasse 1, Zürich", „Eiffelturm", „Times Square New York". Der Simulator sucht sie, zeigt bei mehreren Möglichkeiten eine Trefferliste zum Anklicken und baut daraus die Karte. Koordinaten gehen weiterhin genauso.
 
+**Die Schweiz zuerst:** Gesucht wird erst im Schweizer Kartenausschnitt, dann weltweit. Damit findest du praktisch jede Schweizer Adresse direkt, ohne Land dazuschreiben zu müssen – „Bahnhofstrasse 1" landet in der Schweiz, nicht irgendwo sonst.
+
 Alternativ über **„Weltkarte öffnen"** einen Punkt auf der Weltkarte anklicken oder eine der 16 vorgemerkten Städte wählen. In jedem Fall lädt der Simulator live eine spielbare Karte:
 
 - **Echtes Geländeprofil** über 6 km aus offenen Höhendaten
 - **Echte Gebäudegrundrisse mit ihren echten Höhen** aus OpenStreetMap, im Umkreis von 2,4 km – inklusive **Wahrzeichen** wie Türmen, Leuchttürmen und Kirchen, die ihre wirkliche Höhe behalten (steht keine Höhe in den Daten, wird sie aus Stockwerkzahl oder Grundfläche geschätzt)
+- **Farbige Häuser statt grauer Klötze:** Steht die Farbe in den Geodaten, wird sie übernommen; sonst kommt sie aus Gebäudeart und Größe – warme Fassaden mit Ziegel-, Schiefer- und Kupferdächern, kühle Glasfassaden für Bürotürme, helles Mauerwerk für Kirchen
+- **Fußgänger auch hier:** Auf den echten Karten laufen Menschen auf freiem, flachem Grund herum – niemand steckt in einer Hauswand
 - Die Weltkarte selbst ist ebenfalls aus echten Höhendaten gezeichnet: Meer blau, Land nach Höhe, Hochgebirge weiß
 
 Braucht Internet. Klappt der Abruf nicht, sagt der Simulator das klar und die eingebauten Karten funktionieren weiterhin. Adresssuche über die offenen OSM-Dienste **Photon** und (als Ausweichlösung) **Nominatim**.
@@ -75,6 +79,8 @@ Foto-Button 📷 (Taste `F`): Schnappschüsse landen in einer **Galerie** im Men
 
 ### 🔧 DIY-Drohnen-Editor
 **💬 Einfach hinschreiben, was sie können soll:** Ganz oben im Editor gibt es ein Feld für deinen Wunsch – „schnell und wendig", „lange Flugzeit", „zum Filmen in Rot", „klein für drinnen", „schwere Lasten tragen", „Freestyle". Der Baukasten stellt Rahmen, Motoren, Propeller, Akku, Kamera und Farbe passend ein. *Manche Wünsche schalten etwas frei, das sonst nirgends im Menü steht …*
+
+Der dickste Fund ist ein getarnter **Nurflügler** mit vier in die Fläche versenkten Hubrotoren und zwei **Nuklearraketen**: 100 m Sprengradius, und wer im Umkreis von 200 m steht, wächst hinterher ein paar Gliedmaßen zu viel (Comic-Effekt, je näher desto absurder). Vor dem Abschuss zeigt ein Ring den Sprengradius am Boden – halte selbst Abstand, sonst erwischt dich die Druckwelle.
 
 Was einmal gefunden ist, bleibt: Die freigeschalteten Bauten stehen danach unter **„🥚 Gefundene Easter Eggs"** als Vorlage im Editor und ihre Spezialrahmen tauchen im Teilekatalog auf. Du kannst sie also **komplett umbauen** – anderer Antrieb, anderer Akku, Schwimmer, eigene Farbe – und ihre Besonderheit (Abwurfschacht bzw. Raketen samt kurzer Funkreichweite) nimmst du mit. Die Originale bleiben unangetastet im Flugmenü.
 
@@ -112,6 +118,7 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 | `F` | Foto aufnehmen |
 | `B` | Bergungsdrohne starten (nach Crash) |
 | `X` | Bombe abwerfen (nur mit Abwurfschacht) |
+| `N` | Nuklearrakete starten (nur mit Tarnkappen-Nurflügler) |
 | `R` | Zurücksetzen |
 | `1`–`4` | Windstärke |
 | `Esc` | Menü |
