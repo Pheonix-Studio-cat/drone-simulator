@@ -26,7 +26,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #btnbar button:active{background:var(--panel2)}
 #btnbar button.armed{background:#67251f;border-color:#c25047;color:#ffd9d5}
 #btnbar button.attn{background:#0f4a2d;border-color:#2fae6b;color:#c9ffe0}
-#bRescue,#bBomb,#bNuke,#bFw,#bCargo{display:none}
+#bRescue,#bBomb,#bNuke,#bFw,#bCargo,#bCann,#bHorn,#bScout{display:none}
+#bCann.attn{background:#5c2410;border-color:#e08a3c;color:#ffdfc0}
+#bHorn.attn{background:#5c4a06;border-color:#e0c53c;color:#fff2b8}
+#bScout.attn{background:#0d3f52;border-color:#3ba9d4;color:#cdeeff}
 #bFw.attn{background:#4a2060;border-color:#b46fe0;color:#f2dcff}
 #bNuke.armedNuke{background:#5a3a06;border-color:#e0b13c;color:#ffe9b0}
 /* ---------- Toast ---------- */
@@ -179,6 +182,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <button id="bNuke" title="Nuklearrakete starten (N)">☢ 0</button>
   <button id="bFw" title="Feuerwerk abschießen (V)">🎆 0</button>
   <button id="bCargo" title="Kiste abwerfen / aufnehmen (P)">📦</button>
+  <button id="bCann" title="Feuerwerks-Kanone nach vorn (G)">🎇 0</button>
+  <button id="bHorn" title="Hornissenschwarm loslassen (H)">🐝 0</button>
+  <button id="bScout" title="Mini-Andockdrohne ausklinken (K)">🛰️</button>
   <button id="bArm">ARM</button>
   <button id="bMode">GPS</button>
   <button id="bCam">KAM</button>
@@ -240,6 +246,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     <span class="k">N</span> Nuklearrakete (nur mit Tarnkappen-Nurflügler) ·
     <span class="k">V</span> Feuerwerk (mit Feuerwerks-Magazin) ·
     <span class="k">P</span> Kiste abwerfen/aufnehmen (mit Pakethaken) ·
+    <span class="k">G</span> Feuerwerks-Kanone nach vorn ·
+    <span class="k">H</span> Hornissenschwarm loslassen ·
+    <span class="k">K</span> Mini-Andockdrohne ausklinken ·
     <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
     <b>Gamepad:</b> Linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2) – wird automatisch erkannt.<br>
     <b>Touch:</b> Virtuelle Sticks unten links (Gas/Yaw) und rechts (Nick/Roll), Buttons oben rechts.
@@ -622,7 +631,13 @@ const PARTS={
     {id:'bombmag', name:'Bomben-Magazin (2 Schuss)', mass:0.26, bombs:2,
      desc:'Zwei Abwurfbomben unter dem Rumpf'},
     {id:'firework', name:'Feuerwerks-Magazin (3 Schuss)', mass:0.14, fireworks:3,
-     desc:'Drei Leuchtkugeln, die bunt am Himmel zerplatzen'},
+     desc:'Drei Leuchtkugeln steil nach oben, die bunt am Himmel zerplatzen'},
+    {id:'fwcannon', name:'Feuerwerks-Kanone (3 Schuss)', mass:0.22, cannon:3,
+     desc:'Schießt nach vorn – der Treffer zerlegt Bäume, Masten und anderes Kleinzeug ★neu'},
+    {id:'hornets', name:'Hornissennest', mass:0.34, hornets:3,
+     desc:'Auf Knopfdruck rastet der Schwarm aus und holt fremde Drohnen im Umkreis von 300 m ★neu'},
+    {id:'scout', name:'Mini-Andockdrohne', mass:0.05, scout:1,
+     desc:'Klinkt sich aus, erkundet allein die Umgebung und schickt Fotos ★neu'},
     {id:'cargo', name:'Pakethaken mit Kiste', mass:0.09, cargo:1,
      desc:'Kiste zum Beladen – abwerfen und wieder aufnehmen'},
     {id:'actioncam', name:'Action-Cam', mass:0.012, actionCam:1,
@@ -723,6 +738,9 @@ function buildDIYDrone(sel,name,id){
     ...(F.range?{range:F.range}:{}),
     ...((F.nukes||sum('nukes'))?{nukes:(F.nukes||0)+sum('nukes')}:{}),
     ...(sum('fireworks')?{fireworks:sum('fireworks')}:{}),
+    ...(sum('cannon')?{cannon:sum('cannon')}:{}),
+    ...(sum('hornets')?{hornets:sum('hornets')}:{}),
+    ...(has('scout')?{scout:1}:{}),
     ...(has('kamikaze')?{kamikaze:1}:{}),
     ...(cargo?{cargo:1, cargoMass:Ld.mass, cargoName:Ld.name}:{}),
     ...(has('actionCam')?{actionCam:1}:{}),
@@ -749,7 +767,10 @@ function diySpecs(d){
   const extra=[];
   if(d.bombs) extra.push(['💣 Bomben',d.bombs+' an Bord']);
   if(d.nukes) extra.push(['☢️ Nuklearraketen',d.nukes+' · 100 m Radius']);
-  if(d.fireworks) extra.push(['🎆 Feuerwerk',d.fireworks+' Schuss']);
+  if(d.fireworks) extra.push(['🎆 Feuerwerk',d.fireworks+' Schuss nach oben']);
+  if(d.cannon) extra.push(['🎇 Kanone',d.cannon+' Schuss nach vorn']);
+  if(d.hornets) extra.push(['🐝 Hornissen',d.hornets+'× Schwarm · 300 m']);
+  if(d.scout) extra.push(['🛰️ Mini-Drohne','erkundet und fotografiert']);
   if(d.cargo) extra.push(['📦 Kiste',d.cargoName+' · '+(d.cargoMass*1000).toFixed(0)+' g']);
   if(d.kamikaze) extra.push(['💥 Kamikaze','Aufschlag zündet']);
   if(d.range) extra.push(['📡 Funkreichweite','nur '+d.range+' m']);
@@ -1395,6 +1416,36 @@ const bombMesh=mesh(b=>{
     b.box(0.004+0.055*Math.cos(a),0.004+0.055*Math.sin(a),0.05,[0,0,0.14],0,[0.28,0.29,0.27]);
 });
 const blastMesh=mesh(b=>{ b.ellipsoid(1,1,1,[0,0,0],12,8,[1,1,1]); });
+// Kanonengeschoss: kurze Rakete mit heller Spitze (Nase in -z)
+const cannMesh=mesh(b=>{
+  const body=[0.62,0.16,0.14];
+  b.tube([0,0,0.1],[0,0,-0.05],0.035,0.035,10,body);
+  b.ellipsoid(0.035,0.035,0.05,[0,0,-0.08],10,6,[1,0.88,0.4]);
+  for(const a of [0,Math.PI/2])
+    b.box(0.004+0.05*Math.cos(a),0.004+0.05*Math.sin(a),0.045,[0,0,0.1],0,[0.25,0.26,0.28]);
+});
+// Einzelne Hornisse: gelb-schwarzer Leib mit angedeuteten Flügeln
+const hornetMesh=mesh(b=>{
+  const y=[0.95,0.72,0.12], k=[0.12,0.1,0.09];
+  b.ellipsoid(0.026,0.024,0.048,[0,0,0.014],7,5,y);
+  b.ellipsoid(0.021,0.021,0.024,[0,0,-0.038],7,5,k);
+  b.box(0.052,0.006,0.019,[0,0.014,0.01],0.5,[0.85,0.87,0.92]);
+  b.box(0.052,0.006,0.019,[0,0.014,0.01],-0.5,[0.85,0.87,0.92]);
+  b.ellipsoid(0.013,0.013,0.024,[0,0,0.066],6,4,k);
+});
+// Fliegende Mini-Andockdrohne (eigenes kleines Modell, Nase in -z)
+const scoutMesh=mesh(b=>{
+  const sh=[0.28,0.3,0.34], ar=[0.14,0.15,0.18];
+  b.box(0.16,0.07,0.2,[0,0,0],0,sh);
+  b.ellipsoid(0.05,0.03,0.04,[0,0.02,-0.1],8,5,[0.05,0.06,0.13]);
+  for(const [ax,az] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+    b.box(0.022,0.016,0.17,[ax*0.09,0,az*0.09],Math.atan2(-ax,az),ar);
+    b.tube([ax*0.15,0.005,az*0.15],[ax*0.15,0.035,az*0.15],0.016,0.016,7,[0.1,0.1,0.12]);
+  }
+});
+const scoutPropMesh=mesh(b=>{
+  for(const a of [0,Math.PI/2]) b.box(0.11,0.004,0.02,[0,0,0],a,[0.6,0.62,0.68]);
+});
 // Nuklearrakete: schlanker Körper, roter Kopf, Leitwerk
 const nukeMesh=mesh(b=>{
   const body=[0.88,0.89,0.9];
@@ -1553,6 +1604,37 @@ function addAccessories(b,d,st,L,W,H,arm,bk){
         blob(S*0.26,S*0.26,S*0.5,[sx,uy-S*0.3,-L*0.05],[0.6,0.16,0.13]);
         b.box(S*0.06,S*0.4,S*0.4,[sx,uy-S*0.3,L*0.22],0,[0.2,0.2,0.22]);
         blob(S*0.09,S*0.09,S*0.09,[sx,uy-S*0.3,-L*0.05-S*0.5],[0.95,0.85,0.2]);
+        break;
+      }
+      case 'fwcannon': {                   // Rohrbündel nach vorn, unter dem Rumpf
+        b.box(S*0.55,S*0.3,S*0.7,[sx,uy-S*0.18,L*0.1],0,dark);
+        for(let k=0;k<3;k++){
+          const ox=(k-1)*S*0.28;
+          rod([sx+ox,uy-S*0.3,L*0.12],[sx+ox,uy-S*0.3,-L*0.3-S*0.3],S*0.12,S*0.12,[0.66,0.16,0.14]);
+          blob(S*0.1,S*0.1,S*0.04,[sx+ox,uy-S*0.3,-L*0.3-S*0.32],[1,0.86,0.35]);
+        }
+        break;
+      }
+      case 'hornets': {                    // Nest: Papierkugel mit Flugloch und Ringen
+        const ny=uy-S*0.52;
+        b.box(S*0.3,S*0.16,S*0.3,[sx,uy-S*0.1,0],0,dark);
+        blob(S*0.46,S*0.52,S*0.44,[sx,ny,0],[0.7,0.58,0.38]);
+        blob(S*0.36,S*0.14,S*0.34,[sx,ny+S*0.3,0],[0.62,0.5,0.32]);
+        blob(S*0.3,S*0.12,S*0.28,[sx,ny-S*0.3,0],[0.62,0.5,0.32]);
+        blob(S*0.11,S*0.11,S*0.06,[sx,ny-S*0.2,-S*0.44],[0.14,0.11,0.08]);  // Flugloch
+        break;
+      }
+      case 'scout': {                      // Mini-Andockdrohne auf dem Rücken
+        const dy=ty+S*0.16, dz=L*0.1, ds=S*0.34;
+        b.box(S*0.5,S*0.08,S*0.5,[sx,ty+S*0.05,dz],0,dark);   // Andockteller
+        b.box(ds*0.9,ds*0.5,ds*1.1,[sx,dy,dz],0,[0.24,0.26,0.3]);
+        for(const [ax,az] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+          b.box(ds*0.12,ds*0.1,ds*0.9,[sx+ax*ds*0.5,dy,dz+az*ds*0.5],
+            Math.atan2(-ax,az),[0.16,0.17,0.2]);
+          b.box(ds*0.8,ds*0.05,ds*0.14,[sx+ax*ds*0.8,dy+ds*0.2,dz+az*ds*0.8],
+            ax*az>0?0.8:-0.8,[0.5,0.52,0.56]);
+        }
+        blob(ds*0.12,ds*0.12,ds*0.06,[sx,dy,dz-ds*0.6],[0.05,0.06,0.13]);
         break;
       }
       case 'actioncam': {                  // winzige Frontkamera vorn an der Nase
@@ -3240,8 +3322,10 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.groundTimer=0; DR.iTerm=[0,0,0]; DR.flightTime=0; DR.pkg=false; DR.driftV=[0,0];
   DR.bombs=d.bombs||0; DR.nukes=d.nukes||0; DR.fireworks=d.fireworks||0;
   DR.cargoOn=!!d.cargo; CRATE=null;
+  DR.cannon=d.cannon||0; DR.hornets=d.hornets||0;
+  SWARMS=[]; SCOUT=null; DR.scoutOut=false;
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
-  if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; }
+  if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST; }
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
   IN.thr=APP.springThr?0:-1; IN.yaw=IN.pit=IN.rol=0;
   TOUCH.thrHold=IN.thr;
@@ -3630,6 +3714,7 @@ function stepDebris(dt){
    Getroffene aus dem Szenen-Mesh: die Dreiecke werden auf einen Punkt
    zusammengezogen und die Hitbox entfernt. */
 let BOMBS=[], BLASTS=[], CRATE=null;
+let AIDRONES=[], SWARMS=[], SCOUT=null;
 function bombsLeft(){ return DR.bombs===undefined?0:DR.bombs; }
 function dropBomb(){
   if(!APP.model.bombs||DR.crashed||DR.onGround||APP.state!=='fly')return false;
@@ -3704,6 +3789,235 @@ function stepCrate(dt){
     else CRATE.rest=true;
   }
 }
+/* --- Feuerwerks-Kanone: schießt nach vorn, der Treffer zerlegt Kleinzeug ---
+   Bäume, Masten, Schornsteine und Zäune fliegen weg, Häuser bleiben stehen. */
+const CANNON_R=14;                       // Wirkungsradius am Einschlag
+// „Klein" heißt: dünner Zylinder ohne rechteckige Hausgrundfläche
+function isSmallObstacle(o){ return !o.box && o.r<=2.2; }
+function destroySmallAt(x,z,R){
+  const hit=SCENE.obstacles.filter(o=>isSmallObstacle(o)&&Math.hypot(o.x-x,o.z-z)<R+o.r);
+  if(!hit.length)return 0;
+  eraseFootprints(hit);
+  for(const o of hit){ eraseRange(SCENE.shadow,o.s0,o.s1); objectDebris(o,SCENE.terH(o.x,o.z)); }
+  const dead=new Set(hit);
+  SCENE.obstacles=SCENE.obstacles.filter(o=>!dead.has(o));
+  return hit.length;
+}
+function fireCannon(){
+  if(!APP.model.cannon||DR.crashed||APP.state!=='fly')return false;
+  if((DR.cannon||0)<=0){ toast('Kanone leer – R/RESET lädt neu'); return false; }
+  DR.cannon--;
+  const fwd=Q.rot(DR.q,[0,0,-1]);
+  BOMBS.push({kind:'cann', pos:[DR.pos[0]+fwd[0]*0.3, DR.pos[1]+fwd[1]*0.3, DR.pos[2]+fwd[2]*0.3],
+    vel:[DR.vel[0]+fwd[0]*62, DR.vel[1]+fwd[1]*62+2, DR.vel[2]+fwd[2]*62],
+    col:FW_COLORS[Math.floor(Math.random()*FW_COLORS.length)],
+    fuse:2.6, t:0, trail:0});
+  updateButtons();
+  return true;
+}
+function cannonHit(x,y,z,col){
+  const n=destroySmallAt(x,z,CANNON_R);
+  fireworkBurst(x,y,z,col);
+  BLASTS.push({pos:[x,y,z],vel:[0,1.6,0],r:2.2,t:0,life:0.6,kind:'fire'});
+  for(let i=0;i<7;i++){
+    const a=Math.random()*7, sp=2+Math.random()*7;
+    BLASTS.push({pos:[x,y+0.5,z],vel:[Math.cos(a)*sp,1.2+Math.random()*4,Math.sin(a)*sp],
+      r:0.8+Math.random()*1.2,t:0,life:1.1+Math.random(),kind:'smoke',col:[0.34,0.33,0.32]});
+  }
+  APP.shake=Math.max(APP.shake||0,0.45);
+  if(!DR.crashed&&Math.hypot(DR.pos[0]-x,DR.pos[1]-y,DR.pos[2]-z)<5.5)
+    crash('Eigenen Kanonenschuss abbekommen!');
+  toast(n>0? '🎇 '+n+(n===1?' Objekt':' Objekte')+' zerlegt' : '🎇 Volltreffer ins Leere',1400);
+  return n;
+}
+
+/* ---------------- Fremde KI-Drohnen ----------------
+   Tauchen selten von allein auf, ziehen ihre Bahn und lassen sich abschießen. */
+const AI_FIRST=35, AI_GAP=70, AI_MAX=2;   // erste nach 35 s, danach ~70 s Abstand
+const AI_MODELS=['mini4','air','pro','classic','hyfpv'];
+let aiTimer=AI_FIRST;
+function aiRange(){ return (SCENE&&SCENE.map.range)||500; }
+function aiSpawn(){
+  const R=aiRange();
+  const a=Math.random()*Math.PI*2, r=R*(0.45+Math.random()*0.4);
+  const x=Math.cos(a)*r, z=Math.sin(a)*r;
+  const id=AI_MODELS[Math.floor(Math.random()*AI_MODELS.length)];
+  const y=SCENE.terH(x,z)+28+Math.random()*45;
+  const ai={id, pos:[x,y,z], vel:[0,0,0], yaw:Math.random()*7, propAng:[0,0,0,0],
+    spd:7+Math.random()*9, wp:null, dead:false, t:0, hp:1};
+  aiPickWaypoint(ai);
+  AIDRONES.push(ai);
+  toast('📡 Fremde Drohne gesichtet',2200);
+  return ai;
+}
+function aiPickWaypoint(ai){
+  const R=aiRange()*0.85;
+  const a=Math.random()*Math.PI*2, r=R*(0.15+Math.random()*0.85);
+  const x=Math.cos(a)*r, z=Math.sin(a)*r;
+  ai.wp=[x, SCENE.terH(x,z)+22+Math.random()*50, z];
+}
+function aiKill(ai,why){
+  if(ai.dead)return;
+  ai.dead=true; ai.fall=0;
+  ai.vel=[ai.vel[0]*0.3,0,ai.vel[2]*0.3];
+  toast(why||'📡 Fremde Drohne abgestürzt',2200);
+}
+function stepAI(dt){
+  if(!SCENE||APP.state!=='fly')return;
+  aiTimer-=dt;
+  if(aiTimer<=0){
+    aiTimer=AI_GAP*(0.7+Math.random()*0.9);
+    if(AIDRONES.filter(a=>!a.dead).length<AI_MAX) aiSpawn();
+  }
+  for(let i=AIDRONES.length-1;i>=0;i--){
+    const ai=AIDRONES[i];
+    ai.t+=dt;
+    for(let k=0;k<4;k++) ai.propAng[k]+=dt*(ai.dead?18:95);
+    if(ai.dead){
+      // trudelt zu Boden und verschwindet dort
+      ai.vel[1]-=G*dt*0.85;
+      ai.pos=V3.add(ai.pos,V3.scale(ai.vel,dt));
+      ai.yaw+=dt*6;
+      const gy=SCENE.terH(ai.pos[0],ai.pos[2]);
+      if(ai.pos[1]<=gy+0.4){
+        objectDebris({x:ai.pos[0],z:ai.pos[2],r:1.2},gy);
+        AIDRONES.splice(i,1);
+      }
+      continue;
+    }
+    const to=V3.sub(ai.wp,ai.pos), dist=V3.len(to);
+    if(dist<12){ aiPickWaypoint(ai); continue; }
+    const dir=V3.scale(to,1/dist);
+    // sanft auf Sollgeschwindigkeit einschwenken
+    for(let k=0;k<3;k++) ai.vel[k]+=(dir[k]*ai.spd-ai.vel[k])*Math.min(1,dt*0.8);
+    ai.pos=V3.add(ai.pos,V3.scale(ai.vel,dt));
+    ai.pos[1]=Math.max(ai.pos[1],SCENE.terH(ai.pos[0],ai.pos[2])+6);
+    ai.yaw=Math.atan2(ai.vel[0],ai.vel[2])+Math.PI;
+  }
+}
+// Explosionen nehmen fremde Drohnen mit
+function aiBlast(x,y,z,R){
+  let n=0;
+  for(const ai of AIDRONES){
+    if(ai.dead)continue;
+    if(Math.hypot(ai.pos[0]-x,ai.pos[1]-y,ai.pos[2]-z)<R){ aiKill(ai,'📡 Fremde Drohne getroffen'); n++; }
+  }
+  return n;
+}
+
+/* ---------------- Hornissennest ----------------
+   Auf Knopfdruck rastet ein Schwarm aus, sucht sich die nächste fremde
+   Drohne im Umkreis von 300 m und holt sie vom Himmel. */
+const HORNET_R=300, HORNET_N=34, HORNET_BITE=2.2;
+function releaseHornets(){
+  const d=APP.model;
+  if(!d.hornets||DR.crashed||APP.state!=='fly')return false;
+  if((DR.hornets||0)<=0){ toast('Das Nest ist leer – R/RESET lädt neu'); return false; }
+  let best=null, bd=HORNET_R;
+  for(const ai of AIDRONES){
+    if(ai.dead)continue;
+    const dd=Math.hypot(ai.pos[0]-DR.pos[0],ai.pos[1]-DR.pos[1],ai.pos[2]-DR.pos[2]);
+    if(dd<bd){ bd=dd; best=ai; }
+  }
+  if(!best){ toast('🐝 Keine fremde Drohne in 300 m – der Schwarm bleibt im Nest'); return false; }
+  DR.hornets--;
+  const sw={target:best, bees:[], t:0, hit:0};
+  for(let i=0;i<HORNET_N;i++){
+    const a=Math.random()*7, e=Math.random()*3;
+    sw.bees.push({pos:[DR.pos[0]+Math.cos(a)*0.3, DR.pos[1]-0.2+Math.sin(e)*0.2, DR.pos[2]+Math.sin(a)*0.3],
+      vel:[(Math.random()-0.5)*6,(Math.random()-0.5)*4,(Math.random()-0.5)*6],
+      ph:Math.random()*7, spd:26+Math.random()*16});
+  }
+  SWARMS.push(sw);
+  toast('🐝 Der Schwarm rastet aus – '+bd.toFixed(0)+' m bis zum Ziel',2400);
+  updateButtons();
+  return true;
+}
+function stepHornets(dt){
+  for(let i=SWARMS.length-1;i>=0;i--){
+    const sw=SWARMS[i];
+    sw.t+=dt;
+    const tg=sw.target;
+    const alive=tg&&!tg.dead&&AIDRONES.includes(tg);
+    let onTarget=0;
+    for(const b of sw.bees){
+      b.ph+=dt*22;
+      const aim=alive? tg.pos : [DR.pos[0],DR.pos[1]-0.3,DR.pos[2]];
+      const to=V3.sub(aim,b.pos), dist=V3.len(to)||1;
+      const dir=V3.scale(to,1/dist);
+      // Zickzack: Hornissen fliegen nicht schnurgerade
+      const jx=Math.sin(b.ph)*3.2, jy=Math.sin(b.ph*1.7+1)*2.6, jz=Math.cos(b.ph*1.3)*3.2;
+      for(let k=0;k<3;k++){
+        const wob=[jx,jy,jz][k];
+        b.vel[k]+=(dir[k]*b.spd+wob-b.vel[k])*Math.min(1,dt*4.5);
+      }
+      b.pos=V3.add(b.pos,V3.scale(b.vel,dt));
+      if(alive&&dist<2.2) onTarget++;
+    }
+    // Erst wenn genug Hornissen gleichzeitig dran sind, geht die Drohne runter
+    if(alive) sw.hit+=dt*Math.min(1,onTarget/10);
+    if(alive&&sw.hit>HORNET_BITE) aiKill(tg,'🐝 Vom Schwarm heruntergeholt');
+    // nach dem Angriff lösen sie sich auf
+    if(sw.t>22||(!alive&&sw.t>3.5)) SWARMS.splice(i,1);
+  }
+}
+
+/* ---------------- Mini-Andockdrohne ----------------
+   Klinkt sich aus, fliegt allein eine Erkundungsschleife und fotografiert. */
+const SCOUT_LEGS=4, SCOUT_SPD=15;
+function scoutDockPos(){
+  const d=APP.model;
+  return V3.add(DR.pos,Q.rot(DR.q,[0,d.style.bodyH*1.6+0.05,d.style.bodyL*0.25]));
+}
+function toggleScout(){
+  const d=APP.model;
+  if(!d.scout||APP.state!=='fly')return false;
+  if(DR.crashed){ toast('Erst zurücksetzen'); return false; }
+  if(SCOUT){                                  // vorzeitig zurückrufen
+    SCOUT.leg=SCOUT_LEGS; SCOUT.wp=null;
+    toast('🛰️ Mini-Drohne kommt zurück');
+    return true;
+  }
+  SCOUT={pos:[...scoutDockPos()], vel:[0,0,0], yaw:0, propAng:0, leg:0, wp:null,
+    shot:0, photos:0, t:0};
+  scoutNextLeg();
+  DR.scoutOut=true;
+  toast('🛰️ Mini-Drohne ausgeklinkt – sie erkundet und fotografiert',2600);
+  updateButtons();
+  return true;
+}
+function scoutNextLeg(){
+  if(!SCOUT)return;
+  if(SCOUT.leg>=SCOUT_LEGS){ SCOUT.wp=null; return; }
+  const R=Math.min(140,((SCENE&&SCENE.map.range)||500)*0.5);
+  const a=Math.random()*Math.PI*2, r=45+Math.random()*R;
+  const x=DR.pos[0]+Math.cos(a)*r, z=DR.pos[2]+Math.sin(a)*r;
+  SCOUT.wp=[x, SCENE.terH(x,z)+18+Math.random()*30, z];
+}
+function stepScout(dt){
+  if(!SCOUT)return;
+  SCOUT.t+=dt; SCOUT.propAng+=dt*120;
+  const home=scoutDockPos();
+  const aim=SCOUT.wp||home;
+  const to=V3.sub(aim,SCOUT.pos), dist=V3.len(to)||1;
+  const dir=V3.scale(to,1/dist);
+  const spd=Math.min(SCOUT_SPD,dist*1.6+1.5);
+  for(let k=0;k<3;k++) SCOUT.vel[k]+=(dir[k]*spd-SCOUT.vel[k])*Math.min(1,dt*2.6);
+  SCOUT.pos=V3.add(SCOUT.pos,V3.scale(SCOUT.vel,dt));
+  SCOUT.pos[1]=Math.max(SCOUT.pos[1],SCENE.terH(SCOUT.pos[0],SCOUT.pos[2])+1.5);
+  SCOUT.yaw=Math.atan2(SCOUT.vel[0],SCOUT.vel[2])+Math.PI;
+  if(SCOUT.wp){
+    // unterwegs alle paar Sekunden ein Bild
+    SCOUT.shot+=dt;
+    if(SCOUT.shot>4.5&&SCOUT.photos<SCOUT_LEGS){ SCOUT.shot=0; SCOUT.photos++; scoutPhoto(); }
+    if(dist<8){ SCOUT.leg++; scoutNextLeg(); }
+  }else if(dist<0.8){
+    // wieder angedockt
+    SCOUT=null; DR.scoutOut=false;
+    toast('🛰️ Mini-Drohne angedockt – Bilder in der Galerie',2600);
+    updateButtons();
+  }
+}
 // Startgeschwindigkeit der Rakete: kräftig nach vorn-unten aus dem Schacht
 function nukeLaunchVel(){
   const fwd=Q.rot(DR.q,[0,0,-1]);
@@ -3740,6 +4054,7 @@ function nukeBlast(x,y,z){
   const R=100;                                   // Sprengradius
   const n=destroyAt(x,z,R);
   const mut=mutatePeople(x,z,200);               // Mutationsradius
+  aiBlast(x,y,z,R*2);                            // fremde Drohnen im Umkreis fallen mit
   // Feuerball, Stiel und Pilzkopf
   BLASTS.push({pos:[x,y+18,z],vel:[0,9,0],r:26,t:0,life:2.2,kind:'fire'});
   for(let i=0;i<26;i++){
@@ -3872,6 +4187,7 @@ function explode(x,y,z){
   // Die eigene Drohne hält den Druck nicht aus, wenn sie zu tief drüber steht
   if(!DR.crashed&&Math.hypot(DR.pos[0]-x,DR.pos[1]-y,DR.pos[2]-z)<9)
     crash('Zu tief über der eigenen Bombe!');
+  aiBlast(x,y,z,R*1.4);
   if(n>0) toast('💥 '+n+(n===1?' Objekt':' Objekte')+' zerlegt',1500);
   return n;
 }
@@ -3893,6 +4209,34 @@ function stepBombs(dt){
       if(b.t>=b.fuse||b.pos[1]<=gyf+0.3){
         BOMBS.splice(i,1);
         fireworkBurst(b.pos[0],Math.max(b.pos[1],gyf+0.4),b.pos[2],b.col);
+      }
+      continue;
+    }
+    if(b.kind==='cann'){
+      // Kanonenschuss: flache Bahn nach vorn, Funkenschweif, zerlegt Kleinzeug
+      b.vel[1]+=G*0.72*dt;                 // Treibsatz hält sie fast auf Höhe
+      b.trail=(b.trail||0)+dt;
+      if(b.trail>0.02){
+        b.trail=0;
+        BLASTS.push({pos:[...b.pos],vel:[0,0.5,0],r:0.2,t:0,life:0.4,kind:'spark',col:b.col});
+      }
+      b.pos=V3.add(b.pos,V3.scale(b.vel,dt));
+      b.ang=Math.atan2(Math.hypot(b.vel[0],b.vel[2]),-b.vel[1]);
+      b.yaw=Math.atan2(b.vel[0],b.vel[2]);
+      const gyc=Math.max(SCENE.terH(b.pos[0],b.pos[2]),SCENE.water?SCENE.water.level:-1e9);
+      let hitc=b.pos[1]<=gyc+0.3;
+      // Annäherungszünder: Bäume haben nur eine niedrige Stamm-Hitbox,
+      // das Geschoss soll trotzdem in der Krone zerplatzen
+      if(!hitc) for(const o of SCENE.obstacles){
+        const up=isSmallObstacle(o)?3.5:0.6;
+        if(b.pos[1]>o.h+up)continue;
+        if(Math.hypot(b.pos[0]-o.x,b.pos[2]-o.z)<o.r+1.4){ hitc=true; break; }
+      }
+      if(hitc||b.t>=b.fuse){
+        BOMBS.splice(i,1);
+        const hy=Math.max(b.pos[1],gyc+0.4);
+        cannonHit(b.pos[0],hy,b.pos[2],b.col);
+        aiBlast(b.pos[0],hy,b.pos[2],CANNON_R*0.6);
       }
       continue;
     }
@@ -3943,6 +4287,7 @@ function stepBombs(dt){
     if(p.pos[1]<gy+p.r*0.5){ p.pos[1]=gy+p.r*0.5; p.vel=[p.vel[0]*0.4,-p.vel[1]*0.25,p.vel[2]*0.4]; p.spin*=0.5; }
   }
   stepCrate(dt);
+  stepAI(dt); stepHornets(dt); stepScout(dt);
   if(APP.shake) APP.shake=Math.max(0,APP.shake-dt*1.6);
   if(APP.flashT) APP.flashT=Math.max(0,APP.flashT-dt*1.1);
 }
@@ -4140,6 +4485,8 @@ function bodyEuler(){
   return {pitch:Math.asin(clamp(fw[1],-1,1)), roll:Math.atan2(-rt[1],up[1])};
 }
 function computeCamera(){
+  // Die Mini-Andockdrohne fotografiert aus ihrer eigenen Sicht
+  if(APP.camOverride) return APP.camOverride;
   const d=APP.model;
   const q=DR.q,p=DR.pos;
   const fwd=Q.rot(q,[0,0,-1]);
@@ -4326,6 +4673,12 @@ function render(){
       gl.depthMask(false);
       drawMesh(blastMesh,M4.mul(M4.translate(b.pos[0],b.pos[1],b.pos[2]),M4.scale(0.5,0.5,0.5)),[3,2,0.6],0.8);
       gl.depthMask(true);
+    } else if(b.kind==='cann'){
+      drawMesh(cannMesh,rot);
+      gl.depthMask(false);
+      drawMesh(blastMesh,M4.mul(M4.translate(b.pos[0],b.pos[1],b.pos[2]),M4.scale(0.3,0.3,0.3)),
+        [b.col[0]*2.4,b.col[1]*2.4,b.col[2]*2.4],0.8);
+      gl.depthMask(true);
     } else drawMesh(bombMesh,rot);
   }
   if(!DR.crashed&&!DR.onGround&&APP.state==='fly'){
@@ -4372,6 +4725,39 @@ function render(){
       drawMesh(blastMesh,M4.mul(M4.translate(p.pos[0],p.pos[1],p.pos[2]),M4.scale(p.r,p.r,p.r)),col,a);
       gl.depthMask(true);
     }
+  }
+  // Fremde KI-Drohnen: eigenes Modell, leicht rot getönt, damit man sie erkennt
+  for(const ai of AIDRONES){
+    const ad=droneById(ai.id);
+    const dm=ad&&DRONE_MESH[ad.id];
+    if(!dm)continue;
+    const am=M4.mul(M4.translate(ai.pos[0],ai.pos[1],ai.pos[2]),
+      M4.mul(M4.rotY(ai.yaw),M4.rotZ(ai.dead?Math.sin(ai.t*7)*0.7:0)));
+    drawMesh(dm.body,am,[1.15,0.82,0.8]);
+    for(let i=0;i<4;i++){
+      const [sx,sz]=[[1,-1],[1,1],[-1,1],[-1,-1]][i];
+      const pm=M4.mul(am,M4.mul(M4.translate(sx*ad.arm,dm.propY,sz*ad.arm),M4.rotY(ai.propAng[i])));
+      drawMesh(ai.dead?dm.prop:dm.disc,pm,[1,1,1],ai.dead?1:0.42);
+    }
+    // Blinkendes Kennlicht, damit sie auch auf Distanz auffällt
+    const bl=0.55+0.45*Math.sin(ai.t*7);
+    gl.depthMask(false);
+    drawMesh(blastMesh,M4.mul(M4.translate(ai.pos[0],ai.pos[1]+0.16,ai.pos[2]),
+      M4.scale(0.055,0.055,0.055)),[3,0.5,0.4],bl);
+    gl.depthMask(true);
+  }
+  // Hornissenschwarm
+  for(const sw of SWARMS) for(const bee of sw.bees){
+    const yaw=Math.atan2(bee.vel[0],bee.vel[2])+Math.PI;
+    drawMesh(hornetMesh,M4.mul(M4.translate(bee.pos[0],bee.pos[1],bee.pos[2]),M4.rotY(yaw)));
+  }
+  // Ausgeklinkte Mini-Andockdrohne
+  if(SCOUT){
+    const sm=M4.mul(M4.translate(SCOUT.pos[0],SCOUT.pos[1],SCOUT.pos[2]),M4.rotY(SCOUT.yaw));
+    drawMesh(scoutMesh,sm);
+    for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]])
+      drawMesh(scoutPropMesh,M4.mul(sm,M4.mul(M4.translate(sx*0.15,0.04,sz*0.15),
+        M4.rotY(SCOUT.propAng))),[1,1,1],0.5);
   }
   // Mitspieler aus anderen Fenstern
   for(const p of mpVisible()){
@@ -4451,6 +4837,17 @@ function takePhoto(capExtra){
   f.classList.add('on');
   setTimeout(()=>f.classList.remove('on'),60);
   if(!capExtra)toast('📷 Foto gespeichert – Galerie im Menü',1800);
+}
+/* Aufnahme aus der Sicht der Mini-Andockdrohne: Kamera kurz umhängen,
+   ein Bild rendern, danach wieder die normale Kamera. */
+function scoutPhoto(){
+  if(!SCOUT||APP.state!=='fly'||!SCENE)return;
+  const eye=[SCOUT.pos[0],SCOUT.pos[1]+0.06,SCOUT.pos[2]];
+  const dir=[Math.sin(SCOUT.yaw+Math.PI),-0.18,Math.cos(SCOUT.yaw+Math.PI)];
+  APP.camOverride={eye,at:V3.add(eye,dir),up:[0,1,0],fov:78*deg,name:'SCOUT'};
+  try{ takePhoto('Mini-Drohne'); }
+  finally{ APP.camOverride=null; }
+  toast('🛰️ Mini-Drohne hat fotografiert',1400);
 }
 function buildGallery(){
   const g=$('photoGrid');
@@ -4724,6 +5121,18 @@ function updateButtons(){
   cb.style.display=APP.model.cargo?'block':'none';
   cb.textContent=DR.cargoOn?'📦 ab':'📦 auf';
   cb.classList.toggle('attn',!DR.cargoOn&&!!CRATE);
+  const gb=$('bCann');
+  gb.style.display=APP.model.cannon?'block':'none';
+  gb.textContent='🎇 '+(DR.cannon||0);
+  gb.classList.toggle('attn',!!(DR.cannon>0));
+  const hb=$('bHorn');
+  hb.style.display=APP.model.hornets?'block':'none';
+  hb.textContent='🐝 '+(DR.hornets||0);
+  hb.classList.toggle('attn',!!(DR.hornets>0&&AIDRONES.some(a=>!a.dead)));
+  const sb=$('bScout');
+  sb.style.display=APP.model.scout?'block':'none';
+  sb.textContent=SCOUT?'🛰️ ein':'🛰️ los';
+  sb.classList.toggle('attn',!!SCOUT);
 }
 function tryArm(){
   if(APP.state!=='fly'||APP.paused)return;
@@ -4769,6 +5178,9 @@ function handleKey(code){
   else if(code==='KeyN'){fireNuke();}
   else if(code==='KeyV'){fireFirework();}
   else if(code==='KeyP'){toggleCargo();}
+  else if(code==='KeyG'){fireCannon();}
+  else if(code==='KeyH'){releaseHornets();}
+  else if(code==='KeyK'){toggleScout();}
   else if(code==='KeyR'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}
   else if(/^Digit[1-4]$/.test(code)){APP.windLevel=+code.slice(5)-1;toast('💨 '+WIND_NAMES[APP.windLevel]);}
 }
@@ -4781,6 +5193,9 @@ $('bBomb').onclick=()=>dropBomb();
 $('bNuke').onclick=()=>fireNuke();
 $('bFw').onclick=()=>fireFirework();
 $('bCargo').onclick=()=>toggleCargo();
+$('bCann').onclick=()=>fireCannon();
+$('bHorn').onclick=()=>releaseHornets();
+$('bScout').onclick=()=>toggleScout();
 $('bReset').onclick=()=>{if(APP.state==='fly'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}};
 $('bMenu').onclick=()=>{if(APP.paused)closeMenuAndStart();else openMenu();};
 $('startBtn').onclick=closeMenuAndStart;
