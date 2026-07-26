@@ -63,6 +63,27 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #buildBtn{display:block;width:100%;max-width:420px;margin:10px auto 0;padding:13px;font-size:15px;font-weight:700;
   color:#e8f0f8;background:var(--panel);border:1px solid var(--acc);border-radius:12px;cursor:pointer}
 #buildBtn:active{background:var(--panel2)}
+/* ---------- Karten-Baukasten ---------- */
+#mapb{position:absolute;inset:0;z-index:35;display:none;background:#0b0f14;overflow-y:auto;
+  padding:16px 16px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+#mapb .wrap{max-width:1000px;margin:0 auto}
+#mapb h2{font-size:15px;color:var(--acc);text-transform:uppercase;letter-spacing:1.5px;margin:16px 0 9px}
+#mapb h3{font-size:12px;color:var(--acc);text-transform:uppercase;letter-spacing:1.3px;margin:14px 0 7px}
+#mbWrap{position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0d1a26}
+#mbCanvas{position:static;inset:auto;display:block;width:100%;height:auto;aspect-ratio:1/1;
+  cursor:crosshair;touch-action:manipulation}
+#mbTools,#mbTer{display:flex;flex-wrap:wrap;gap:7px}
+#mbTools button,#mbTer button{background:var(--panel);border:1px solid var(--line);color:var(--txt);
+  border-radius:10px;padding:8px 13px;font-size:13px;cursor:pointer}
+#mbTools button.sel,#mbTer button.sel{border-color:var(--acc);color:var(--acc);font-weight:700}
+#mbSliders{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:12.5px;color:var(--dim)}
+#mbSliders label{display:flex;align-items:center;gap:7px}
+#mbSliders input[type=range]{width:130px}
+#mbMsg{margin-top:8px;font-size:12.5px;color:var(--dim);min-height:17px}
+#mapb .mbtns{display:flex;gap:9px;margin-top:13px;flex-wrap:wrap}
+#mapb .mbtns button{flex:1 1 180px;padding:13px;font-size:14.5px;font-weight:700;border-radius:12px;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);color:var(--txt)}
+#mapb .mbtns button.go{background:linear-gradient(180deg,#5fd4ff,#25a9e0);color:#03202e;border:none}
 /* ---------- Weltkarte ---------- */
 #world{position:absolute;inset:0;z-index:34;display:none;background:#0b0f14;overflow-y:auto;
   padding:16px 16px calc(20px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
@@ -195,6 +216,13 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <div class="rowbtns" id="gfxRow"></div>
   <h2>Steuerempfindlichkeit</h2>
   <div class="rowbtns" id="sensRow"></div>
+  <h2>Mehrspieler (lokal)</h2>
+  <div class="rowbtns" id="mpRow"></div>
+  <div class="help" style="margin-top:8px;font-size:12px">
+    Öffne den Simulator in einem <b>zweiten Fenster oder Tab</b> desselben Browsers und schalte dort ebenfalls
+    ein – ihr seht euch dann gegenseitig fliegen. Für ein Spiel über das Internet bräuchte es einen Server;
+    diese Seite liegt auf rein statischem Hosting und hat keinen.
+  </div>
   <h2>Foto-Galerie</h2>
   <div id="photoGrid"></div>
   <h2>Steuerung</h2>
@@ -213,6 +241,40 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   </div>
   <button id="startBtn">ABHEBEN</button>
   <button id="buildBtn">🔧 Eigene Drohne bauen (DIY-Editor)</button>
+  <button id="mapBtn" style="display:block;width:100%;max-width:420px;margin:10px auto 0;padding:13px;
+    font-size:15px;font-weight:700;color:#e8f0f8;background:var(--panel);border:1px solid var(--acc);
+    border-radius:12px;cursor:pointer">🛠️ Eigene Karte bauen (Map-Builder)</button>
+</div></div>
+<div id="mapb"><div class="wrap">
+  <h2>🛠️ Eigene Karte bauen</h2>
+  <div style="font-size:13px;color:var(--dim);margin-bottom:10px">
+    Erst die Landschaft einstellen, dann Objekte auf die Karte tippen. Die Ansicht zeigt 800 × 800 m von oben,
+    der Startplatz liegt in der Mitte.
+  </div>
+  <h3>Landschaft</h3>
+  <div id="mbTer"></div>
+  <div id="mbSliders">
+    <label>Hügeligkeit <input id="mbAmp" type="range" min="0" max="160" step="2"><span id="mbAmpV"></span></label>
+    <label>Wasser <input id="mbWater" type="range" min="-1" max="40" step="1"><span id="mbWaterV"></span></label>
+    <label style="color:var(--dim)">(Anteil der Geländehöhe)</label>
+    <label>Bäume <input id="mbTrees" type="range" min="0" max="260" step="10"><span id="mbTreesV"></span></label>
+    <label>Zufall <input id="mbSeed" type="range" min="1" max="99" step="1"><span id="mbSeedV"></span></label>
+  </div>
+  <h3>Werkzeug</h3>
+  <div id="mbTools"></div>
+  <div id="mbWrap" style="margin-top:10px"><canvas id="mbCanvas" width="640" height="640"></canvas></div>
+  <div id="mbMsg"></div>
+  <h3>Name &amp; Speichern</h3>
+  <div class="esave">
+    <input id="mbName" maxlength="28" placeholder="Name deiner Karte">
+    <button id="mbSave">💾 Speichern</button>
+  </div>
+  <h3>Meine Karten</h3>
+  <div class="ediy" id="mbList"></div>
+  <div class="mbtns">
+    <button id="mbClose">Zurück</button>
+    <button id="mbTest" class="go">Testflug starten</button>
+  </div>
 </div></div>
 <div id="world"><div class="wrap">
   <h2>🗺️ Ort auf der Weltkarte wählen</h2>
@@ -542,8 +604,20 @@ const PARTS={
      desc:'Vier Feststoffraketen – irre schnell, aber nur 750 m Funk 🚀'},
     {id:'stealth', name:'Nurflügel-Tarnkappe', kind:'stealth', cls:'cam',
      arm:0.20, mass:1.55, bodyL:.62,bodyW:1.0,bodyH:.07, feat:{legs:1,propY:.026},
-     nukes:2, maxTilt:38, egg:'egg_stealth',
-     desc:'Getarnter Nurflügler mit zwei Nuklearraketen ☢️'},
+     nukes:5, maxTilt:38, egg:'egg_stealth',
+     desc:'Getarnter Nurflügler mit fünf Nuklearraketen ☢️'},
+    {id:'reaper', name:'Langstrecken-Rumpf mit Pylonen', kind:'reaper', cls:'cam',
+     arm:0.5, mass:3.4, bodyL:.72,bodyW:1.5,bodyH:.09, feat:{legs:1,propY:.02},
+     nukes:1, bombs:10, maxTilt:44, egg:'egg_reaper',
+     desc:'Riesenspannweite, V-Leitwerk, Waffenpylone ✈️'},
+  ],
+  // Zubehör: unauffällige Zusätze, die es nur über versteckte Wünsche gibt
+  acc:[
+    {id:'none', name:'Kein Zubehör', mass:0, desc:'Nichts Zusätzliches an Bord'},
+    {id:'kamikaze', name:'Kamikaze-Sprengsatz', mass:0.12, kamikaze:1, egg:'egg_kamikaze',
+     desc:'Die Drohne selbst ist die Bombe – Aufschlag zündet ★Easter Egg'},
+    {id:'nukemag', name:'Atombomben-Magazin (unsichtbar)', mass:0.0, nukes:20, egg:'egg_nukemag',
+     desc:'20 Nuklearsprengköpfe, von außen nicht zu sehen ★Easter Egg'},
   ],
   motor:[
     {id:'eco', name:'Eco-Motoren', twr:2.0, tau:0.12, mass:0.014, ampF:0.85, desc:'Sparsam, ruhig'},
@@ -585,7 +659,7 @@ const PARTS={
     {id:'purple',name:'Violett',c1:[.45,.24,.7], c2:[.9,.85,.4]},
   ],
 };
-const DIY_DEFAULT={frame:'fold',motor:'std',prop:'m',batt:'4s',cam:'gimbal',gear:'none',color:'grey'};
+const DIY_DEFAULT={frame:'fold',motor:'std',prop:'m',batt:'4s',cam:'gimbal',gear:'none',acc:'none',color:'grey'};
 function partBy(cat,id){ return PARTS[cat].find(p=>p.id===id)||PARTS[cat][0]; }
 function hexToRgb(h){ h=(h||'').replace('#',''); if(h.length!==6)return null;
   return [parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255]; }
@@ -593,13 +667,14 @@ function rgbToHex(c){ return '#'+c.map(x=>Math.round(clamp(x,0,1)*255).toString(
 
 function buildDIYDrone(sel,name,id){
   const F=partBy('frame',sel.frame), M=partBy('motor',sel.motor), P=partBy('prop',sel.prop),
-        B=partBy('batt',sel.batt), C=partBy('cam',sel.cam), Gr=partBy('gear',sel.gear);
+        B=partBy('batt',sel.batt), C=partBy('cam',sel.cam), Gr=partBy('gear',sel.gear),
+        Ac=partBy('acc',sel.acc);
   // Farbe: Preset ODER frei gewählte Custom-Farben (Hex)
   let c1,c2;
   if(sel.c1 && sel.c2 && sel.color==='custom'){ c1=hexToRgb(sel.c1)||[.7,.7,.7]; c2=hexToRgb(sel.c2)||[.15,.15,.15]; }
   else { const COL=partBy('color',sel.color); c1=COL.c1; c2=COL.c2; }
   const fpv=F.cls==='fpv';
-  const mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0));
+  const mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0) + (Ac.mass||0));
   // Schub/Gewicht sinkt leicht mit schwerem Akku, steigt mit großen Props
   const twr=Math.max(1.6, M.twr*(0.85+P.propR*1.6)*(fpv?1.05:1.0)*(F.twrF||1));
   const maxSpeed = (fpv ? 9+twr*3.6 : 6+twr*5.5)*(F.speedF||1);
@@ -610,7 +685,8 @@ function buildDIYDrone(sel,name,id){
     mass, arm:F.arm, twr, tauUp:M.tau, tauDn:M.tau*1.45, propR:P.propR,
     maxTilt: F.maxTilt||(fpv?55:35), maxSpeed, dragF:F.dragF,
     ...(F.bombs?{bombs:F.bombs}:{}), ...(F.range?{range:F.range}:{}),
-    ...(F.nukes?{nukes:F.nukes}:{}),
+    ...((F.nukes||Ac.nukes)?{nukes:(F.nukes||0)+(Ac.nukes||0)}:{}),
+    ...(Ac.kamikaze?{kamikaze:1}:{}),
     climb: (fpv?3.5:2.6)*(twr-1)+2, desc_:(fpv?3:2)*(twr-1)+2,
     yawRate: fpv?200+agility*40:100+agility*30,
     batt:{cells:B.cells, mah:B.mah, min:B.min},
@@ -631,6 +707,7 @@ function diySpecs(d){
   const extra=[];
   if(d.bombs) extra.push(['💣 Bomben',d.bombs+' an Bord']);
   if(d.nukes) extra.push(['☢️ Nuklearraketen',d.nukes+' · 100 m Radius']);
+  if(d.kamikaze) extra.push(['💥 Kamikaze','Aufschlag zündet']);
   if(d.range) extra.push(['📡 Funkreichweite','nur '+d.range+' m']);
   return extra.concat([['⚖ Gewicht',(d.mass*1000).toFixed(0)+' g'],
     ['🚀 Topspeed',(d.maxSpeed*3.6).toFixed(0)+(d.cls==='fpv'?'+':'')+' km/h'],
@@ -681,8 +758,23 @@ const EGG_SPECS=[
   cls:'cam', mass:2.4, arm:0.20, twr:3.0, tauUp:0.09, tauDn:0.13, propR:0.085,
   maxTilt:38, maxSpeed:36, climb:11, desc_:9, yawRate:80,
   batt:{cells:6, mah:6000, min:26}, modes:['GPS','ATTI'], gpsQ:1.0, agility:.45,
-  rates:{max:240,expo:.6}, camAngle:0, fovFpv:78, meshKind:'stealth', nukes:2,
+  rates:{max:240,expo:.6}, camAngle:0, fovFpv:78, meshKind:'stealth', nukes:5,
   style:{c1:[.20,.21,.23],c2:[.44,.46,.5],bodyL:.62,bodyW:1.0,bodyH:.07,gimbal:1,legs:1,propY:.026}},
+ {id:'egg_reaper', name:'Nuklear Operating System', egg:'reaper', badge:'✈️ EASTER EGG',
+  sel:{frame:'reaper',motor:'sport',prop:'xl',batt:'6s',cam:'gimbal',gear:'skids',color:'grey'},
+  desc:'Schlanke Langstreckendrohne mit Satellitenkuppel, V-Leitwerk und Waffenpylonen: 1 Nuklearrakete, 10 normale Bomben, 200 km/h Spitze.',
+  cls:'cam', mass:4.5, arm:0.5, twr:2.8, tauUp:0.1, tauDn:0.15, propR:0.16,
+  maxTilt:44, maxSpeed:55.6, climb:12, desc_:10, yawRate:70,
+  batt:{cells:6, mah:7000, min:34}, modes:['GPS','ATTI'], gpsQ:1.0, agility:.4,
+  rates:{max:220,expo:.6}, camAngle:0, fovFpv:74, meshKind:'reaper', nukes:1, bombs:10,
+  style:{c1:[.80,.81,.82],c2:[.32,.34,.38],bodyL:.72,bodyW:1.5,bodyH:.09,gimbal:1,legs:1,propY:.02}},
+];
+// Versteckte Bauteile (keine eigenen Drohnen, sondern Zubehör im Editor)
+const EGG_UNLOCKS=[
+  {id:'egg_kamikaze', name:'Kamikaze-Sprengsatz',
+   hint:'Steht ab jetzt im Editor unter <b>Zubehör</b> – für jede Drohne, die du baust.'},
+  {id:'egg_nukemag', name:'Atombomben-Magazin',
+   hint:'Unsichtbares Magazin mit <b>20 Nuklearsprengköpfen</b> – im Editor unter <b>Zubehör</b>, passt an jede Drohne.'},
 ];
 let EGGS_FOUND=[];
 function loadEggs(){
@@ -693,10 +785,12 @@ function saveEggs(){ try{ localStorage.setItem('ds_eggs',JSON.stringify(EGGS_FOU
 function eggDrones(){ return EGG_SPECS.filter(e=>EGGS_FOUND.includes(e.id)); }
 function unlockEgg(id){
   const spec=EGG_SPECS.find(e=>e.id===id);
-  if(!spec) return null;
+  const part=EGG_UNLOCKS.find(e=>e.id===id);
+  if(!spec&&!part) return null;
   if(!EGGS_FOUND.includes(id)){ EGGS_FOUND.push(id); saveEggs(); }
-  return spec;
+  return spec||part;
 }
+function isDroneEgg(id){ return EGG_SPECS.some(e=>e.id===id); }
 for(const e of EGG_SPECS) finalizeDrone(e);
 loadEggs();
 
@@ -704,9 +798,15 @@ loadEggs();
    Wertet freie Eingaben nach Schlagwörtern aus und stellt die Teile passend
    ein. Bestimmte Wünsche schalten versteckte Bauten frei. */
 const PROMPT_RULES=[
-  {k:['bombe','bomben','bomber','bomb','sprengen','zerstör','zerstor','destroy','explos'], egg:'egg_bomber'},
+  // Reihenfolge ist wichtig: die genaueren Wünsche stehen vor den allgemeinen,
+  // sonst schluckt z. B. „bomben" schon das „Atombomben-Magazin".
+  {k:['atombomben magazin','atombomben-magazin','atombomben magazine','bombenmagazin','nukemag',
+      'magazin voller','20 atombomben','atomraketen magazin'], egg:'egg_nukemag'},
+  {k:['kamikaze','selbstzerstör','selbstzerstor','reinfliegen und','opferdrohne'], egg:'egg_kamikaze'},
+  {k:['reaper','langstrecke','langstrecken','aufklärer','aufklaerer','operating system','satellitenschüssel'], egg:'egg_reaper'},
   {k:['nuklear','nuke','atom','kernwaffe','atombombe','atomrakete','nuclear','pilzwolke'], egg:'egg_stealth'},
   {k:['rakete','raketen','rocket','düse','duese','turbo','überschall','ueberschall'], egg:'egg_rocket'},
+  {k:['bombe','bomben','bomber','bomb','sprengen','zerstör','zerstor','destroy','explos'], egg:'egg_bomber'},
   {k:['schnell','speed','rennen','race','racing','tempo','fast','flott'],
    sel:{motor:'race',prop:'s',batt:'6sr',frame:'race5',cam:'fpv'}, say:'Rennaufbau: Rennmotoren, kleine Props, leichter Race-Akku'},
   {k:['lange flugzeit','ausdauer','lang fliegen','long range','longrange','weit','endurance','sparsam'],
@@ -790,6 +890,69 @@ const MAPS=[
   trees:25, people:36, gen:'city', range:760, grass:{n:500,col:[0.26,0.48,0.2],parkOnly:1}},
 ];
 
+/* ---------------- Selbstgebaute Karten (Map-Builder) ----------------
+   Werden als Beschreibung im Browser gespeichert und wie eine normale Karte
+   in die Liste gehängt. */
+const MB_TERRAIN=[
+  {id:'flat', name:'🌾 Flach', ter:{amp:3,freq:0.004,ramp:60},
+   pal:{low:[0.42,0.44,0.22],high:[0.34,0.5,0.24],rock:[0.5,0.47,0.42],snow:0}},
+  {id:'hills', name:'🌳 Hügel', ter:{amp:22,freq:0.0055,ramp:130},
+   pal:{low:[0.26,0.45,0.19],high:[0.4,0.52,0.26],rock:[0.48,0.45,0.4],snow:0}},
+  {id:'alps', name:'🏔️ Berge', ter:{amp:130,freq:0.006,ramp:160},
+   pal:{low:[0.28,0.46,0.2],high:[0.42,0.4,0.36],rock:[0.5,0.47,0.44],snow:0,snowLine:60}},
+  {id:'desert', name:'🏜️ Wüste', ter:{amp:16,freq:0.005,ramp:110},
+   pal:{low:[0.72,0.62,0.4],high:[0.78,0.68,0.45],rock:[0.6,0.5,0.36],snow:0}},
+];
+let MY_MAPS=[];
+function mbTerrainById(id){ return MB_TERRAIN.find(t=>t.id===id)||MB_TERRAIN[1]; }
+function buildCustomMap(def){
+  const t=mbTerrainById(def.terrain);
+  const m={
+    id:def.id, name:def.name||'Eigene Karte', icon:'🛠️', custom:true, gen:'custom',
+    desc:'Selbst gebaut · '+t.name.replace(/^\S+\s/,'')+' · '+(def.objects||[]).length+' Objekte',
+    ter:{...t.ter, amp:def.amp!==undefined?def.amp:t.ter.amp, seed:def.seed||11},
+    pal:{...t.pal},
+    water:null,
+    fog:[0.66,0.76,0.88], fogD:0.0014, sky:[0.28,0.52,0.86],
+    trees:0, people:0, range:760, objects:def.objects||[],
+    grass:{n:2000,col:[0.24,0.46,0.16]},
+    def,
+  };
+  if(def.terrain==='desert') m.grass=null;
+  // 1) Reliefspanne außerhalb des Startplateaus messen
+  m.ter.base=0; m.ter.pad=0;
+  {
+    const probe=makeTerFn(m);
+    let lo=1e9, hi=-1e9;
+    for(let j=-8;j<=8;j++)for(let i=-8;i<=8;i++){
+      if(Math.hypot(i,j)*48<t.ter.ramp)continue;         // Plateau auslassen
+      const h=probe(i*48,j*48);
+      if(h<lo)lo=h; if(h>hi)hi=h;
+    }
+    if(lo>hi){ lo=0; hi=1; }
+    m.ter.base=-lo;                                      // tiefste Stelle auf 0
+    m.range2=hi-lo;
+  }
+  // 2) Wasserstand als Anteil der Geländespanne, Startplateau immer darüber
+  const pct=def.water>=0?clamp(def.water,0,40)/100:0;
+  const level=m.range2*pct;
+  m.ter.pad=Math.max(level+2.5, m.range2*0.14);
+  m.water=(pct>0&&level>0.6)?{level, col:[0.1,0.3,0.42]}:null;
+  m.waterClamped=false;
+  return m;
+}
+function loadMyMaps(){
+  MY_MAPS=[];
+  try{
+    const arr=JSON.parse(localStorage.getItem('ds_maps')||'[]');
+    for(const def of arr) MY_MAPS.push(buildCustomMap(def));
+  }catch(e){ MY_MAPS=[]; }
+}
+function saveMyMaps(){
+  try{ localStorage.setItem('ds_maps',JSON.stringify(MY_MAPS.map(m=>m.def))); }catch(e){}
+}
+loadMyMaps();
+
 /* ---------------- Echte Orte ----------------
    Geländeprofil aus offenen Terrain-Daten (SRTM u.a.), Gebäudegrundrisse aus
    Overture Maps / OpenStreetMap-Mitwirkenden (ODbL). Alles vorab eingebacken. */
@@ -857,6 +1020,10 @@ for(const m of REAL_MAPS){
   const d=(typeof MAPDATA!=='undefined')?MAPDATA[m.key]:null;
   if(d){ m.data=d; MAPS.push(m); }
 }
+
+// Eingebaute Karten plus die selbst gebauten
+function allMaps(){ return MAPS.concat(MY_MAPS); }
+function mapById(id){ return allMaps().find(m=>m.id===id); }
 
 /* ---------------- Missionen (Basisdaten, Höhen werden pro Karte gesetzt) ---------------- */
 const MISSIONS=[
@@ -1518,6 +1685,76 @@ function buildDroneMesh(d){
       bladeCol=st.c2; hubCol=carbon;
       break;
     }
+    case 'reaper': {
+      // Langstreckendrohne: schlanker Rumpf mit Satellitenkuppel, sehr langer
+      // gerader Flügel mit abgeknickten Enden, V-Leitwerk, Waffenpylone.
+      const skin=st.c1, dk=[0.13,0.14,0.16], HW=W/2;
+      // Rumpf
+      b.loft([
+        {z:-L*0.52,y:H*0.1,w:W*0.075,h:H*0.7,e:2.6},
+        {z:-L*0.42,y:H*0.22,w:W*0.15,h:H*1.5,e:3.0},   // dicke Bugkuppel
+        {z:-L*0.26,y:H*0.2,w:W*0.155,h:H*1.6,e:3.2},
+        {z:0,y:H*0.12,w:W*0.135,h:H*1.35,e:3.2},
+        {z:L*0.3,y:H*0.1,w:W*0.1,h:H*1.0,e:3.0},
+        {z:L*0.5,y:H*0.12,w:W*0.03,h:H*0.3,e:2.6},
+      ],18,skin);
+      b.ellipsoid(W*0.08,H*0.8,L*0.1,[0,H*0.24,-L*0.4],14,9,skin);       // SATCOM-Kuppel
+      b.loft([                                                            // Triebwerksbuckel
+        {z:L*0.02,y:H*0.95,w:W*0.075,h:H*0.55,e:2.8},
+        {z:L*0.2,y:H*1.0,w:W*0.085,h:H*0.7,e:3.0},
+        {z:L*0.42,y:H*0.9,w:W*0.05,h:H*0.4,e:2.6},
+      ],12,skin);
+      b.tube([0,H*0.85,L*0.42],[0,H*0.8,L*0.52],W*0.028,W*0.02,10,dk);
+      // Flügel: lang, gerade, mit nach unten geknickten Enden
+      const wz=-L*0.06, wc=L*0.2;
+      for(const s of [-1,1]){
+        b.loft([
+          {z:wz,y:H*0.3,w:0.001,h:0.001,e:3},
+        ],4,skin);
+        const seg=[[W*0.07,H*0.32,wc],[HW*0.55,H*0.34,wc*0.8],[HW*0.86,H*0.36,wc*0.6],[HW*1.0,H*0.2,wc*0.36]];
+        for(let i=0;i<seg.length-1;i++){
+          const [x0,y0,c0]=seg[i], [x1,y1,c1]=seg[i+1];
+          b.curCol=skin;
+          // Ober- und Unterseite des Flügelsegments
+          const q=(x,y,c,dy)=>[[s*x,y+dy,wz-c/2],[s*x,y+dy,wz+c/2]];
+          const a0=q(x0,y0,c0,H*0.06), a1=q(x1,y1,c1,H*0.06);
+          const b0=q(x0,y0,c0,-H*0.06), b1=q(x1,y1,c1,-H*0.06);
+          b.quad(a0[0],a1[0],a1[1],a0[1]);
+          b.quad(b0[1],b1[1],b1[0],b0[0]);
+          b.quad(a0[0],b0[0],b1[0],a1[0]);
+          b.quad(a1[1],b1[1],b0[1],a0[1]);
+        }
+        // V-Leitwerk
+        b.box(0.01,H*1.5,L*0.13,[s*W*0.09,H*0.9,L*0.42],0,skin);
+        b.box(0.012,H*0.1,L*0.16,[s*W*0.13,H*1.55,L*0.42],0,skin);
+        // Waffenpylone mit Bomben
+        for(let k=0;k<2;k++){
+          const px=s*(HW*0.24+k*HW*0.16);
+          b.box(0.014,H*0.5,L*0.07,[px,H*0.06,wz],0,dk);
+          b.tube([px,-H*0.2,wz-L*0.1],[px,-H*0.2,wz+L*0.08],0.017,0.017,10,[0.5,0.5,0.42]);
+          b.ellipsoid(0.017,0.017,L*0.04,[px,-H*0.2,wz-L*0.13],10,7,[0.45,0.45,0.38]);
+          for(const fa of [0,Math.PI/2])
+            b.box(0.004+0.026*Math.cos(fa),0.004+0.026*Math.sin(fa),0.03,[px,-H*0.2,wz+L*0.07],0,[0.5,0.5,0.42]);
+        }
+        // Hauptfahrwerk
+        b.tube([s*W*0.06,-H*0.45,L*0.02],[s*W*0.06,-H*1.05,L*0.02],0.008,0.007,7,dk);
+        b.tube([s*W*0.06-0.016,-H*1.05,L*0.02],[s*W*0.06+0.016,-H*1.05,L*0.02],0.021,0.021,10,[0.08,0.08,0.09]);
+      }
+      // Bugfahrwerk
+      b.tube([0,-H*0.55,-L*0.3],[0,-H*1.05,-L*0.3],0.007,0.006,7,dk);
+      b.tube([-0.013,-H*1.05,-L*0.3],[0.013,-H*1.05,-L*0.3],0.018,0.018,10,[0.08,0.08,0.09]);
+      // vier Hubrotoren an den Flügeln
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        b.cyl(d.propR*1.1,d.propR*1.1,0.014,[ax,pY-0.02,az],18,dk,false);
+        b.cyl(d.propR*1.22,d.propR*1.22,0.005,[ax,pY-0.024,az],18,[0.5,0.51,0.54]);
+        motor(ax,az,dk,0.02);
+      }
+      gimbal(-H*0.95,-L*0.3,0.05);
+      leds();
+      bladeCol=[0.2,0.21,0.23]; hubCol=dk;
+      break;
+    }
     case 'stealth': {
       // Getarnter Nurflügler: stark gepfeilte Deltafläche, verschmolzener Rumpf,
       // Triebwerksbuckel oben, vier versenkte Hubrotoren, Bugfahrwerk.
@@ -1777,6 +2014,39 @@ function buildDroneMeshBlocky(d){
   if(bmk==='tinywhoop')bmk='whoop';
   else if(bmk==='deadcat'||bmk==='toothpick'||bmk==='rocket')bmk='race5';
   else if(bmk==='bomber')bmk='cine';
+  else if(bmk==='reaper'){
+    // Retro-Variante: Kastenrumpf, gerader Balkenflügel, V-Leitwerk
+    const skin=st.c1, dk=[0.13,0.14,0.16], HW=W/2;
+    b.box(W*0.14,H*1.5,L*0.95,[0,H*0.15,0],0,skin);
+    b.box(W*0.17,H*1.7,L*0.18,[0,H*0.2,-L*0.4],0,skin);
+    b.box(W*0.09,H*0.7,L*0.42,[0,H*1.1,L*0.2],0,skin);
+    b.box(W*0.98,H*0.16,L*0.2,[0,H*0.32,-L*0.06],0,skin);
+    for(const s of [-1,1]){
+      b.box(W*0.04,H*0.5,L*0.2,[s*HW*0.95,H*0.1,-L*0.06],0,skin);
+      b.box(0.014,H*1.5,L*0.14,[s*W*0.09,H*0.95,L*0.42],0,skin);
+      for(let k=0;k<2;k++){
+        const px=s*(HW*0.24+k*HW*0.16);
+        b.box(0.02,H*0.5,L*0.07,[px,H*0.05,-L*0.06],0,dk);
+        b.box(0.036,0.036,L*0.2,[px,-H*0.22,-L*0.06],0,[0.5,0.5,0.42]);
+      }
+      b.box(0.016,H*0.9,0.016,[s*W*0.06,-H*0.75,L*0.02],0,dk);
+      b.box(0.042,0.04,0.04,[s*W*0.06,-H*1.12,L*0.02],0,dk);
+    }
+    b.box(0.014,H*0.8,0.014,[0,-H*0.8,-L*0.3],0,dk);
+    for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+      const ax=sx*arm, az=sz*arm;
+      b.box(d.propR*2.2,0.02,d.propR*2.2,[ax,pY-0.02,az],0,dk);
+      motor(ax,az,dk,0.02,0.024);
+    }
+    bladeCol=[0.2,0.21,0.23]; hubCol=dk;
+    const body1=b.build();
+    const prop1=mesh(pb=>{
+      for(const a of [0,Math.PI/2]) pb.box(d.propR*1.5,0.006,d.propR*0.16,[0,0,0],a,bladeCol);
+      pb.box(d.propR*0.28,0.01,d.propR*0.28,[0,0,0],0,hubCol);
+    });
+    const disc1=mesh(pb=>{ pb.cyl(d.propR,d.propR,0.004,[0,0,0],16,bladeCol); });
+    return {body:body1,prop:prop1,disc:disc1,propY:pY};
+  }
   else if(bmk==='stealth'){
     // Retro-Variante des Nurflüglers: gestufte Deltafläche aus Klötzen
     const skin=st.c1, dk=[0.07,0.07,0.08];
@@ -2051,6 +2321,15 @@ function makeTerFn(map){
       return h;
     };
   }
+  if(map.gen==='custom'){
+    // Selbstgebaut: außen echtes Relief, in der Mitte ein trockenes Startplateau
+    const base=t.base||0, pad=t.pad||0;
+    return (x,z)=>{
+      const ramp=smoothstep(20,t.ramp,Math.hypot(x,z));
+      const outer=base+(fbm(x*t.freq,z*t.freq,t.seed)-0.45)*2*t.amp;
+      return pad*(1-ramp)+outer*ramp;
+    };
+  }
   return (x,z)=>{
     const dd=Math.hypot(x,z);
     const ramp=smoothstep(20,t.ramp,dd);
@@ -2312,6 +2591,52 @@ GEN.real=(map,B,obs,terH,rnd)=>{
     addTree(B,obs,x,y-0.2,z,3.5+rnd()*5);
   }
 };
+/* --- Selbstgebaute Karten: Objektliste aus dem Map-Builder aufstellen --- */
+const MB_KINDS={
+  tree:{icon:'🌲',name:'Baum',size:7},
+  house:{icon:'🏠',name:'Haus',size:9},
+  tower:{icon:'🏢',name:'Hochhaus',size:34},
+  hall:{icon:'🏭',name:'Halle',size:9},
+  wall:{icon:'🧱',name:'Mauer',size:5},
+  chimney:{icon:'🏗️',name:'Schornstein',size:45},
+  ramp:{icon:'⛰️',name:'Felsen',size:6},
+  person:{icon:'🚶',name:'Person',size:0},
+};
+GEN.custom=(map,B,obs,terH,rnd)=>{
+  const conc=[0.6,0.59,0.56], rust=[0.5,0.32,0.2];
+  for(const o of (map.objects||[])){
+    const x=o.x, z=o.z, y0=terH(x,z), s=o.s||MB_KINDS[o.k].size;
+    if(map.water&&y0<map.water.level-0.2&&o.k!=='tower')continue;   // nichts im See
+    switch(o.k){
+      case 'tree': addTree(B,obs,x,y0-0.2,z,s); break;
+      case 'house': {
+        const w=s*1.1,dd=s*0.9,h=s*0.75;
+        addBuildingBox(B,obs,x,z,w,dd,h,y0,[0.82,0.76,0.66],o.r||0);
+        B.box(w+0.9,0.45,dd+0.9,[x,y0+h+0.2,z],o.r||0,[0.5,0.24,0.18]);
+        break; }
+      case 'tower': {
+        const w=Math.max(7,s*0.32);
+        addBuildingBox(B,obs,x,z,w,w*0.9,s,y0,[0.52,0.55,0.6],o.r||0);
+        B.box(w*0.5,1.2,w*0.45,[x,y0+s+0.6,z],o.r||0,[0.3,0.31,0.34]);
+        break; }
+      case 'hall': {
+        const w=s*2.6,dd=s*1.5,h=s;
+        addBuildingBox(B,obs,x,z,w,dd,h,y0,conc,o.r||0);
+        B.box(w+0.6,0.5,dd+0.6,[x,y0+h+0.25,z],o.r||0,rust);
+        break; }
+      case 'wall': addBuildingBox(B,obs,x,z,s*3,1.0,s,y0,[0.55,0.5,0.46],o.r||0); break;
+      case 'chimney': {
+        addBuildingBox(B,obs,x,z,0.1,0.1,0.1,y0,conc); obs.pop();
+        B.cyl(s*0.07,s*0.045,s,[x,y0,z],12,[0.48,0.3,0.24]);
+        obs.push({x,z,r:s*0.08,h:y0+s});
+        break; }
+      case 'ramp': {
+        B.cyl(s*0.8,s*0.12,s*0.9,[x,y0-0.3,z],9,[0.5,0.48,0.45]);
+        obs.push({x,z,r:s*0.6,h:y0+s*0.7});
+        break; }
+    }
+  }
+};
 GEN.standard=(map,B,obs,terH,rnd)=>{
   for(let i=0;i<map.trees;i++){
     const a=rnd()*Math.PI*2,r=25+rnd()*330;
@@ -2510,7 +2835,7 @@ GEN.city=(map,B,obs,terH,rnd)=>{
 
 /* --- Szene bauen --- */
 function buildScene(mapId){
-  const map=MAPS.find(m=>m.id===mapId)||MAPS[0];
+  const map=mapById(mapId)||MAPS[0];
   const terH=makeTerFn(map);
   let s=map.ter.seed*7919+13;
   const rnd=()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
@@ -2604,6 +2929,14 @@ function buildScene(mapId){
     const dir=rnd()*Math.PI*2, len=12+rnd()*25;
     people.push({x0:x,z0:z,x1:x+Math.cos(dir)*len,z1:z+Math.sin(dir)*len,
       t:rnd(),spd:(0.5+rnd()*0.7)/len,mesh:pm[i%pm.length],x,z,yaw:0,phase:rnd()*7});
+  }
+  // von Hand gesetzte Personen (Map-Builder)
+  for(const o of (map.objects||[])){
+    if(o.k!=='person')continue;
+    const dir=rnd()*Math.PI*2, len=10+rnd()*18;
+    people.push({x0:o.x,z0:o.z,x1:o.x+Math.cos(dir)*len,z1:o.z+Math.sin(dir)*len,
+      t:rnd(),spd:(0.5+rnd()*0.6)/len,mesh:pm[people.length%pm.length],
+      x:o.x,z:o.z,yaw:0,phase:rnd()*7});
   }
   SCENE={map,terH,stat,terMesh,shadow,obstacles:obs,race,photo,plats,people,
     water:map.water?{...map.water}:null};
@@ -3407,6 +3740,12 @@ function crash(msg){
   if(DR.crashed)return;
   DR.crashed=true; DR.armed=false; DR.motors=[0,0,0,0];
   spawnDebris();
+  // Kamikaze-Sprengsatz: der Aufschlag selbst ist die Zündung
+  // (crashed steht schon auf true, die Explosion kann also nicht zurückschlagen)
+  if(APP.model.kamikaze&&SCENE){
+    explode(DR.pos[0],Math.max(DR.pos[1],SCENE.terH(DR.pos[0],DR.pos[2])),DR.pos[2]);
+    msg='💥 Kamikaze-Sprengsatz gezündet';
+  }
   // Wrack merken (Bergung möglich) – falls Bergungsdrohne selbst crasht, geht die Fracht mit unter
   if(RESCUE&&RESCUE.carrying){ RESCUE=null; }
   WRECK={modelId:APP.model.id, mass:APP.model.mass, pos:[...DR.pos]};
@@ -3804,6 +4143,24 @@ function render(){
       gl.depthMask(true);
     }
   }
+  // Mitspieler aus anderen Fenstern
+  for(const p of mpVisible()){
+    const pd=droneById(p.model)||APP.model;
+    const dm=DRONE_MESH[pd.id]||DRONE_MESH[APP.model.id];
+    if(!dm)continue;
+    const pm=M4.fromQuatPos(p.q,p.pos);
+    drawMesh(dm.body,pm,[1,1,1],p.crashed?0.5:1);
+    if(!p.crashed){
+      const spin=(p.spin||0)>0.06;
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const local=M4.mul(pm,M4.translate(sx*pd.arm,dm.propY,sz*pd.arm));
+        drawMesh(spin?dm.disc:dm.prop,local,[1,1,1],spin?0.42:1);
+      }
+    }
+    // Namensschild als kleine Tafel über der Drohne
+    drawMesh(padWpMesh,M4.mul(M4.translate(p.pos[0],p.pos[1]+0.55,p.pos[2]),M4.scale(0.3,1,0.3)),
+      [0.25,0.85,1],0.75);
+  }
   // Drohnenschatten (Richtung Sonne versetzt)
   if(!DR.crashed){
     const sx2=DR.pos[0]+sox*Math.min(DR.pos[1]-SCENE.terH(DR.pos[0],DR.pos[2]),22)*0.55;
@@ -4012,9 +4369,10 @@ function toast(msg,ms=2600){
 function buildMenu(){
   const mg0=$('mapGrid');
   mg0.innerHTML='';
-  for(const m of MAPS){
+  for(const m of allMaps()){
     const c=document.createElement('div');c.className='card mcard'+(m.id===APP.mapId?' sel':'');
-    c.innerHTML=`<div class="nm">${m.icon} ${m.name}</div><div class="ds">${m.desc}</div>`;
+    c.innerHTML=`<div class="nm">${m.icon} ${m.name}${m.custom?'<span class="chip fpv">EIGENE</span>':''}</div>
+      <div class="ds">${m.desc}</div>`;
     c.onclick=()=>{APP.mapId=m.id;buildMenu();};
     mg0.appendChild(c);
   }
@@ -4067,6 +4425,28 @@ function buildMenu(){
     if(s===APP.sens)b.className='sel';
     b.onclick=()=>{APP.sens=s;localStorage.setItem('ds_sens',s);buildMenu();};
     sr.appendChild(b);
+  }
+  const mr=$('mpRow');
+  if(mr){
+    mr.innerHTML='';
+    const supported=(typeof BroadcastChannel!=='undefined');
+    const b=document.createElement('button');
+    b.textContent=MP.on?'👥 An':'👤 Aus';
+    if(MP.on)b.className='sel';
+    b.disabled=!supported;
+    b.onclick=()=>mpSetOn(!MP.on);
+    mr.appendChild(b);
+    const inp=document.createElement('input');
+    inp.id='mpName'; inp.maxLength=16; inp.value=MP.name; inp.placeholder='Dein Pilotenname';
+    inp.style.cssText='flex:1 1 180px;background:var(--panel);border:1px solid var(--line);color:var(--txt);'+
+      'border-radius:9px;padding:9px 12px;font-size:13px';
+    inp.oninput=()=>{ MP.name=inp.value.slice(0,16)||'Pilot'; mpSave(); };
+    mr.appendChild(inp);
+    const info=document.createElement('span');
+    info.style.cssText='align-self:center;font-size:12.5px;color:var(--dim)';
+    info.textContent=!supported?'Dein Browser kann das nicht.':
+      (MP.on?(MP.peers.size?MP.peers.size+' andere(r) verbunden':'Warte auf ein zweites Fenster …'):'Aus');
+    mr.appendChild(info);
   }
   buildGallery();
   $('startBtn').textContent=(APP.state==='fly'&&!configChanged())?'WEITERFLIEGEN':'ABHEBEN';
@@ -4136,6 +4516,7 @@ function handleKey(code){
   if(code==='Escape'){
     if($('pview').style.display==='block'){$('pview').style.display='none';return;}
     if($('world').style.display==='block'){closeWorld();return;}
+    if($('mapb').style.display==='block'){closeMapBuilder();return;}
     if(APP.state==='editor'){closeEditor();return;}
     if(APP.state==='fly'){ if(APP.paused)closeMenuAndStart(); else openMenu(); }
     return;
@@ -4585,6 +4966,226 @@ $('wmap').addEventListener('click',e=>{
   wmapPick(lat,lon);
 });
 
+/* ---------------- Mehrspieler (lokal) ----------------
+   Ohne eigenen Server geht kein Spiel über das Internet – diese Seite liegt
+   auf statischem Hosting. Was ohne Server geht: alle Fenster/Tabs desselben
+   Browsers sehen sich gegenseitig. Zwei Fenster nebeneinander, zwei Piloten. */
+const MP={on:false, ch:null, id:Math.random().toString(36).slice(2,9),
+  name:'', peers:new Map(), lastSend:0};
+function mpLoad(){
+  try{
+    MP.name=localStorage.getItem('ds_mpname')||('Pilot '+MP.id.slice(0,3).toUpperCase());
+    MP.on=localStorage.getItem('ds_mp')==='1';
+  }catch(e){ MP.name='Pilot'; }
+}
+function mpSave(){
+  try{ localStorage.setItem('ds_mpname',MP.name); localStorage.setItem('ds_mp',MP.on?'1':'0'); }catch(e){}
+}
+function mpStart(){
+  if(MP.ch||typeof BroadcastChannel==='undefined')return;
+  try{ MP.ch=new BroadcastChannel('ds_multiplayer'); }catch(e){ MP.ch=null; return; }
+  MP.ch.onmessage=(ev)=>{
+    const m=ev.data;
+    if(!m||m.id===MP.id)return;
+    if(m.bye){ MP.peers.delete(m.id); return; }
+    MP.peers.set(m.id,{...m,seen:performance.now()});
+  };
+}
+function mpStop(){
+  if(MP.ch){ try{ MP.ch.postMessage({id:MP.id,bye:1}); MP.ch.close(); }catch(e){} }
+  MP.ch=null; MP.peers.clear();
+}
+function mpSetOn(v){
+  MP.on=v; mpSave();
+  if(v) mpStart(); else mpStop();
+  buildMenu();
+}
+function mpStep(){
+  if(!MP.on||!MP.ch)return;
+  const now=performance.now();
+  // eigene Lage senden (etwa 20-mal pro Sekunde)
+  if(now-MP.lastSend>50&&APP.state==='fly'&&SCENE){
+    MP.lastSend=now;
+    try{
+      MP.ch.postMessage({id:MP.id, name:MP.name, map:SCENE.map.id, model:APP.model.id,
+        pos:[+DR.pos[0].toFixed(2),+DR.pos[1].toFixed(2),+DR.pos[2].toFixed(2)],
+        q:[+DR.q[0].toFixed(3),+DR.q[1].toFixed(3),+DR.q[2].toFixed(3),+DR.q[3].toFixed(3)],
+        spin:(DR.motors[0]+DR.motors[1]+DR.motors[2]+DR.motors[3])/4,
+        crashed:DR.crashed});
+    }catch(e){}
+  }
+  // alte Einträge vergessen
+  for(const [id,p] of MP.peers) if(now-p.seen>2500) MP.peers.delete(id);
+}
+function mpVisible(){
+  if(!MP.on||!SCENE)return [];
+  const out=[];
+  for(const p of MP.peers.values()) if(p.map===SCENE.map.id&&p.pos) out.push(p);
+  return out;
+}
+
+/* ---------------- Map-Builder: eigene Karten bauen ----------------
+   Draufsicht auf 800 × 800 m. Gelände kommt aus denselben Reglern wie die
+   eingebauten Karten, Objekte werden per Klick gesetzt. */
+const MB={def:null, tool:'tree', editId:null, span:800, map:null, terH:null};
+function mbNewDef(){
+  return {id:'my_'+Date.now().toString(36), name:'', terrain:'hills',
+    amp:22, water:-1, trees:120, seed:11, objects:[]};
+}
+function mbRebuild(){
+  MB.def.trees=+$('mbTrees').value;
+  MB.map=buildCustomMap(MB.def);
+  MB.map.trees=MB.def.trees;
+  MB.terH=makeTerFn(MB.map);
+  mbSyncSliders();
+  mbDraw();
+}
+function mbDraw(){
+  const cv=$('mbCanvas'), cx=cv.getContext('2d'), N=cv.width;
+  const span=MB.span, half=span/2;
+  const step=8, cells=N/step;
+  const img=cx.createImageData(N,N);
+  const wl=MB.map.water?MB.map.water.level:-1e9;
+  for(let j=0;j<cells;j++)for(let i=0;i<cells;i++){
+    const x=-half+span*(i+0.5)/cells, z=-half+span*(j+0.5)/cells;
+    const h=MB.terH(x,z);
+    let c;
+    if(h<wl) c=[26,74,104];
+    else {
+      // gleiche Einfärbung wie im Spiel, nur grob
+      const n=[0,1,0];
+      const col=terColor(MB.map,h,0.95,x,z);
+      c=[col[0]*255,col[1]*255,col[2]*255];
+      const sh=1+(MB.terH(x+6,z)-h)*0.06;      // leichte Schummerung
+      c=[c[0]*sh,c[1]*sh,c[2]*sh];
+    }
+    for(let py=0;py<step;py++)for(let px=0;px<step;px++){
+      const o=(((j*step+py)*N)+(i*step+px))*4;
+      img.data[o]=clamp(c[0],0,255); img.data[o+1]=clamp(c[1],0,255);
+      img.data[o+2]=clamp(c[2],0,255); img.data[o+3]=255;
+    }
+  }
+  cx.putImageData(img,0,0);
+  // Startplatz
+  const toPx=(x,z)=>[(x+half)/span*N,(z+half)/span*N];
+  cx.strokeStyle='rgba(255,255,255,.75)'; cx.lineWidth=2;
+  const [sx,sz]=toPx(0,0);
+  cx.beginPath(); cx.arc(sx,sz,10,0,7); cx.stroke();
+  cx.beginPath(); cx.moveTo(sx-15,sz); cx.lineTo(sx+15,sz);
+  cx.moveTo(sx,sz-15); cx.lineTo(sx,sz+15); cx.stroke();
+  // Flugradius
+  cx.strokeStyle='rgba(55,198,255,.35)';
+  cx.beginPath(); cx.arc(sx,sz,760/span*N,0,7); cx.stroke();
+  // Objekte
+  cx.font='16px system-ui,sans-serif'; cx.textAlign='center'; cx.textBaseline='middle';
+  for(const o of MB.def.objects){
+    const [px,pz]=toPx(o.x,o.z);
+    cx.fillText(MB_KINDS[o.k].icon,px,pz);
+  }
+  cx.textAlign='left'; cx.textBaseline='alphabetic';
+  $('mbMsg').textContent=MB.def.objects.length+' Objekte · Werkzeug: '+
+    (MB.tool==='del'?'Löschen':MB_KINDS[MB.tool].name)+
+    (MB.map.water?' · See auf '+MB.map.water.level.toFixed(0)+' m, Startplatz liegt darüber':'');
+}
+function mbBuildUI(){
+  const ter=$('mbTer'); ter.innerHTML='';
+  for(const t of MB_TERRAIN){
+    const b=document.createElement('button');
+    b.textContent=t.name;
+    b.className=(MB.def.terrain===t.id?'sel':'');
+    b.onclick=()=>{ MB.def.terrain=t.id;
+      MB.def.amp=t.ter.amp; $('mbAmp').value=t.ter.amp; $('mbAmpV').textContent=t.ter.amp;
+      mbRebuild(); mbBuildUI(); };
+    ter.appendChild(b);
+  }
+  const tools=$('mbTools'); tools.innerHTML='';
+  for(const [k,v] of Object.entries(MB_KINDS)){
+    const b=document.createElement('button');
+    b.textContent=v.icon+' '+v.name;
+    b.className=(MB.tool===k?'sel':'');
+    b.onclick=()=>{ MB.tool=k; mbBuildUI(); mbDraw(); };
+    tools.appendChild(b);
+  }
+  const del=document.createElement('button');
+  del.textContent='🗑 Löschen';
+  del.className=(MB.tool==='del'?'sel':'');
+  del.onclick=()=>{ MB.tool='del'; mbBuildUI(); mbDraw(); };
+  tools.appendChild(del);
+  // gespeicherte Karten
+  const list=$('mbList'); list.innerHTML='';
+  if(!MY_MAPS.length) list.innerHTML='<span style="color:#8ea4b8;font-size:12.5px">Noch keine gespeichert.</span>';
+  for(const m of MY_MAPS){
+    const c=document.createElement('div');c.className='card';
+    const nm=document.createElement('span');nm.className='nm';nm.textContent='🛠️ '+m.name;
+    nm.onclick=()=>{ MB.def=JSON.parse(JSON.stringify(m.def)); MB.editId=m.id;
+      $('mbName').value=m.name; mbSyncSliders(); mbRebuild(); mbBuildUI(); };
+    const del2=document.createElement('span');del2.className='del';del2.textContent='🗑';
+    del2.onclick=()=>{ MY_MAPS=MY_MAPS.filter(x=>x.id!==m.id); saveMyMaps();
+      if(APP.mapId===m.id){APP.mapId='standard';SCENE=null;}
+      if(MB.editId===m.id)MB.editId=null; mbBuildUI(); buildMenu(); };
+    c.appendChild(nm);c.appendChild(del2);list.appendChild(c);
+  }
+}
+function mbSyncSliders(){
+  $('mbAmp').value=MB.def.amp; $('mbAmpV').textContent=MB.def.amp;
+  $('mbWater').value=MB.def.water;
+  $('mbWaterV').textContent=MB.def.water<0?'aus':MB.def.water+' %'+
+    (MB.map&&MB.map.water?' ('+MB.map.water.level.toFixed(0)+' m)':'');
+  $('mbTrees').value=MB.def.trees; $('mbTreesV').textContent=MB.def.trees;
+  $('mbSeed').value=MB.def.seed; $('mbSeedV').textContent=MB.def.seed;
+}
+function openMapBuilder(){
+  MB.prevState=(APP.state==='fly')?'fly':'menu';
+  APP.paused=true;
+  $('menu').style.display='none';
+  $('mapb').style.display='block';
+  if(!MB.def){ MB.def=mbNewDef(); $('mbName').value=''; }
+  mbSyncSliders(); mbRebuild(); mbBuildUI();
+}
+function closeMapBuilder(){ $('mapb').style.display='none'; openMenu(); }
+function mbSave(){
+  const name=($('mbName').value||'').trim()||('Karte '+(MY_MAPS.length+1));
+  MB.def.name=name;
+  const def=JSON.parse(JSON.stringify(MB.def));
+  const i=MY_MAPS.findIndex(m=>m.id===def.id);
+  const m=buildCustomMap(def);
+  if(i>=0) MY_MAPS[i]=m; else MY_MAPS.push(m);
+  MB.editId=def.id;
+  saveMyMaps(); mbBuildUI(); buildMenu();
+  toast('💾 Karte „'+name+'" gespeichert – steht im Kartenmenü',3000);
+}
+function mbTestFlight(){
+  mbSave();
+  APP.mapId=MB.def.id; SCENE=null;
+  $('mapb').style.display='none';
+  buildMenu();
+  closeMenuAndStart();
+}
+$('mapBtn').onclick=openMapBuilder;
+$('mbClose').onclick=closeMapBuilder;
+$('mbSave').onclick=mbSave;
+$('mbTest').onclick=mbTestFlight;
+for(const [id,key] of [['mbAmp','amp'],['mbWater','water'],['mbTrees','trees'],['mbSeed','seed']]){
+  $(id).addEventListener('input',()=>{ MB.def[key]=+$(id).value; mbRebuild(); });
+}
+$('mbCanvas').addEventListener('click',e=>{
+  const cv=$('mbCanvas'), r=cv.getBoundingClientRect();
+  const px=(e.clientX-r.left)/r.width, pz=(e.clientY-r.top)/r.height;
+  const x=Math.round((px-0.5)*MB.span), z=Math.round((pz-0.5)*MB.span);
+  if(MB.tool==='del'){
+    let bi=-1,bd=1e9;
+    MB.def.objects.forEach((o,i)=>{ const dd=Math.hypot(o.x-x,o.z-z); if(dd<bd){bd=dd;bi=i;} });
+    if(bi>=0&&bd<40) MB.def.objects.splice(bi,1);
+  }else{
+    if(Math.hypot(x,z)<12){ $('mbMsg').textContent='Der Startplatz in der Mitte bleibt frei.'; return; }
+    if(Math.hypot(x,z)>760){ $('mbMsg').textContent='Außerhalb der Flugreichweite – näher an die Mitte.'; return; }
+    if(MB.def.objects.length>=400){ $('mbMsg').textContent='400 Objekte sind genug.'; return; }
+    const k=MB.tool;
+    MB.def.objects.push({k, x, z, s:MB_KINDS[k].size*(0.75+Math.random()*0.6), r:Math.random()*3});
+  }
+  mbDraw();
+});
+
 /* ---------------- DIY-Editor ---------------- */
 const EDIT={sel:{...DIY_DEFAULT}, drone:null, editId:null, spin:0, propAng:0};
 function editorRebuild(){
@@ -4595,7 +5196,8 @@ function editorRebuild(){
 }
 function buildEditorUI(){
   const cats=[['frame','Gehäuse / Rahmen'],['motor','Motoren'],['prop','Propeller'],
-    ['batt','Akku'],['cam','Kamera'],['gear','Fahrwerk / Landefüße'],['color','Farbe']];
+    ['batt','Akku'],['cam','Kamera'],['gear','Fahrwerk / Landefüße'],
+    ['acc','Zubehör'],['color','Farbe']];
   const host=$('eParts');
   host.innerHTML='';
   for(const [cat,label] of cats){
@@ -4684,6 +5286,17 @@ function onPrompt(){
   const msg=$('ePromptMsg');
   const r=parsePrompt(txt);
   if(r.empty){ msg.textContent='Schreib erst, was die Drohne können soll.'; msg.style.color='var(--warn)'; return; }
+  if(r.egg&&!isDroneEgg(r.egg)){
+    // Versteckte Bauteile: gleich anlegen und im Editor auswählen
+    const u=unlockEgg(r.egg);
+    const part=PARTS.acc.find(p=>p.egg===r.egg);
+    if(part){ EDIT.sel.acc=part.id; editorRebuild(); }
+    buildEditorUI();
+    msg.innerHTML='🥚 <b>Easter Egg gefunden:</b> '+u.name+' – '+u.hint;
+    msg.style.color='var(--acc2)';
+    toast('🥚 Easter Egg freigeschaltet: '+u.name+'<br><small>Im Editor unter Zubehör</small>',4500);
+    return;
+  }
   if(r.egg){
     const spec=unlockEgg(r.egg);
     ensureDroneMesh(spec);
@@ -4807,11 +5420,15 @@ function frame(t){
     stepDebris(dt);
     rescueStep(dt);
     stepBombs(dt);
+    mpStep();
     updateAudio((DR.motors[0]+DR.motors[1]+DR.motors[2]+DR.motors[3])/4,DR.armed,dt);
   } else updateAudio(0,false,dt);
   if(APP.state==='fly'){render();drawHUD();}
   else if(APP.state==='editor'){ EDIT.spin+=dt*0.5; EDIT.propAng+=dt*22; renderEditorPreview(); }
 }
+mpLoad();
+if(MP.on) mpStart();
+addEventListener('pagehide',()=>{ if(MP.ch) try{ MP.ch.postMessage({id:MP.id,bye:1}); }catch(e){} });
 buildScene(APP.mapId);
 resize();
 buildMenu();
