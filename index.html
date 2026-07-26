@@ -26,7 +26,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #btnbar button:active{background:var(--panel2)}
 #btnbar button.armed{background:#67251f;border-color:#c25047;color:#ffd9d5}
 #btnbar button.attn{background:#0f4a2d;border-color:#2fae6b;color:#c9ffe0}
-#bRescue,#bBomb,#bNuke,#bFw,#bCargo,#bCann,#bHorn,#bScout{display:none}
+#bRescue,#bBomb,#bNuke,#bFw,#bCargo,#bCann,#bHorn,#bScout,#bWasp,#bCat{display:none}
+#bWasp.attn{background:#4a4406;border-color:#d8cf3c;color:#fbf7bb}
+#bCat.attn{background:#4a2d13;border-color:#d08c4a;color:#ffe2c4}
 #bCann.attn{background:#5c2410;border-color:#e08a3c;color:#ffdfc0}
 #bHorn.attn{background:#5c4a06;border-color:#e0c53c;color:#fff2b8}
 #bScout.attn{background:#0d3f52;border-color:#3ba9d4;color:#cdeeff}
@@ -185,6 +187,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <button id="bCann" title="Feuerwerks-Kanone nach vorn (G)">🎇 0</button>
   <button id="bHorn" title="Hornissenschwarm loslassen (H)">🐝 0</button>
   <button id="bScout" title="Mini-Andockdrohne ausklinken (K)">🛰️</button>
+  <button id="bWasp" title="Wespenschwarm loslassen (J)">🪰 0</button>
+  <button id="bCat" title="Katze miauen lassen (Y)">🐱</button>
   <button id="bArm">ARM</button>
   <button id="bMode">GPS</button>
   <button id="bCam">KAM</button>
@@ -249,6 +253,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     <span class="k">G</span> Feuerwerks-Kanone nach vorn ·
     <span class="k">H</span> Hornissenschwarm loslassen ·
     <span class="k">K</span> Mini-Andockdrohne ausklinken ·
+    <span class="k">J</span> Wespenschwarm loslassen ·
+    <span class="k">Y</span> Katze miauen lassen ·
     <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
     <b>Gamepad:</b> Linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2) – wird automatisch erkannt.<br>
     <b>Touch:</b> Virtuelle Sticks unten links (Gas/Yaw) und rechts (Nick/Roll), Buttons oben rechts.
@@ -641,6 +647,8 @@ const PARTS={
      desc:'Auf Knopfdruck rastet der Schwarm aus und holt fremde Drohnen im Umkreis von 300 m ★neu'},
     {id:'scout', name:'Mini-Andockdrohne', mass:0.05, scout:1,
      desc:'Klinkt sich aus, erkundet allein die Umgebung und schickt Fotos ★neu'},
+    {id:'waspnest', name:'Wespennest', mass:0.28, wasps:3,
+     desc:'Der Schwarm verscheucht alle Menschen im Umkreis von 150 m ★neu'},
     {id:'cargo', name:'Pakethaken mit Kiste', mass:0.09, cargo:1,
      desc:'Kiste zum Beladen – abwerfen und wieder aufnehmen'},
     {id:'actioncam', name:'Action-Cam', mass:0.012, actionCam:1,
@@ -649,6 +657,8 @@ const PARTS={
      desc:'Die Drohne selbst ist die Bombe – Aufschlag zündet ★Easter Egg'},
     {id:'nukemag', name:'Atombomben-Magazin (unsichtbar)', mass:0.0, nukes:20, egg:'egg_nukemag',
      desc:'20 Nuklearsprengköpfe, von außen nicht zu sehen ★Easter Egg'},
+    {id:'cat', name:'Katze im Tragegurt', mass:1.6, cat:1, egg:'egg_cat',
+     desc:'Hängt unter dem Rumpf und maunzt auf Knopfdruck – 1,6 kg wollen erst mal gehoben sein ★Easter Egg'},
   ],
   // Inhalt der Kiste (nur mit Pakethaken)
   load:[
@@ -729,7 +739,11 @@ function buildDIYDrone(sel,name,id){
   const fpv=F.cls==='fpv';
   const mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0) + accMass);
   // Schub/Gewicht sinkt leicht mit schwerem Akku, steigt mit großen Props
-  const twr=Math.max(1.6, M.twr*(0.85+P.propR*1.6)*(fpv?1.05:1.0)*(F.twrF||1));
+  const twrDry=Math.max(1.6, M.twr*(0.85+P.propR*1.6)*(fpv?1.05:1.0)*(F.twrF||1));
+  // Zubehör hängt am selben Antrieb: der Schub bleibt gleich, das Gewicht steigt.
+  // (finalizeDrone rechnet tmax = twr·mass·g, also entspricht das genau dem
+  //  Schub des nackten Aufbaus – sonst wären angebaute Teile schwerelos.)
+  const twr=twrDry*(mass-accMass)/mass;
   const maxSpeed = (fpv ? 9+twr*3.6 : 6+twr*5.5)*(F.speedF||1);
   const agility = clamp((fpv?1.0:0.55) + (0.09-F.arm)*3 + (twr-2.5)*0.06, 0.4, 1.9);
   const d={
@@ -744,6 +758,8 @@ function buildDIYDrone(sel,name,id){
     ...(sum('cannon')?{cannon:sum('cannon')}:{}),
     ...(sum('hornets')?{hornets:sum('hornets')}:{}),
     ...(has('scout')?{scout:1}:{}),
+    ...(sum('wasps')?{wasps:sum('wasps')}:{}),
+    ...(has('cat')?{cat:1}:{}),
     ...(has('kamikaze')?{kamikaze:1}:{}),
     ...(cargo?{cargo:1, cargoMass:Ld.mass, cargoName:Ld.name}:{}),
     ...(has('actionCam')?{actionCam:1}:{}),
@@ -774,6 +790,8 @@ function diySpecs(d){
   if(d.cannon) extra.push(['🎇 Kanone',d.cannon+' Schuss nach vorn']);
   if(d.hornets) extra.push(['🐝 Hornissen',d.hornets+'× Schwarm · 300 m']);
   if(d.scout) extra.push(['🛰️ Mini-Drohne','erkundet und fotografiert']);
+  if(d.wasps) extra.push(['🪰 Wespen',d.wasps+'× Schwarm · 150 m']);
+  if(d.cat) extra.push(['🐱 Katze','1,6 kg an Bord, miaut auf Knopfdruck']);
   if(d.cargo) extra.push(['📦 Kiste',d.cargoName+' · '+(d.cargoMass*1000).toFixed(0)+' g']);
   if(d.kamikaze) extra.push(['💥 Kamikaze','Aufschlag zündet']);
   if(d.range) extra.push(['📡 Funkreichweite','nur '+d.range+' m']);
@@ -844,6 +862,8 @@ const EGG_UNLOCKS=[
    hint:'Steht ab jetzt im Editor unter <b>Zubehör</b> – für jede Drohne, die du baust.'},
   {id:'egg_nukemag', name:'Atombomben-Magazin',
    hint:'Unsichtbares Magazin mit <b>20 Nuklearsprengköpfen</b> – im Editor unter <b>Zubehör</b>, passt an jede Drohne.'},
+  {id:'egg_cat', name:'Katze im Tragegurt',
+   hint:'Hängt ab jetzt unter jeder Drohne, die du baust – im Editor unter <b>Zubehör</b>. Im Flug maunzt sie auf Knopfdruck (Taste <b>Y</b>).'},
 ];
 let EGGS_FOUND=[];
 function loadEggs(){
@@ -869,6 +889,7 @@ loadEggs();
 const PROMPT_RULES=[
   // Reihenfolge ist wichtig: die genaueren Wünsche stehen vor den allgemeinen,
   // sonst schluckt z. B. „bomben" schon das „Atombomben-Magazin".
+  {k:['miau','miao','katze','mieze','kater','schnurr'], egg:'egg_cat'},
   {k:['magazin','magazine','nukemag','20 atombomben'], egg:'egg_nukemag'},
   {k:['kamikaze','selbstzerstör','selbstzerstor','reinfliegen und','opferdrohne'], egg:'egg_kamikaze'},
   {k:['reaper','langstrecke','langstrecken','aufklärer','aufklaerer','operating system','satellitenschüssel'], egg:'egg_reaper'},
@@ -1439,6 +1460,16 @@ const hornetMesh=mesh(b=>{
   b.box(0.052,0.006,0.019,[0,0.014,0.01],-0.5,[0.85,0.87,0.92]);
   b.ellipsoid(0.013,0.013,0.024,[0,0,0.066],6,4,k);
 });
+// Einzelne Wespe: schlanker und blasser als die Hornisse, mit Wespentaille
+const waspMesh=mesh(b=>{
+  const y=[0.98,0.9,0.25], k=[0.1,0.09,0.08];
+  b.ellipsoid(0.021,0.02,0.04,[0,0,0.014],7,5,y);
+  b.tube([0,0,-0.012],[0,0,-0.022],0.007,0.007,5,k);      // Wespentaille
+  b.ellipsoid(0.018,0.018,0.021,[0,0,-0.034],7,5,k);
+  b.box(0.046,0.005,0.017,[0,0.012,0.008],0.5,[0.9,0.92,0.96]);
+  b.box(0.046,0.005,0.017,[0,0.012,0.008],-0.5,[0.9,0.92,0.96]);
+  b.ellipsoid(0.009,0.009,0.022,[0,0,0.058],6,4,k);
+});
 // Fliegende Mini-Andockdrohne (eigenes kleines Modell, Nase in -z)
 const scoutMesh=mesh(b=>{
   const sh=[0.28,0.3,0.34], ar=[0.14,0.15,0.18];
@@ -1628,6 +1659,41 @@ function addAccessories(b,d,st,L,W,H,arm,bk){
         blob(S*0.36,S*0.14,S*0.34,[sx,ny+S*0.3,0],[0.62,0.5,0.32]);
         blob(S*0.3,S*0.12,S*0.28,[sx,ny-S*0.3,0],[0.62,0.5,0.32]);
         blob(S*0.11,S*0.11,S*0.06,[sx,ny-S*0.2,-S*0.44],[0.14,0.11,0.08]);  // Flugloch
+        break;
+      }
+      case 'waspnest': {                   // graues Papiernest, unten offen
+        const ny=uy-S*0.5;
+        b.box(S*0.26,S*0.18,S*0.26,[sx,uy-S*0.09,0],0,dark);
+        rod([sx,uy-S*0.16,0],[sx,ny+S*0.34,0],S*0.07,S*0.16,[0.62,0.6,0.58]);
+        blob(S*0.42,S*0.46,S*0.4,[sx,ny,0],[0.68,0.66,0.63]);
+        blob(S*0.34,S*0.13,S*0.32,[sx,ny+S*0.26,0],[0.6,0.58,0.55]);
+        blob(S*0.26,S*0.12,S*0.25,[sx,ny-S*0.3,0],[0.6,0.58,0.55]);
+        blob(S*0.12,S*0.08,S*0.12,[sx,ny-S*0.36,0],[0.1,0.09,0.08]);   // Einflugloch
+        break;
+      }
+      case 'cat': {                        // Katze im Tragegurt unter dem Rumpf
+        // Eine Katze ist so groß wie eine Katze – nicht wie der Rahmen.
+        // Auf einem Racer sieht das absurd aus, und das ist genau der Witz.
+        const K=0.115;
+        const fur=[0.62,0.5,0.37], dk=[0.35,0.28,0.2];
+        const cy=uy-K*0.66;
+        // etwas nach hinten gesetzt, sonst steckt der Kopf in Kamera oder Gimbal
+        const cz=Math.max(L*0.18,K*0.5);
+        for(const gz of [cz-K*0.34,cz+K*0.34])                           // Gurte
+          for(const gs of [-1,1])
+            rod([sx+gs*K*0.2,uy,gz],[sx+gs*K*0.32,cy+K*0.24,gz],K*0.035,K*0.035,[0.2,0.2,0.24]);
+        b.box(K*0.8,K*0.1,K*1.05,[sx,cy+K*0.28,cz],0,[0.22,0.24,0.3]);   // Gurtplatte
+        blob(K*0.34,K*0.32,K*0.6,[sx,cy,cz],fur);                        // Rumpf
+        blob(K*0.25,K*0.25,K*0.23,[sx,cy+K*0.08,cz-K*0.72],fur);         // Kopf
+        for(const es of [-1,1])                                          // Ohren
+          rod([sx+es*K*0.13,cy+K*0.2,cz-K*0.7],[sx+es*K*0.17,cy+K*0.46,cz-K*0.68],
+            K*0.1,K*0.012,dk);
+        for(const es of [-1,1])                                          // Augen
+          blob(K*0.05,K*0.05,K*0.025,[sx+es*K*0.1,cy+K*0.11,cz-K*0.92],[0.95,0.88,0.2]);
+        blob(K*0.055,K*0.045,K*0.03,[sx,cy+K*0.03,cz-K*0.95],[0.88,0.52,0.52]); // Nase
+        rod([sx,cy+K*0.14,cz+K*0.56],[sx+K*0.3,cy+K*0.58,cz+K*0.8],K*0.075,K*0.04,fur); // Schwanz
+        for(const ls of [-1,1]) for(const lz of [cz-K*0.3,cz+K*0.3])     // Pfoten
+          blob(K*0.1,K*0.1,K*0.13,[sx+ls*K*0.22,cy-K*0.28,lz],dk);
         break;
       }
       case 'scout': {                      // Mini-Andockdrohne auf dem Rücken
@@ -3330,8 +3396,8 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.groundTimer=0; DR.iTerm=[0,0,0]; DR.flightTime=0; DR.pkg=false; DR.driftV=[0,0];
   DR.bombs=d.bombs||0; DR.nukes=d.nukes||0; DR.fireworks=d.fireworks||0;
   DR.cargoOn=!!d.cargo; CRATE=null;
-  DR.cannon=d.cannon||0; DR.hornets=d.hornets||0;
-  SWARMS=[]; SCOUT=null; DR.scoutOut=false;
+  DR.cannon=d.cannon||0; DR.hornets=d.hornets||0; DR.wasps=d.wasps||0;
+  SWARMS=[]; SCOUT=null; DR.scoutOut=false; DR.meowT=0;
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST; }
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
@@ -3945,6 +4011,10 @@ function stepHornets(dt){
   for(let i=SWARMS.length-1;i>=0;i--){
     const sw=SWARMS[i];
     sw.t+=dt;
+    if(sw.kind==='wasp'){
+      if(!stepWaspSwarm(sw,dt)) SWARMS.splice(i,1);
+      continue;
+    }
     const tg=sw.target;
     const alive=tg&&!tg.dead&&AIDRONES.includes(tg);
     let onTarget=0;
@@ -3968,6 +4038,116 @@ function stepHornets(dt){
     // nach dem Angriff lösen sie sich auf
     if(sw.t>22||(!alive&&sw.t>3.5)) SWARMS.splice(i,1);
   }
+}
+
+/* ---------------- Wespennest ----------------
+   Der Schwarm geht auf die Menschen los: Wer erwischt wird, rennt
+   panisch los und ist gleich darauf über alle Berge. */
+const WASP_R=150, WASP_N=40, WASP_STING=1.1;
+function releaseWasps(){
+  const d=APP.model;
+  if(!d.wasps||DR.crashed||APP.state!=='fly')return false;
+  if((DR.wasps||0)<=0){ toast('Das Wespennest ist leer – R/RESET lädt neu'); return false; }
+  const near=(SCENE&&SCENE.people||[]).filter(p=>
+    Math.hypot(p.x-DR.pos[0],p.z-DR.pos[2])<WASP_R);
+  if(!near.length){ toast('🪰 Niemand in 150 m – die Wespen bleiben im Nest'); return false; }
+  DR.wasps--;
+  const sw={kind:'wasp', people:near, bees:[], t:0};
+  for(let i=0;i<WASP_N;i++){
+    const a=Math.random()*7;
+    sw.bees.push({pos:[DR.pos[0]+Math.cos(a)*0.3, DR.pos[1]-0.2, DR.pos[2]+Math.sin(a)*0.3],
+      vel:[(Math.random()-0.5)*6,(Math.random()-0.5)*4,(Math.random()-0.5)*6],
+      ph:Math.random()*7, spd:19+Math.random()*11,
+      tgt:near[i%near.length], sting:0});
+  }
+  SWARMS.push(sw);
+  toast('🪰 Wespen ausgeschwärmt – '+near.length+
+    (near.length===1?' Person':' Personen')+' in Reichweite',2400);
+  updateButtons();
+  return true;
+}
+// Eine Person rennt davon und verschwindet
+function scarePersonAway(p){
+  if(p.gone)return;
+  p.gone=true;
+  p.spd=Math.abs(p.spd)*4.5;
+  // Fluchtziel weit weg von der Drohne
+  const a=Math.atan2(p.x-DR.pos[0],p.z-DR.pos[2]);
+  p.x0=p.x; p.z0=p.z; p.t=0;
+  p.x1=p.x+Math.sin(a)*90; p.z1=p.z+Math.cos(a)*90;
+}
+function stepWaspSwarm(sw,dt){
+  for(const b of sw.bees){
+    b.ph+=dt*26;
+    const tg=b.tgt;
+    const aim=(tg&&!tg.removed)? [tg.x,SCENE.terH(tg.x,tg.z)+1.1,tg.z]
+                               : [DR.pos[0],DR.pos[1]-0.3,DR.pos[2]];
+    const to=V3.sub(aim,b.pos), dist=V3.len(to)||1;
+    const dir=V3.scale(to,1/dist);
+    const jx=Math.sin(b.ph)*3.6, jy=Math.sin(b.ph*1.6+1)*2.8, jz=Math.cos(b.ph*1.2)*3.6;
+    for(let k=0;k<3;k++){
+      const wob=[jx,jy,jz][k];
+      b.vel[k]+=(dir[k]*b.spd+wob-b.vel[k])*Math.min(1,dt*4.5);
+    }
+    b.pos=V3.add(b.pos,V3.scale(b.vel,dt));
+    if(tg&&!tg.removed&&dist<2.5){
+      b.sting+=dt;
+      if(!tg.gone) scarePersonAway(tg);
+      // nach kurzem Gestochenwerden ist die Person weg
+      tg.stung=(tg.stung||0)+dt;
+      if(tg.stung>WASP_STING&&SCENE){
+        tg.removed=true;
+        SCENE.people=SCENE.people.filter(x=>x!==tg);
+      }
+    }
+  }
+  if(sw.t>20) return false;
+  return true;
+}
+
+/* ---------------- Katze im Tragegurt (Easter Egg) ----------------
+   Miaut auf Knopfdruck. Der Ton wird kurz synthetisiert – kein Sample,
+   also nichts nachzuladen. Menschen in der Nähe schauen erschrocken hoch. */
+function meowSound(){
+  // nutzt denselben AudioContext wie das Motorengeräusch
+  initAudio();
+  const ac=SND.ctx;
+  if(!ac)return false;
+  try{
+    const t=ac.currentTime, dur=0.55;
+    const osc=ac.createOscillator(), f=ac.createBiquadFilter(), g=ac.createGain();
+    osc.type='sawtooth';
+    // Tonhöhe: rauf und wieder runter – das „miau"
+    osc.frequency.setValueAtTime(430,t);
+    osc.frequency.linearRampToValueAtTime(700,t+0.14);
+    osc.frequency.linearRampToValueAtTime(560,t+0.3);
+    osc.frequency.linearRampToValueAtTime(330,t+dur);
+    f.type='bandpass'; f.Q.value=5;
+    f.frequency.setValueAtTime(900,t);
+    f.frequency.linearRampToValueAtTime(1700,t+0.16);
+    f.frequency.linearRampToValueAtTime(700,t+dur);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.22,t+0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    osc.connect(f); f.connect(g); g.connect(ac.destination);
+    osc.start(t); osc.stop(t+dur+0.05);
+    return true;
+  }catch(e){ return false; }
+}
+function catMeow(){
+  const d=APP.model;
+  if(!d.cat||APP.state!=='fly')return false;
+  if(DR.crashed){ toast('🐱 Die Katze ist beleidigt – erst zurücksetzen'); return false; }
+  meowSound();
+  DR.meowT=1.1;
+  // Wer unten steht, dreht sich erschrocken um
+  let n=0;
+  for(const p of (SCENE&&SCENE.people||[])){
+    if(Math.hypot(p.x-DR.pos[0],p.z-DR.pos[2])<45){ p.spd=Math.abs(p.spd)*1.7; n++; }
+  }
+  toast(n? '🐱 Miau! '+n+(n===1?' Person schaut hoch':' Leute schauen hoch')
+         : '🐱 Miau!',1500);
+  return true;
 }
 
 /* ---------------- Mini-Andockdrohne ----------------
@@ -4297,6 +4477,7 @@ function stepBombs(dt){
   stepCrate(dt);
   stepAI(dt); stepHornets(dt); stepScout(dt);
   if(APP.shake) APP.shake=Math.max(0,APP.shake-dt*1.6);
+  if(DR.meowT) DR.meowT=Math.max(0,DR.meowT-dt);
   if(APP.flashT) APP.flashT=Math.max(0,APP.flashT-dt*1.1);
 }
 function crash(msg){
@@ -4754,10 +4935,13 @@ function render(){
       M4.scale(0.055,0.055,0.055)),[3,0.5,0.4],bl);
     gl.depthMask(true);
   }
-  // Hornissenschwarm
-  for(const sw of SWARMS) for(const bee of sw.bees){
-    const yaw=Math.atan2(bee.vel[0],bee.vel[2])+Math.PI;
-    drawMesh(hornetMesh,M4.mul(M4.translate(bee.pos[0],bee.pos[1],bee.pos[2]),M4.rotY(yaw)));
+  // Hornissen- und Wespenschwärme
+  for(const sw of SWARMS){
+    const bm=sw.kind==='wasp'?waspMesh:hornetMesh;
+    for(const bee of sw.bees){
+      const yaw=Math.atan2(bee.vel[0],bee.vel[2])+Math.PI;
+      drawMesh(bm,M4.mul(M4.translate(bee.pos[0],bee.pos[1],bee.pos[2]),M4.rotY(yaw)));
+    }
   }
   // Ausgeklinkte Mini-Andockdrohne
   if(SCOUT){
@@ -5141,6 +5325,15 @@ function updateButtons(){
   sb.style.display=APP.model.scout?'block':'none';
   sb.textContent=SCOUT?'🛰️ ein':'🛰️ los';
   sb.classList.toggle('attn',!!SCOUT);
+  const wb=$('bWasp');
+  wb.style.display=APP.model.wasps?'block':'none';
+  wb.textContent='🪰 '+(DR.wasps||0);
+  wb.classList.toggle('attn',!!(DR.wasps>0&&SCENE&&SCENE.people.some(p=>
+    Math.hypot(p.x-DR.pos[0],p.z-DR.pos[2])<WASP_R)));
+  const kb=$('bCat');
+  kb.style.display=APP.model.cat?'block':'none';
+  kb.textContent='🐱';
+  kb.classList.toggle('attn',!!DR.meowT);
 }
 function tryArm(){
   if(APP.state!=='fly'||APP.paused)return;
@@ -5189,6 +5382,8 @@ function handleKey(code){
   else if(code==='KeyG'){fireCannon();}
   else if(code==='KeyH'){releaseHornets();}
   else if(code==='KeyK'){toggleScout();}
+  else if(code==='KeyJ'){releaseWasps();}
+  else if(code==='KeyY'){catMeow();}
   else if(code==='KeyR'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}
   else if(/^Digit[1-4]$/.test(code)){APP.windLevel=+code.slice(5)-1;toast('💨 '+WIND_NAMES[APP.windLevel]);}
 }
@@ -5204,6 +5399,8 @@ $('bCargo').onclick=()=>toggleCargo();
 $('bCann').onclick=()=>fireCannon();
 $('bHorn').onclick=()=>releaseHornets();
 $('bScout').onclick=()=>toggleScout();
+$('bWasp').onclick=()=>releaseWasps();
+$('bCat').onclick=()=>catMeow();
 $('bReset').onclick=()=>{if(APP.state==='fly'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}};
 $('bMenu').onclick=()=>{if(APP.paused)closeMenuAndStart();else openMenu();};
 $('startBtn').onclick=closeMenuAndStart;
