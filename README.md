@@ -23,8 +23,10 @@ Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffn
 | **ANGLE** | Selbstaufrichtend mit Neigungsbegrenzung, Gas manuell |
 | **ACRO** | Volle manuelle Raten-Steuerung wie im FPV-Racing |
 
-### 12 Drohnenmodelle
+### 13 Drohnenmodelle
 Von der winzigen Tiny-Whoop-Klasse (**Typhoon20**) über die 249-g-Ultraleichtdrohne und klassische/professionelle Kameradrohnen bis zu Cinewhoop und 5-Zoll-Racer – jedes Modell mit eigenen, realen Vorbildern nachempfundenen Kennwerten. Die Modelle sind zudem **unterschiedlich stabil**: leichte, agile Drohnen (Whoops, Micros) tanzen im Wind spürbar, schwere Kameraplattformen liegen wie festgenagelt in der Luft.
+
+Ganz oben in der Tempo-Liste steht die **PHÖNIX DRONES SPEEDY** – ein 3D-gedruckter Eigenbau mit hohem weißem Kastenrumpf, Keilnase und rotem Nasenstreifen: 6S-Antrieb, **über 160 km/h im GPS-Modus** (bei voller Empfindlichkeit 225 km/h) und **über 210 km/h in ANGLE/ACRO**, im Sturzflug mehr. Ihr Rahmen steht auch im DIY-Editor zur Auswahl.
 
 ### 🌍 8 echte Orte (reale Geodaten)
 Karten aus **echten Geländedaten** dieser Welt – kein erfundenes Terrain:

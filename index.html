@@ -397,6 +397,13 @@ const DRONES=[
   batt:{cells:2, mah:300, min:4.5}, modes:['ANGLE','ACRO'], gpsQ:0, agility:1.7, stab:0.22,
   rates:{max:620,expo:.62}, camAngle:18, fovFpv:100, meshKind:'tinywhoop',
   style:{c1:[.15,.16,.19],c2:[.92,.55,.15],bodyL:.05,bodyW:.045,bodyH:.03,ducts:1,canopy:1}},
+ {id:'speedy', name:'PHÖNIX DRONES SPEEDY', cls:'fpv',
+  desc:'Eigenbau aus dem 3D-Drucker: hoher weißer Kastenrumpf mit Keilnase und rotem Streifen. Kompromisslose 6S-Speedmaschine – schon bei normaler Empfindlichkeit über 160 km/h im GPS-Modus, in ANGLE/ACRO über 210 km/h.',
+  mass:0.6, arm:0.09, twr:7.4, tauUp:0.05, tauDn:0.08, propR:0.0635,
+  maxTilt:65, maxSpeed:62, climb:18, desc_:14, yawRate:240,
+  batt:{cells:6, mah:1500, min:4.2}, modes:['GPS','ANGLE','ACRO'], gpsQ:0.9, agility:1.45,
+  rates:{max:700,expo:.6}, camAngle:25, fovFpv:120, meshKind:'speedy', dragH:0.0025,
+  style:{c1:[.93,.93,.91],c2:[.86,.11,.11],bodyL:.155,bodyW:.038,bodyH:.062,propY:-0.008,canopy:1,ant:1}},
 ];
 function finalizeDrone(d){
   // Stabilität (0=zappelig/windanfällig … 1=felsenfest): schwere/große Drohnen sind ruhiger
@@ -407,10 +414,14 @@ function finalizeDrone(d){
   const r=d.arm*1.5;
   d.Ix = d.mass*r*r*0.45; d.Iz = d.mass*r*r*0.45; d.Iy = d.mass*r*r*0.8;
   const tilt=d.maxTilt*deg;
-  d.dragH = d.cls==='fpv'
-    ? d.tmax*0.85*Math.sin(55*deg)/(d.maxSpeed>30? d.maxSpeed*1.35 : d.maxSpeed*1.3)**2
-    : d.mass*G*Math.tan(tilt)/(d.maxSpeed**2);
-  if(d.style.ducts) d.dragH*=2.2;
+  // Modelle dürfen ihren Luftwiderstand selbst vorgeben (auf ein Zieltempo kalibriert),
+  // sonst wird er wie bisher aus Schub, Neigung und Höchstgeschwindigkeit geschätzt.
+  if(d.dragH===undefined){
+    d.dragH = d.cls==='fpv'
+      ? d.tmax*0.85*Math.sin(55*deg)/(d.maxSpeed>30? d.maxSpeed*1.35 : d.maxSpeed*1.3)**2
+      : d.mass*G*Math.tan(tilt)/(d.maxSpeed**2);
+    if(d.style.ducts) d.dragH*=2.2;
+  }
   d.dragV = d.dragH*1.6;
   d.dragL = d.dragH*2.5;
   d.kq = 0.018;
@@ -443,6 +454,9 @@ const PARTS={
      bodyL:.09,bodyW:.03,bodyH:.03, feat:{canopy:1,ant:1}, desc:'Ultraleicht, dünne Arme ★neu'},
     {id:'tinywhoop', name:'Tiny-Whoop-Rahmen', kind:'tinywhoop', cls:'fpv', arm:0.032, mass:0.045,
      bodyL:.05,bodyW:.045,bodyH:.03, feat:{ducts:1,canopy:1}, desc:'Winzig, Ducts, für drinnen ★neu'},
+    {id:'speedy', name:'Speedy-Rahmen (3D-Druck)', kind:'speedy', cls:'fpv', arm:0.09, mass:0.19,
+     bodyL:.155,bodyW:.038,bodyH:.062, feat:{canopy:1,ant:1,propY:-0.008},
+     desc:'Eigenbau: hoher Druckrumpf mit Keilnase ★neu'},
   ],
   motor:[
     {id:'eco', name:'Eco-Motoren', twr:2.0, tau:0.12, mass:0.014, ampF:0.85, desc:'Sparsam, ruhig'},
@@ -551,37 +565,37 @@ const MAPS=[
   ter:{amp:14, freq:0.006, ramp:150, seed:11},
   pal:{low:[0.26,0.45,0.19], high:[0.4,0.52,0.26], rock:[0.48,0.45,0.4], snow:0},
   water:null, fog:[0.62,0.74,0.86], fogD:0.0016, sky:[0.25,0.5,0.85],
-  trees:120, people:8, gen:'standard', grass:{n:2600,col:[0.24,0.46,0.16]}},
+  trees:120, people:8, gen:'standard', range:760, grass:{n:2600,col:[0.24,0.46,0.16]}},
  {id:'lost', name:'Lostplace', icon:'🏚️',
   desc:'Verlassenes Industriegelände: 60-m-Schornstein, Hallen und Ruinen – perfekt für FPV-Dives.',
   ter:{amp:3, freq:0.01, ramp:80, seed:23},
   pal:{low:[0.42,0.4,0.33], high:[0.36,0.38,0.3], rock:[0.45,0.43,0.4], snow:0},
   water:null, fog:[0.66,0.66,0.62], fogD:0.0022, sky:[0.45,0.5,0.58],
-  trees:45, people:3, gen:'lost', grass:{n:900,col:[0.5,0.45,0.22]}},
+  trees:45, people:3, gen:'lost', range:760, grass:{n:900,col:[0.5,0.45,0.22]}},
  {id:'arctic', name:'Antarktis', icon:'🧊',
   desc:'Endloses Eis, eine Forschungsstation und beißender Wind. Gut sichtbar: nichts.',
   ter:{amp:10, freq:0.005, ramp:100, seed:37},
   pal:{low:[0.88,0.91,0.95], high:[0.92,0.95,0.99], rock:[0.55,0.6,0.68], snow:1},
   water:null, fog:[0.83,0.87,0.92], fogD:0.0026, sky:[0.55,0.7,0.88],
-  trees:0, people:4, gen:'arctic'},
+  trees:0, people:4, gen:'arctic', range:760},
  {id:'mount', name:'Berge & Seen', icon:'🏔️',
   desc:'Alpines Panorama mit Gipfeln, Bergseen und Nadelwald. Vorsicht: Wasser ist endgültig.',
   ter:{amp:120, freq:0.0062, ramp:160, seed:52},
   pal:{low:[0.28,0.46,0.2], high:[0.42,0.4,0.36], rock:[0.5,0.47,0.44], snow:0, snowLine:48},
   water:{level:1.1, col:[0.1,0.3,0.42]}, fog:[0.66,0.76,0.88], fogD:0.0014, sky:[0.28,0.52,0.86],
-  trees:170, people:6, gen:'mount', grass:{n:2200,col:[0.24,0.46,0.16],maxAlt:36}},
+  trees:170, people:6, gen:'mount', range:760, grass:{n:2200,col:[0.24,0.46,0.16],maxAlt:36}},
  {id:'flat', name:'Flachland', icon:'🌾',
   desc:'Felder bis zum Horizont, Windräder und ein Bauernhof. Ideal für Geschwindigkeit.',
   ter:{amp:2.5, freq:0.004, ramp:60, seed:71},
   pal:{low:[0.45,0.42,0.2], high:[0.35,0.5,0.22], rock:[0.5,0.47,0.42], snow:0, fields:1},
   water:null, fog:[0.68,0.77,0.87], fogD:0.0013, sky:[0.3,0.55,0.87],
-  trees:35, people:5, gen:'flat', grass:{n:2600,col:[0.35,0.5,0.2]}},
+  trees:35, people:5, gen:'flat', range:760, grass:{n:2600,col:[0.35,0.5,0.2]}},
  {id:'city', name:'Großstadt', icon:'🏙️',
   desc:'Hochhaus-Schluchten, Straßen, Fußgänger und ein Park. Fliege verantwortungsvoll.',
   ter:{amp:0, freq:0.01, ramp:60, seed:99},
   pal:{low:[0.36,0.37,0.38], high:[0.38,0.39,0.4], rock:[0.4,0.4,0.42], snow:0, city:1},
   water:null, fog:[0.7,0.72,0.76], fogD:0.002, sky:[0.4,0.55,0.78],
-  trees:25, people:36, gen:'city', grass:{n:500,col:[0.26,0.48,0.2],parkOnly:1}},
+  trees:25, people:36, gen:'city', range:760, grass:{n:500,col:[0.26,0.48,0.2],parkOnly:1}},
 ];
 
 /* ---------------- Echte Orte ----------------
@@ -1006,6 +1020,7 @@ function buildDroneMesh(d){
   const leds=()=>{ for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]])
     b.ellipsoid(0.007,0.005,0.007,[sx*arm,pY-H*0.45,sz*arm],6,4,sz<0?[0.2,1,0.3]:[1,0.2,0.2]); };
   let bladeCol=[0.16,0.17,0.19], tipCol=null, hubCol=st.c2;
+  let nBlades=d.cls==='fpv'?3:2;
 
   switch(d.meshKind||d.id){
     case 'mini1': case 'mini4': case 'air': case 'pro': {
@@ -1226,6 +1241,60 @@ function buildDroneMesh(d){
       bladeCol=st.c2; hubCol=carbon;
       break;
     }
+    case 'speedy': {
+      // Eigenbau aus dem 3D-Drucker: hoher, schmaler Kastenrumpf mit Keilnase,
+      // rotem Nasenstreifen, Kamera und Kufen vorn, flache dunkle Arme.
+      const shell=st.c1, carbon=[0.07,0.07,0.08], stripe=st.c2;
+      const layer=[shell[0]*0.86,shell[1]*0.86,shell[2]*0.87];
+      const armY=-H*0.56;
+      // Rumpf: Querschnitt fast rechteckig (hohes e = harte Kanten wie am Druckteil).
+      // Die Oberkante läuft gerade durch, die Unterkante steigt vorn steil an -> Keilnase.
+      b.loft([
+        {z:L*0.50,y:0,w:W*0.94,h:H*0.94,e:9},
+        {z:L*0.44,y:0,w:W,h:H,e:9},
+        {z:L*0.05,y:0,w:W,h:H,e:9},
+        {z:-L*0.14,y:H*0.11,w:W,h:H*0.78,e:9},
+        {z:-L*0.32,y:H*0.24,w:W*0.99,h:H*0.52,e:8},
+        {z:-L*0.45,y:H*0.33,w:W*0.92,h:H*0.34,e:7},
+        {z:-L*0.50,y:H*0.36,w:W*0.8,h:H*0.28,e:6},
+      ],16,shell);
+      // Deckel: hinten senkrecht abgeschnitten, vorn die kleine Nasenfläche
+      b.box(W*0.94,H*0.94,0.003,[0,0,L*0.5],0,shell);
+      b.box(W*0.8,H*0.28,0.003,[0,H*0.36,-L*0.5],0,shell);
+      // Roter Streifen entlang der ganzen Nasenschräge (steht seitlich leicht vor)
+      b.loft([
+        {z:L*0.08,y:-H*0.47,w:W*1.06,h:H*0.1,e:7},
+        {z:-L*0.14,y:-H*0.26,w:W*1.06,h:H*0.1,e:7},
+        {z:-L*0.32,y:0,w:W*1.05,h:H*0.1,e:7},
+        {z:-L*0.46,y:H*0.18,w:W*0.86,h:H*0.1,e:7},
+      ],12,stripe);
+      // angedeutete Drucklagen: feine Rillen über die Rumpfflanken
+      for(let i=0;i<5;i++)
+        b.box(W*1.04,H*0.006,L*0.6,[0,-H*0.3+i*H*0.15,L*0.1],0,layer);
+      // FPV-Kamera vorn unten bzw. Gimbal, wenn im Editor gewählt
+      if(st.gimbal) gimbal(-H*0.5,-L*0.28,0.026+d.mass*0.014);
+      else {
+        b.ellipsoid(W*0.44,H*0.22,L*0.07,[0,-H*0.1,-L*0.3],12,8,[0.09,0.09,0.11]);
+        b.ellipsoid(W*0.2,W*0.2,L*0.025,[0,-H*0.12,-L*0.36],10,6,[0.05,0.06,0.12]);
+      }
+      // zwei weiße Kufen vorn unten, auf denen der Rumpf steht
+      for(const s of [-1,1]){
+        b.box(W*0.22,H*0.55,L*0.05,[s*W*0.3,-H*0.35,-L*0.3],0,shell);
+        b.box(W*0.26,H*0.05,L*0.09,[s*W*0.3,-H*0.63,-L*0.31],0,shell);
+      }
+      // Karbonplatte unter dem Rumpf + vier dünne flache Arme
+      b.box(W*1.15,0.0035,L*0.5,[0,armY,L*0.02],0,carbon);
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        b.box(0.016,0.005,Math.hypot(ax,az)*1.03,[ax/2,armY,az/2],Math.atan2(-ax,az),carbon);
+        b.box(0.022,0.004,0.022,[ax,armY+0.004,az],0,carbon);
+        motor(ax,az,[0.1,0.1,0.12],0.011);
+      }
+      // dünne Antenne hinten oben
+      b.tube([0,H*0.48,L*0.34],[0,H*0.48+L*0.3,L*0.4],W*0.045,W*0.035,6,carbon);
+      nBlades=2; bladeCol=[0.12,0.12,0.14]; hubCol=carbon;
+      break;
+    }
     default: {
       // Race-Quads: Karbon-Platten (die sind real flach!), geloftete Canopy, Antenne
       const carbon=[0.11,0.11,0.13];
@@ -1254,7 +1323,7 @@ function buildDroneMesh(d){
   const body=b.build();
   // Schlanke Propellerblätter: 2 Blätter bei Kameradrohnen, 3 bei FPV (wie real)
   const prop=mesh(pb=>{
-    const R=d.propR, nb=d.cls==='fpv'?3:2;
+    const R=d.propR, nb=nBlades;
     for(let k=0;k<nb;k++){
       const a=k/nb*Math.PI*2;
       const dir=[Math.cos(a),0,-Math.sin(a)];
@@ -1410,6 +1479,30 @@ function buildDroneMeshBlocky(d){
       b.cyl(0.004,0.004,0.08,[0,H*0.9,L*0.4],5,[0.8,0.8,0.82]);
       leds();
       bladeCol=[0.18,0.19,0.21]; tipCol=red; hubCol=red;
+      break;
+    }
+    case 'speedy': {
+      // Retro-Variante des Eigenbaus: gestufter Keilrumpf aus Klötzen
+      const shell=st.c1, carbon=[0.08,0.08,0.1], stripe=st.c2;
+      const armY=-H*0.56;
+      b.box(W,H,L*0.62,[0,0,L*0.19],0,shell);                        // Rumpfkasten
+      // Keilnase als Treppe aus vier Stufen
+      for(let i=0;i<4;i++){
+        const t=i/4, h=H*(1-0.19*(i+1));
+        b.box(W,h,L*0.095,[0,H*0.5-h/2,-L*(0.02+0.095*i)-L*0.048],0,shell);
+        b.box(W*1.06,H*0.1,L*0.095,[0,H*0.5-h-H*0.02,-L*(0.02+0.095*i)-L*0.048],0,stripe);
+      }
+      for(let i=0;i<4;i++) b.box(W*1.05,H*0.02,L*0.58,[0,-H*0.3+i*H*0.19,L*0.2],0,[shell[0]*0.85,shell[1]*0.85,shell[2]*0.86]);
+      b.box(W*0.5,H*0.22,L*0.08,[0,-H*0.06,-L*0.32],0,[0.07,0.07,0.1]);  // Kamera
+      for(const s of [-1,1]) b.box(W*0.22,H*0.55,L*0.06,[s*W*0.3,-H*0.36,-L*0.3],0,shell);
+      b.box(W*1.15,0.005,L*0.5,[0,armY,L*0.02],0,carbon);
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        armTo(ax,az,0.017,0.006,carbon,armY);
+        motor(ax,az,carbon,0.012,0.02);
+      }
+      b.cyl(W*0.05,W*0.05,L*0.32,[0,H*0.5,L*0.36],4,carbon);
+      bladeCol=[0.13,0.13,0.15]; hubCol=carbon;
       break;
     }
     default: {
@@ -2204,8 +2297,20 @@ function flightController(dt){
         vtx+=DR.driftV[0]*3; vtz+=DR.driftV[1]*3;
       }
       const kv=1.6*(0.4+0.6*d.gpsQ);
-      let ax=kv*(vtx-DR.vel[0])+d.dragH*vtx*Math.abs(vtx)/m,
-          az=kv*(vtz-DR.vel[2])+d.dragH*vtz*Math.abs(vtz)/m;
+      // Luftwiderstands-Vorsteuerung: im Schnellflug steht die Drohne schräg,
+      // dann bremst auch der vertikale Widerstand kräftig mit. Zweimal nachrechnen
+      // (Neigung folgt aus der nötigen Beschleunigung), sonst bleibt sie deutlich
+      // unter ihrer Sollgeschwindigkeit.
+      const vt=Math.hypot(vtx,vtz);
+      let aff=d.dragH*vt*vt/m;
+      for(let k=0;k<2&&vt>0.01;k++){
+        const th=Math.atan2(aff,G), sT=Math.sin(th), cT=Math.cos(th);
+        aff=((d.dragV*vt*vt*sT*sT+d.dragL*vt*sT)*sT
+            +(d.dragH*vt*vt*cT*cT+d.dragL*vt*cT)*cT)/m;
+      }
+      const ffk=vt>0.01?aff/vt:0;
+      let ax=kv*(vtx-DR.vel[0])+ffk*vtx,
+          az=kv*(vtz-DR.vel[2])+ffk*vtz;
       const am=G*maxT, al=Math.hypot(ax,az);
       if(al>am){ ax*=am/al; az*=am/al; }
       const db=0.08;
