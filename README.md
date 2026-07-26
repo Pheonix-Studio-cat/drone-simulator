@@ -80,7 +80,7 @@ Foto-Button 📷 (Taste `F`): Schnappschüsse landen in einer **Galerie** im Men
 ### 🔧 DIY-Drohnen-Editor
 **💬 Einfach hinschreiben, was sie können soll:** Ganz oben im Editor gibt es ein Feld für deinen Wunsch – „schnell und wendig", „lange Flugzeit", „zum Filmen in Rot", „klein für drinnen", „schwere Lasten tragen", „Freestyle". Der Baukasten stellt Rahmen, Motoren, Propeller, Akku, Kamera und Farbe passend ein. *Manche Wünsche schalten etwas frei, das sonst nirgends im Menü steht …*
 
-Es gibt auch **Zubehör** zu finden, das an *jede* selbstgebaute Drohne passt: einen **Kamikaze-Sprengsatz** (der Aufschlag ist die Zündung) und ein **unsichtbares Atombomben-Magazin** mit 20 Sprengköpfen. Und eine schlanke **Langstreckendrohne** mit Satellitenkuppel, V-Leitwerk und Waffenpylonen – 200 km/h, 10 Bomben und eine Atombombe.
+Es gibt auch **Zubehör** zu finden, das an *jede* selbstgebaute Drohne passt: einen **Kamikaze-Sprengsatz** (der Aufschlag ist die Zündung) und ein **unsichtbares Atombomben-Magazin** mit 20 Sprengköpfen. Beide tauchen nach dem Fund im Editor unter **Zubehör** auf. Und eine schlanke **Langstreckendrohne** mit Satellitenkuppel, V-Leitwerk und Waffenpylonen – 200 km/h, 10 Bomben und eine Atombombe.
 
 Der dickste Fund ist ein getarnter **Nurflügler** mit vier in die Fläche versenkten Hubrotoren und zwei **Nuklearraketen**: 100 m Sprengradius, und wer im Umkreis von 200 m steht, wächst hinterher ein paar Gliedmaßen zu viel (Comic-Effekt, je näher desto absurder). Vor dem Abschuss zeigt ein Ring den Sprengradius am Boden – halte selbst Abstand, sonst erwischt dich die Druckwelle.
 
