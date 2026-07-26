@@ -45,13 +45,15 @@ Karten aus **echten Geländedaten** dieser Welt – kein erfundenes Terrain:
 Dazu **dünne Luft nach echter Höhenformel**: auf dem Everest liefert dieselbe Drohne nur noch rund die Hälfte des Schubs und steigt merklich zäher – wie in echt.
 
 ### 🗺️ Jeden Ort der Welt fliegen
-Über **„Weltkarte öffnen"** im Menü einen Punkt auf der Weltkarte anklicken (oder eine der 16 vorgemerkten Städte wählen, oder Koordinaten eintippen) – und der Simulator lädt daraus live eine spielbare Karte:
+**Adresse eintippen und dort starten:** Ins Feld im Menü (oder in die Suche der Weltkarte) schreibst du eine ganz normale Adresse – „Bahnhofstrasse 1, Zürich", „Eiffelturm", „Times Square New York". Der Simulator sucht sie, zeigt bei mehreren Möglichkeiten eine Trefferliste zum Anklicken und baut daraus die Karte. Koordinaten gehen weiterhin genauso.
+
+Alternativ über **„Weltkarte öffnen"** einen Punkt auf der Weltkarte anklicken oder eine der 16 vorgemerkten Städte wählen. In jedem Fall lädt der Simulator live eine spielbare Karte:
 
 - **Echtes Geländeprofil** über 6 km aus offenen Höhendaten
 - **Echte Gebäudegrundrisse mit ihren echten Höhen** aus OpenStreetMap, im Umkreis von 2,4 km – inklusive **Wahrzeichen** wie Türmen, Leuchttürmen und Kirchen, die ihre wirkliche Höhe behalten (steht keine Höhe in den Daten, wird sie aus Stockwerkzahl oder Grundfläche geschätzt)
 - Die Weltkarte selbst ist ebenfalls aus echten Höhendaten gezeichnet: Meer blau, Land nach Höhe, Hochgebirge weiß
 
-Braucht Internet. Klappt der Abruf nicht, sagt der Simulator das klar und die eingebauten Karten funktionieren weiterhin.
+Braucht Internet. Klappt der Abruf nicht, sagt der Simulator das klar und die eingebauten Karten funktionieren weiterhin. Adresssuche über die offenen OSM-Dienste **Photon** und (als Ausweichlösung) **Nominatim**.
 
 **Datenquellen:** Geländehöhen aus offenen Terrain-Tiles (SRTM u. a.), Gebäudegrundrisse © **Overture Maps / OpenStreetMap-Mitwirkende** (ODbL). Bewusst **keine** Satellitenbilder – die sind proprietär; der Boden wird stattdessen aus echter Höhe, Hangneigung und Wasserlinie eingefärbt.
 

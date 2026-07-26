@@ -75,6 +75,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #wPins button{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:20px;
   padding:7px 13px;font-size:12.5px;cursor:pointer}
 #wPins button:hover{border-color:var(--acc)}
+#wHits{display:flex;flex-direction:column;gap:6px;margin-bottom:11px}
+#wHits .whit{text-align:left;background:var(--panel);border:1px solid var(--line);color:var(--txt);
+  border-radius:10px;padding:9px 12px;font-size:13px;cursor:pointer;line-height:1.35}
+#wHits .whit small{display:block;color:var(--dim);font-size:11.5px;margin-top:2px}
+#wHits .whit:hover{border-color:var(--acc)}
+#wHits .whit.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
 #wSel{margin-top:11px;font-size:13.5px;color:var(--txt)}
 #wMsg{margin-top:8px;font-size:12.5px;color:var(--dim);min-height:18px}
 #world .wbtns{display:flex;gap:9px;margin-top:13px;flex-wrap:wrap}
@@ -160,14 +166,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <div class="grid" id="mapGrid"></div>
   <div class="help" id="geoBox" style="margin-top:10px">
     <b>🌍 Echten Ort der Welt fliegen</b><br>
-    Ort auf der Weltkarte anklicken oder Koordinaten eingeben – Gelände <b>und echte Gebäude</b>
-    (inklusive Wahrzeichen) werden live aus offenen Daten geladen. Braucht Internet.
+    <b>Adresse eintippen</b> („Bahnhofstrasse 1, Zürich"), einen Ort auf der Weltkarte anklicken oder
+    Koordinaten eingeben – Gelände <b>und echte Gebäude</b> (inklusive Wahrzeichen) werden live aus
+    offenen Daten geladen. Danach startest du mitten dort. Braucht Internet.
     <div class="wbtns" style="display:flex;gap:9px;margin:10px 0 4px">
       <button id="worldBtn" style="flex:1;padding:11px;font-size:14px;font-weight:700;border-radius:11px;
         background:var(--panel2);border:1px solid var(--acc);color:var(--acc);cursor:pointer">🗺️ Weltkarte öffnen</button>
     </div>
     <div class="esave" style="margin-top:9px">
-      <input id="geoInp" maxlength="40" placeholder="z. B. 46.5590, 7.9080">
+      <input id="geoInp" maxlength="120" placeholder="Adresse oder Koordinaten – z. B. Bahnhofstrasse 1, Zürich">
       <button id="geoBtn">Laden</button>
     </div>
     <div id="geoMsg" style="margin-top:7px;color:var(--dim)"></div>
@@ -207,9 +214,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 <div id="world"><div class="wrap">
   <h2>🗺️ Ort auf der Weltkarte wählen</h2>
   <div style="font-size:13px;color:var(--dim);margin-bottom:10px">
-    Klick auf die Karte oder wähle unten eine bekannte Stadt. Geladen werden das echte Geländeprofil
-    und die echten Gebäudegrundrisse mit ihren Höhen – also auch Wahrzeichen wie Türme und Kirchen.
+    Such eine Adresse, klick auf die Karte oder wähle unten eine bekannte Stadt. Geladen werden das echte
+    Geländeprofil und die echten Gebäudegrundrisse mit ihren Höhen – also auch Wahrzeichen wie Türme und Kirchen.
   </div>
+  <div class="esave" style="margin-bottom:11px">
+    <input id="wSearch" maxlength="120" placeholder="Adresse, Ort oder Bauwerk – z. B. Bahnhofstrasse 1, Zürich">
+    <button id="wSearchBtn">🔎 Suchen</button>
+  </div>
+  <div id="wHits"></div>
   <div id="wmapWrap"><canvas id="wmap" width="1024" height="512"></canvas></div>
   <div id="wPins"></div>
   <div id="wSel">Noch kein Ort gewählt.</div>
@@ -220,7 +232,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   </div>
   <div style="margin-top:12px;font-size:11.5px;color:var(--dim)">
     Gelände: offene Terrain-Kacheln (SRTM u. a.) · Gebäude: © OpenStreetMap-Mitwirkende (ODbL) über die
-    Overpass-API. Keine Satellitenbilder – der Boden wird aus Höhe, Hangneigung und Wasserlinie eingefärbt.
+    Overpass-API · Adresssuche: Photon/Nominatim, ebenfalls auf OpenStreetMap-Daten.
+    Keine Satellitenbilder – der Boden wird aus Höhe, Hangneigung und Wasserlinie eingefärbt.
   </div>
 </div></div>
 <div id="editor">
@@ -3936,21 +3949,98 @@ async function fetchBuildings(lat,lon,span,onMsg){
   return polys.slice(0,5000);
 }
 function geoStatus(t,col){ const e=$('geoMsg'); if(e){ e.textContent=t; e.style.color=col||'var(--dim)'; } }
+/* --- Adresssuche (Geocoding über offene OSM-Dienste) --- */
+function coordsFrom(raw){
+  const mm=(raw||'').match(/^\s*(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)\s*$/);
+  if(!mm) return null;
+  const lat=parseFloat(mm[1].replace(',','.')), lon=parseFloat(mm[2].replace(',','.'));
+  if(!(lat>=-85&&lat<=85&&lon>=-180&&lon<=180)) return {bad:true};
+  return {lat,lon};
+}
+function labelFromPhoton(p){
+  const t=p.properties||{};
+  // Straße + Hausnummer, sonst der Name des Objekts – danach Ort, Region, Land
+  const street=t.street||(t.housenumber?t.name:null);
+  const head=street? (street+(t.housenumber?' '+t.housenumber:'')) : t.name;
+  const parts=[head, (t.name&&t.name!==street)?t.name:null,
+    t.city||t.town||t.village||t.county, t.state, t.country];
+  const seen=new Set();
+  return parts.filter(x=>x&&!seen.has(x)&&seen.add(x)).join(', ');
+}
+async function geocode(q){
+  const query=(q||'').trim();
+  if(query.length<2) throw new Error('zu kurz');
+  const jget=async(url)=>{
+    const ctl=new AbortController();
+    const to=setTimeout(()=>ctl.abort(),20000);
+    try{
+      const r=await fetch(url,{signal:ctl.signal,headers:{'Accept':'application/json'}});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return await r.json();
+    } finally { clearTimeout(to); }
+  };
+  let err=null;
+  // 1) Photon (OSM-basiert, für Suchfelder gedacht)
+  try{
+    const js=await jget('https://photon.komoot.io/api/?limit=6&q='+encodeURIComponent(query));
+    const out=((js&&js.features)||[]).filter(f=>f.geometry&&f.geometry.coordinates).map(f=>({
+      lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0],
+      label:labelFromPhoton(f)||query}));
+    if(out.length) return out;
+  }catch(e){ err=e; }
+  // 2) Nominatim als Ausweichlösung
+  try{
+    const js=await jget('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q='+encodeURIComponent(query));
+    const out=(Array.isArray(js)?js:[]).filter(f=>f.lat&&f.lon)
+      .map(f=>({lat:parseFloat(f.lat), lon:parseFloat(f.lon), label:f.display_name||query}));
+    if(out.length) return out;
+  }catch(e){ err=e; }
+  if(err) throw err;
+  throw new Error('nichts gefunden');
+}
+/* --- Gemeinsamer Ladeweg: Gelände + echte Gebäude an einer Koordinate --- */
+async function loadPlace(lat,lon,name,status){
+  const say=status||(()=>{});
+  say('Lade Geländeprofil …');
+  const {map,lo,hi}=await loadGeoMap(lat,lon);
+  if(name){ map.name=name.split(',')[0].slice(0,28); map.icon='📍'; }
+  say('Gelände da ('+lo.toFixed(0)+'–'+hi.toFixed(0)+' m). Lade echte Gebäude …');
+  let nb=0, bldErr=null;
+  try{
+    const polys=await fetchBuildings(lat,lon,2400,t=>say(t,'var(--warn)'));
+    map.data.polys=polys; nb=polys.length;
+  }catch(e){ bldErr=e; }
+  map.desc=(name?name.slice(0,60)+' · ':'')+'echtes Gelände '+lo.toFixed(0)+'–'+hi.toFixed(0)+' m'+
+    (nb?' mit '+nb+' echten Gebäuden':' (ohne Gebäude)');
+  const i=MAPS.findIndex(x=>x.id==='r_geo');
+  if(i>=0) MAPS[i]=map; else MAPS.push(map);
+  APP.mapId='r_geo';
+  SCENE=null;                                   // Neuaufbau erzwingen
+  buildMenu();
+  return {lo,hi,nb,bldErr};
+}
 async function onGeoLoad(){
   const raw=($('geoInp').value||'').trim();
-  const mm=raw.match(/(-?\d+(?:[.,]\d+)?)\s*[,; ]\s*(-?\d+(?:[.,]\d+)?)/);
-  if(!mm){ geoStatus('Bitte im Format  47.3736, 8.5410  eingeben.','var(--warn)'); return; }
-  const lat=parseFloat(mm[1].replace(',','.')), lon=parseFloat(mm[2].replace(',','.'));
-  if(!(lat>=-85&&lat<=85&&lon>=-180&&lon<=180)){ geoStatus('Koordinaten außerhalb des gültigen Bereichs.','var(--warn)'); return; }
-  geoStatus('Lade Höhendaten …');
+  if(!raw){ geoStatus('Adresse oder Koordinaten eingeben.','var(--warn)'); return; }
+  const c=coordsFrom(raw);
+  if(c&&c.bad){ geoStatus('Koordinaten außerhalb des gültigen Bereichs.','var(--warn)'); return; }
+  let lat,lon,name=null;
+  if(c){ lat=c.lat; lon=c.lon; }
+  else{
+    geoStatus('Suche „'+raw+'" …');
+    try{
+      const hits=await geocode(raw);
+      lat=hits[0].lat; lon=hits[0].lon; name=hits[0].label;
+    }catch(e){
+      geoStatus('Adresse nicht gefunden ('+e.message+'). Du kannst auch Koordinaten eingeben, z. B. 47.3736, 8.5410.','var(--bad)');
+      return;
+    }
+  }
   try{
-    const {map,lo,hi}=await loadGeoMap(lat,lon);
-    const i=MAPS.findIndex(x=>x.id==='r_geo');
-    if(i>=0) MAPS[i]=map; else MAPS.push(map);
-    APP.mapId='r_geo';
-    SCENE=null;                                   // Neuaufbau erzwingen
-    geoStatus(`Geladen: ${lat.toFixed(4)}, ${lon.toFixed(4)} · Höhen ${lo.toFixed(0)}–${hi.toFixed(0)} m`,'var(--acc2)');
-    buildMenu();
+    const r=await loadPlace(lat,lon,name,(t)=>geoStatus(t));
+    geoStatus('Geladen: '+(name||lat.toFixed(4)+', '+lon.toFixed(4))+' · Höhen '+
+      r.lo.toFixed(0)+'–'+r.hi.toFixed(0)+' m'+
+      (r.nb?' · '+r.nb+' Gebäude':(r.bldErr?' · Gebäude kamen nicht durch':' · keine Gebäude erfasst')),'var(--acc2)');
   }catch(e){
     geoStatus('Ort konnte nicht geladen werden ('+e.message+'). Die eingebauten echten Karten funktionieren immer.','var(--bad)');
   }
@@ -4078,40 +4168,56 @@ function wmapPick2(){ const cv=$('wmap'), cx=cv.getContext('2d');
 function closeWorld(){ $('world').style.display='none'; openMenu(); }
 function wStatus(t,col){ const e=$('wMsg'); e.textContent=t; e.style.color=col||'var(--dim)'; }
 async function loadWorldPlace(){
-  if(WMAP.lat===null){ wStatus('Erst einen Ort auf der Karte oder unten auswählen.','var(--warn)'); return; }
+  if(WMAP.lat===null){ wStatus('Erst eine Adresse suchen oder einen Ort auf der Karte wählen.','var(--warn)'); return; }
   const lat=WMAP.lat, lon=WMAP.lon, nm=WMAP.name;
   $('wGo').disabled=true;
   try{
-    wStatus('Lade Geländeprofil …');
-    const {map,lo,hi}=await loadGeoMap(lat,lon);
-    if(nm){ map.name=nm; map.icon='📍'; }
-    wStatus('Gelände da ('+lo.toFixed(0)+'–'+hi.toFixed(0)+' m). Lade echte Gebäude …');
-    let nb=0;
-    try{
-      const polys=await fetchBuildings(lat,lon,2400,t=>wStatus(t,'var(--warn)'));
-      map.data.polys=polys; nb=polys.length;
-    }catch(e){
-      wStatus('Gelände geladen, aber die Gebäude kamen nicht durch ('+e.message+'). Du fliegst über das echte Relief.','var(--warn)');
-    }
-    map.desc=(nm?nm+': ':'')+'echtes Gelände '+lo.toFixed(0)+'–'+hi.toFixed(0)+' m'+
-      (nb?' mit '+nb+' echten Gebäuden':' (ohne Gebäude)');
-    const i=MAPS.findIndex(x=>x.id==='r_geo');
-    if(i>=0) MAPS[i]=map; else MAPS.push(map);
-    APP.mapId='r_geo';
-    SCENE=null;
-    buildMenu();
-    if(nb) wStatus('✔ Fertig: '+nb+' echte Gebäude geladen. Zurück ins Menü und abheben!','var(--acc2)');
-    else if(!/Gebäude kamen nicht durch/.test($('wMsg').textContent))
-      wStatus('✔ Gelände geladen – hier gibt es keine erfassten Gebäude.','var(--acc2)');
-    geoStatus('Geladen: '+(nm||lat.toFixed(4)+', '+lon.toFixed(4))+(nb?' · '+nb+' Gebäude':''),'var(--acc2)');
+    const r=await loadPlace(lat,lon,nm,(t,c)=>wStatus(t,c));
+    if(r.bldErr) wStatus('Gelände geladen, aber die Gebäude kamen nicht durch ('+r.bldErr.message+'). Du fliegst über das echte Relief.','var(--warn)');
+    else if(r.nb) wStatus('✔ Fertig: '+r.nb+' echte Gebäude geladen. Zurück ins Menü und abheben!','var(--acc2)');
+    else wStatus('✔ Gelände geladen – hier gibt es keine erfassten Gebäude.','var(--acc2)');
+    geoStatus('Geladen: '+(nm||lat.toFixed(4)+', '+lon.toFixed(4))+(r.nb?' · '+r.nb+' Gebäude':''),'var(--acc2)');
   }catch(e){
     wStatus('Ort konnte nicht geladen werden ('+e.message+'). Die eingebauten echten Karten funktionieren immer.','var(--bad)');
   }
   $('wGo').disabled=false;
 }
+/* --- Adresssuche in der Weltkarte --- */
+async function onWorldSearch(){
+  const q=($('wSearch').value||'').trim();
+  const list=$('wHits');
+  list.innerHTML='';
+  if(!q){ wStatus('Gib eine Adresse, einen Ort oder ein Bauwerk ein.','var(--warn)'); return; }
+  const c=coordsFrom(q);
+  if(c&&!c.bad){ wmapPick(c.lat,c.lon,null); wStatus('Koordinaten übernommen.','var(--acc2)'); return; }
+  if(c&&c.bad){ wStatus('Koordinaten außerhalb des gültigen Bereichs.','var(--warn)'); return; }
+  wStatus('Suche „'+q+'" …');
+  $('wSearchBtn').disabled=true;
+  try{
+    const hits=await geocode(q);
+    wStatus(hits.length+(hits.length===1?' Treffer':' Treffer')+' – wähle einen aus:','var(--acc2)');
+    for(const h of hits){
+      const b=document.createElement('button');
+      b.className='whit';
+      b.innerHTML='<b>'+h.label.split(',')[0]+'</b><small>'+h.label.split(',').slice(1).join(',').trim()+
+        ' · '+h.lat.toFixed(4)+', '+h.lon.toFixed(4)+'</small>';
+      b.onclick=()=>{ wmapPick(h.lat,h.lon,h.label);
+        [...list.children].forEach(x=>x.classList.remove('sel'));
+        b.classList.add('sel');
+        wStatus('📍 '+h.label+' gewählt – jetzt „Ort laden".','var(--acc2)'); };
+      list.appendChild(b);
+    }
+    if(hits.length===1) list.firstChild.click();
+  }catch(e){
+    wStatus('Nichts gefunden ('+e.message+'). Versuch es mit Ort und Land, z. B. „Bahnhofstrasse 1, Zürich" – oder gib Koordinaten ein.','var(--bad)');
+  }
+  $('wSearchBtn').disabled=false;
+}
 $('worldBtn').onclick=openWorld;
 $('wClose').onclick=closeWorld;
 $('wGo').onclick=loadWorldPlace;
+$('wSearchBtn').onclick=onWorldSearch;
+$('wSearch').addEventListener('keydown',e=>{if(e.key==='Enter')onWorldSearch();});
 $('wmap').addEventListener('click',e=>{
   const cv=$('wmap'), r=cv.getBoundingClientRect();
   const px=(e.clientX-r.left)/r.width*cv.width, py=(e.clientY-r.top)/r.height*cv.height;
