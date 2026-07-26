@@ -26,7 +26,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #btnbar button:active{background:var(--panel2)}
 #btnbar button.armed{background:#67251f;border-color:#c25047;color:#ffd9d5}
 #btnbar button.attn{background:#0f4a2d;border-color:#2fae6b;color:#c9ffe0}
-#bRescue,#bBomb{display:none}
+#bRescue,#bBomb,#bNuke{display:none}
+#bNuke.armedNuke{background:#5a3a06;border-color:#e0b13c;color:#ffe9b0}
 /* ---------- Toast ---------- */
 #toast{position:absolute;left:50%;top:16%;transform:translateX(-50%);z-index:15;
   background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 18px;
@@ -153,6 +154,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <button id="bFoto" title="Foto (F)">📷</button>
   <button id="bRescue" title="Bergungsdrohne (B)">BERGEN</button>
   <button id="bBomb" title="Bombe abwerfen (X)">💣 0</button>
+  <button id="bNuke" title="Nuklearrakete starten (N)">☢ 0</button>
   <button id="bArm">ARM</button>
   <button id="bMode">GPS</button>
   <button id="bCam">KAM</button>
@@ -204,6 +206,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     <span class="k">M</span> Flugmodus · <span class="k">C</span> Kamera ·
     <span class="k">F</span> Foto · <span class="k">B</span> Bergungsdrohne (nach Crash) ·
     <span class="k">X</span> Bombe abwerfen (nur mit Abwurfschacht) ·
+    <span class="k">N</span> Nuklearrakete (nur mit Tarnkappen-Nurflügler) ·
     <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
     <b>Gamepad:</b> Linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2) – wird automatisch erkannt.<br>
     <b>Touch:</b> Virtuelle Sticks unten links (Gas/Yaw) und rechts (Nick/Roll), Buttons oben rechts.
@@ -537,6 +540,10 @@ const PARTS={
      arm:0.11, mass:0.72, bodyL:.2,bodyW:.055,bodyH:.05, feat:{canopy:1,ant:1,propY:-0.004},
      twrF:1.4, speedF:6.8, dragF:0.755, maxTilt:75, range:750, egg:'egg_rocket',
      desc:'Vier Feststoffraketen – irre schnell, aber nur 750 m Funk 🚀'},
+    {id:'stealth', name:'Nurflügel-Tarnkappe', kind:'stealth', cls:'cam',
+     arm:0.20, mass:1.55, bodyL:.62,bodyW:1.0,bodyH:.07, feat:{legs:1,propY:.026},
+     nukes:2, maxTilt:38, egg:'egg_stealth',
+     desc:'Getarnter Nurflügler mit zwei Nuklearraketen ☢️'},
   ],
   motor:[
     {id:'eco', name:'Eco-Motoren', twr:2.0, tau:0.12, mass:0.014, ampF:0.85, desc:'Sparsam, ruhig'},
@@ -603,6 +610,7 @@ function buildDIYDrone(sel,name,id){
     mass, arm:F.arm, twr, tauUp:M.tau, tauDn:M.tau*1.45, propR:P.propR,
     maxTilt: F.maxTilt||(fpv?55:35), maxSpeed, dragF:F.dragF,
     ...(F.bombs?{bombs:F.bombs}:{}), ...(F.range?{range:F.range}:{}),
+    ...(F.nukes?{nukes:F.nukes}:{}),
     climb: (fpv?3.5:2.6)*(twr-1)+2, desc_:(fpv?3:2)*(twr-1)+2,
     yawRate: fpv?200+agility*40:100+agility*30,
     batt:{cells:B.cells, mah:B.mah, min:B.min},
@@ -622,6 +630,7 @@ function stabLabel(s){ return s>0.85?'felsenfest':s>0.65?'stabil':s>0.45?'ausgew
 function diySpecs(d){
   const extra=[];
   if(d.bombs) extra.push(['💣 Bomben',d.bombs+' an Bord']);
+  if(d.nukes) extra.push(['☢️ Nuklearraketen',d.nukes+' · 100 m Radius']);
   if(d.range) extra.push(['📡 Funkreichweite','nur '+d.range+' m']);
   return extra.concat([['⚖ Gewicht',(d.mass*1000).toFixed(0)+' g'],
     ['🚀 Topspeed',(d.maxSpeed*3.6).toFixed(0)+(d.cls==='fpv'?'+':'')+' km/h'],
@@ -666,6 +675,14 @@ const EGG_SPECS=[
   rates:{max:640,expo:.62}, camAngle:20, fovFpv:125, dragH:0.000357, range:750,
   meshKind:'rocket',
   style:{c1:[.90,.91,.93],c2:[.90,.22,.10],bodyL:.2,bodyW:.055,bodyH:.05,canopy:1,ant:1,propY:-0.004}},
+ {id:'egg_stealth', name:'Schattenflügel SW-1', egg:'nuke', badge:'☢️ EASTER EGG',
+  sel:{frame:'stealth',motor:'sport',prop:'l',batt:'6s',cam:'fpv',gear:'skids',color:'dark'},
+  desc:'Getarnter Nurflügler mit versenkten Hubrotoren und zwei Nuklearraketen. Sprengradius 100 m – und wer im Umkreis von 200 m steht, wächst hinterher ein paar Gliedmaßen zu viel. Start mit ☢ oder Taste N.',
+  cls:'cam', mass:2.4, arm:0.20, twr:3.0, tauUp:0.09, tauDn:0.13, propR:0.085,
+  maxTilt:38, maxSpeed:36, climb:11, desc_:9, yawRate:80,
+  batt:{cells:6, mah:6000, min:26}, modes:['GPS','ATTI'], gpsQ:1.0, agility:.45,
+  rates:{max:240,expo:.6}, camAngle:0, fovFpv:78, meshKind:'stealth', nukes:2,
+  style:{c1:[.20,.21,.23],c2:[.44,.46,.5],bodyL:.62,bodyW:1.0,bodyH:.07,gimbal:1,legs:1,propY:.026}},
 ];
 let EGGS_FOUND=[];
 function loadEggs(){
@@ -688,6 +705,7 @@ loadEggs();
    ein. Bestimmte Wünsche schalten versteckte Bauten frei. */
 const PROMPT_RULES=[
   {k:['bombe','bomben','bomber','bomb','sprengen','zerstör','zerstor','destroy','explos'], egg:'egg_bomber'},
+  {k:['nuklear','nuke','atom','kernwaffe','atombombe','atomrakete','nuclear','pilzwolke'], egg:'egg_stealth'},
   {k:['rakete','raketen','rocket','düse','duese','turbo','überschall','ueberschall'], egg:'egg_rocket'},
   {k:['schnell','speed','rennen','race','racing','tempo','fast','flott'],
    sel:{motor:'race',prop:'s',batt:'6sr',frame:'race5',cam:'fpv'}, say:'Rennaufbau: Rennmotoren, kleine Props, leichter Race-Akku'},
@@ -1166,6 +1184,16 @@ const bombMesh=mesh(b=>{
     b.box(0.004+0.055*Math.cos(a),0.004+0.055*Math.sin(a),0.05,[0,0,0.14],0,[0.28,0.29,0.27]);
 });
 const blastMesh=mesh(b=>{ b.ellipsoid(1,1,1,[0,0,0],12,8,[1,1,1]); });
+// Nuklearrakete: schlanker Körper, roter Kopf, Leitwerk
+const nukeMesh=mesh(b=>{
+  const body=[0.88,0.89,0.9];
+  b.tube([0,0,-0.16],[0,0,0.2],0.038,0.038,12,body);
+  b.ellipsoid(0.038,0.038,0.1,[0,0,-0.2],12,8,[0.82,0.2,0.14]);
+  b.tube([0,0,0.2],[0,0,0.25],0.038,0.048,12,[0.16,0.16,0.18]);
+  for(const a of [0,Math.PI/2])
+    b.box(0.006+0.055*Math.cos(a),0.006+0.055*Math.sin(a),0.07,[0,0,0.2],0,[0.75,0.76,0.78]);
+  b.box(0.06,0.012,0.09,[0,0.036,-0.02],0,[0.9,0.78,0.2]);
+});
 
 /* --- Menschen (verschiedene Varianten) --- */
 function personMesh(shirt,pants,parka){
@@ -1180,12 +1208,50 @@ function personMesh(shirt,pants,parka){
     b.ellipsoid(0.11,0.1,0.115,[0,1.56,0],12,6,parka?shirt:[0.3,0.25,0.2],0.5,1);
   });
 }
+// Mutanten: nach einer Nuklearexplosion wachsen zusätzliche Gliedmaßen
+// (Comic-Effekt, wie der dreiäugige Fisch im Zeichentrick)
+function mutantMesh(stage){
+  const shirt=[0.36,0.55+stage*0.08,0.3], pants=[0.24,0.3,0.26];
+  const skin=[0.62,0.82-stage*0.05,0.42];
+  return mesh(b=>{
+    b.box(0.13,0.78,0.16,[-0.09,0.39,0],0,pants);
+    b.box(0.13,0.78,0.16,[ 0.09,0.39,0],0,pants);
+    if(stage>1) b.box(0.11,0.62,0.13,[0,0.31,0.13],0,pants);        // drittes Bein
+    b.box(0.4,0.62,0.24,[0,1.06,0],0,shirt);
+    // Grundarme plus je nach Stufe weitere
+    const arms=[[-0.25,1.08,0,0],[0.25,1.08,0,0]];
+    if(stage>=1) arms.push([-0.29,0.86,0.1,0.5],[0.29,0.86,0.1,-0.5]);
+    if(stage>=2) arms.push([-0.24,1.3,-0.12,-0.7],[0.24,1.3,-0.12,0.7]);
+    if(stage>=3) arms.push([-0.3,0.66,-0.13,1.0],[0.3,0.66,-0.13,-1.0]);
+    for(const [ax,ay,az,tilt] of arms){
+      b.box(0.1,0.55,0.12,[ax,ay,az],0,shirt);
+      b.ellipsoid(0.055,0.055,0.055,[ax+Math.sin(tilt)*0.06,ay-0.3,az],8,5,skin);
+    }
+    b.ellipsoid(0.105,0.12,0.11,[0,1.52,0],12,8,skin);              // Kopf
+    if(stage>=2) b.ellipsoid(0.085,0.1,0.09,[0.17,1.44,0.02],12,8,skin);   // zweiter Kopf
+    if(stage>=3) b.ellipsoid(0.075,0.09,0.08,[-0.17,1.4,-0.02],12,8,skin); // dritter Kopf
+    // zusätzliche Augen
+    const eyes=[[0,1.55,-0.1]];
+    if(stage>=1) eyes.push([-0.05,1.62,-0.09],[0.05,1.62,-0.09]);
+    if(stage>=2) eyes.push([0.17,1.47,-0.08]);
+    for(const [ex,ey,ez] of eyes){
+      b.ellipsoid(0.026,0.026,0.014,[ex,ey,ez],8,5,[0.95,0.97,0.9]);
+      b.ellipsoid(0.012,0.012,0.008,[ex,ey,ez-0.011],6,4,[0.1,0.5,0.15]);
+    }
+  });
+}
 const PERSON_MESHES={
   std:[personMesh([0.7,0.3,0.3],[0.25,0.28,0.35]),personMesh([0.3,0.45,0.7],[0.2,0.2,0.22]),
        personMesh([0.85,0.8,0.4],[0.3,0.35,0.3]),personMesh([0.4,0.6,0.4],[0.25,0.25,0.3])],
   parka:[personMesh([0.95,0.45,0.1],[0.2,0.22,0.28],1),personMesh([0.9,0.2,0.15],[0.18,0.2,0.25],1)],
+  mutant:[mutantMesh(1),mutantMesh(2),mutantMesh(3)],
 };
 
+// Einzelnes Dreieck mit Farbe; flip dreht die Umlaufrichtung (gespiegelte Hälften)
+function B_tri(bd,a,b2,c,col,flip){
+  bd.curCol=col;
+  if(flip) bd.tri(a,c,b2); else bd.tri(a,b2,c);
+}
 /* --- Wasser-Landefüße: zwei Schwimmer unter dem Rumpf ---
    Wird an jeden Rahmen angehängt, egal welcher Bauart (auch blockig). */
 function floatGeom(d,st,L,W,H,arm){
@@ -1452,6 +1518,77 @@ function buildDroneMesh(d){
       bladeCol=st.c2; hubCol=carbon;
       break;
     }
+    case 'stealth': {
+      // Getarnter Nurflügler: stark gepfeilte Deltafläche, verschmolzener Rumpf,
+      // Triebwerksbuckel oben, vier versenkte Hubrotoren, Bugfahrwerk.
+      const skin=st.c1, edge=[skin[0]*0.66,skin[1]*0.68,skin[2]*0.72], dk=[0.06,0.06,0.07];
+      const HW=W/2, nose=-L*0.52, tail=L*0.48;
+      // Flügel als flaches Vieleck: Pfeilung vorn, gerader Abriss hinten
+      const half=(s)=>[
+        [s*0.0,     nose],           [s*HW*0.30, nose+L*0.07],
+        [s*HW*0.62, nose+L*0.20],    [s*HW*0.90, nose+L*0.44],
+        [s*HW*1.0,  nose+L*0.72],    [s*HW*0.94, tail],
+        [s*HW*0.22, tail],           [s*0.0,     tail],
+      ];
+      for(const s of [-1,1]){
+        const p=half(s), n=p.length;
+        const yTop=(q)=>{
+          const f=1-Math.min(1,Math.abs(q[0])/(HW*0.75));    // Mitte dicker als Spitze
+          return H*0.5*(0.25+0.75*f*f);
+        };
+        // Ober- und Unterseite als Fächer vom Rumpfmittelpunkt
+        for(let i=0;i<n-1;i++){
+          const a=p[i], c=p[i+1], m0=[0,(nose+tail)/2];
+          B_tri(b,[m0[0],H*0.5,m0[1]],[a[0],yTop(a),a[1]],[c[0],yTop(c),c[1]],skin,s>0);
+          B_tri(b,[m0[0],-H*0.42,m0[1]],[a[0],-yTop(a)*0.55,a[1]],[c[0],-yTop(c)*0.55,c[1]],edge,s<0);
+          // Kante geschlossen
+          b.curCol=edge;
+          b.quad([a[0],yTop(a),a[1]],[c[0],yTop(c),c[1]],
+                 [c[0],-yTop(c)*0.55,c[1]],[a[0],-yTop(a)*0.55,a[1]]);
+        }
+      }
+      // flacher, verschmolzener Rumpfrücken mit Triebwerksauslass hinten
+      b.loft([
+        {z:nose+L*0.05,y:H*0.15,w:W*0.07,h:H*0.4,e:3.0},
+        {z:nose+L*0.22,y:H*0.28,w:W*0.19,h:H*0.9,e:3.2},
+        {z:nose+L*0.5,y:H*0.34,w:W*0.24,h:H*1.15,e:3.2},
+        {z:L*0.2,y:H*0.34,w:W*0.21,h:H*1.05,e:3.0},
+        {z:tail-L*0.03,y:H*0.28,w:W*0.13,h:H*0.7,e:2.8},
+      ],16,skin);
+      b.tube([0,H*0.3,tail-L*0.06],[0,H*0.28,tail+L*0.02],W*0.06,W*0.05,12,dk);   // Schubdüse
+      b.ellipsoid(W*0.035,H*0.4,L*0.045,[0,H*0.12,nose+L*0.13],12,8,[0.05,0.06,0.1]); // Sensorkuppel
+      // zwei nach unten gezogene Seitenflossen
+      for(const s of [-1,1]){
+        b.box(0.006,H*2.4,L*0.14,[s*HW*0.44,-H*1.3,tail-L*0.12],0,edge);
+      }
+      // vier versenkte Hubrotoren: dunkle Ringe in der Fläche
+      for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+        const ax=sx*arm, az=sz*arm;
+        b.cyl(d.propR*1.16,d.propR*1.16,0.012,[ax,pY-0.02,az],18,dk,false);
+        b.cyl(d.propR*1.02,d.propR*1.02,0.012,[ax,pY-0.02,az],18,dk,false);
+        b.cyl(d.propR*1.18,d.propR*1.18,0.004,[ax,pY-0.021,az],18,[0.03,0.03,0.04]);
+        motor(ax,az,dk,0.016);
+      }
+      // Bugfahrwerk und zwei Hauptbeine (wie auf der Vorlage)
+      const legs=[[0,nose+L*0.30,0.9],[-HW*0.34,L*0.16,1.0],[HW*0.34,L*0.16,1.0]];
+      for(const [lx,lz,f] of legs){
+        b.tube([lx,-H*0.3,lz],[lx,-H*0.3-0.10*f,lz],0.008,0.007,7,[0.4,0.41,0.44]);
+        b.tube([lx-0.014,-H*0.3-0.10*f,lz],[lx+0.014,-H*0.3-0.10*f,lz],0.019,0.019,10,[0.08,0.08,0.09]);
+      }
+      // zwei Nuklearraketen unter der Fläche
+      for(const s of [-1,1]){
+        const mx=s*HW*0.26, my=-H*0.55, mz=L*0.02;
+        b.tube([mx,my,mz-L*0.12],[mx,my,mz+L*0.1],0.019,0.019,12,[0.86,0.87,0.88]);
+        b.ellipsoid(0.019,0.019,0.045,[mx,my,mz-L*0.145],12,8,[0.8,0.2,0.15]);
+        b.tube([mx,my,mz+L*0.1],[mx,my,mz+L*0.13],0.019,0.024,12,dk);
+        for(const fa of [0,Math.PI/2])
+          b.box(0.004+0.028*Math.cos(fa),0.004+0.028*Math.sin(fa),0.036,[mx,my,mz+L*0.1],0,[0.75,0.76,0.78]);
+        b.box(0.03,0.006,0.05,[mx,my+0.022,mz],0,[0.9,0.78,0.2]);      // Warnband
+      }
+      leds();
+      bladeCol=[0.14,0.15,0.16]; hubCol=dk;
+      break;
+    }
     case 'bomber': {
       // Schwere Transportplattform in Olivgrün mit Abwurfschächten unter dem Bauch
       const c1=st.c1, carbon=[0.13,0.13,0.14], warn=[0.85,0.62,0.1];
@@ -1640,6 +1777,39 @@ function buildDroneMeshBlocky(d){
   if(bmk==='tinywhoop')bmk='whoop';
   else if(bmk==='deadcat'||bmk==='toothpick'||bmk==='rocket')bmk='race5';
   else if(bmk==='bomber')bmk='cine';
+  else if(bmk==='stealth'){
+    // Retro-Variante des Nurflüglers: gestufte Deltafläche aus Klötzen
+    const skin=st.c1, dk=[0.07,0.07,0.08];
+    const HW=W/2;
+    for(let i=0;i<7;i++){
+      const t=i/7, w=W*(0.16+t*0.9), z=-L*0.46+t*L*0.9;
+      b.box(w,H*(1-t*0.45),L*0.14,[0,0,z],0,skin);
+    }
+    b.box(W*0.3,H*2.0,L*0.6,[0,H*0.9,L*0.02],0,skin);         // Triebwerksbuckel
+    b.box(W*0.16,H*1.1,L*0.1,[0,H*0.6,L*0.48],0,dk);          // Düse
+    for(const s of [-1,1]) b.box(0.014,H*2.2,L*0.14,[s*HW*0.44,-H*1.2,L*0.34],0,dk);
+    for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]]){
+      const ax=sx*arm, az=sz*arm;
+      b.box(d.propR*2.3,0.02,d.propR*2.3,[ax,pY-0.02,az],0,dk);
+      motor(ax,az,dk,0.016,0.02);
+    }
+    for(const [lx,lz] of [[0,-L*0.2],[-HW*0.34,L*0.16],[HW*0.34,L*0.16]]){
+      b.box(0.016,0.1,0.016,[lx,-H*0.8,lz],0,[0.4,0.41,0.44]);
+      b.box(0.04,0.038,0.038,[lx,-H*0.8-0.06,lz],0,dk);
+    }
+    for(const s of [-1,1]){
+      b.box(0.04,0.04,L*0.34,[s*HW*0.26,-H*0.7,L*0.02],0,[0.86,0.87,0.88]);
+      b.box(0.032,0.032,L*0.08,[s*HW*0.26,-H*0.7,-L*0.19],0,[0.8,0.2,0.15]);
+    }
+    bladeCol=[0.14,0.15,0.16]; hubCol=dk;
+    const body0=b.build();
+    const prop0=mesh(pb=>{
+      for(const a of [0,Math.PI/2]) pb.box(d.propR*1.5,0.006,d.propR*0.16,[0,0,0],a,bladeCol);
+      pb.box(d.propR*0.28,0.01,d.propR*0.28,[0,0,0],0,hubCol);
+    });
+    const disc0=mesh(pb=>{ pb.cyl(d.propR,d.propR,0.004,[0,0,0],16,bladeCol); });
+    return {body:body0,prop:prop0,disc:disc0,propY:pY};
+  }
   switch(bmk){
     case 'mini1': case 'mini4': case 'air': case 'pro': {
       // Faltdrohnen-Familie: Keil-Rumpf, Gimbal vorn, schlanke Arme
@@ -1999,6 +2169,61 @@ function buildTerrainMesh(map,terH){
   return m;
 }
 
+/* --- Hausfarben auf den echten Karten ---
+   Echte Farbangaben aus den Geodaten haben Vorrang; sonst eine Palette nach
+   Gebäudeart und Höhe, damit Städte nicht grau in grau dastehen. */
+const CSS_COLORS={white:[.94,.94,.92],black:[.14,.14,.15],grey:[.55,.55,.55],gray:[.55,.55,.55],
+  silver:[.72,.72,.73],red:[.68,.18,.15],darkred:[.45,.12,.11],brown:[.45,.31,.2],
+  maroon:[.4,.14,.14],orange:[.85,.5,.16],yellow:[.87,.78,.34],beige:[.85,.78,.63],
+  cream:[.92,.88,.75],green:[.28,.48,.28],darkgreen:[.16,.32,.18],olive:[.45,.44,.24],
+  blue:[.25,.38,.62],lightblue:[.55,.7,.82],darkblue:[.16,.24,.44],navy:[.13,.18,.35],
+  purple:[.42,.26,.48],pink:[.85,.65,.68],sandstone:[.83,.73,.56],terracotta:[.7,.36,.24],
+  turquoise:[.25,.6,.6],tan:[.78,.68,.52],ivory:[.93,.9,.8]};
+function parseColorTag(s){
+  if(!s) return null;
+  const v=String(s).trim().toLowerCase();
+  if(/^#[0-9a-f]{6}$/.test(v)) return hexToRgb(v);
+  if(/^#[0-9a-f]{3}$/.test(v)) return hexToRgb('#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3]);
+  const key=v.replace(/[\s_-]/g,'');
+  return CSS_COLORS[key]||null;
+}
+// Wandfarben für Wohn-/Altbauten (warm) und Dachfarben (Ziegel, Schiefer, Kupfer)
+const WALL_PAL=[[.90,.86,.78],[.86,.80,.68],[.82,.74,.62],[.90,.83,.70],[.78,.75,.72],
+  [.88,.78,.66],[.75,.70,.66],[.92,.89,.83],[.80,.72,.58],[.86,.72,.60],
+  [.70,.72,.70],[.88,.84,.74],[.76,.66,.58],[.84,.80,.76],[.92,.85,.72],[.72,.74,.78]];
+const ROOF_PAL=[[.55,.24,.17],[.48,.22,.16],[.38,.32,.30],[.30,.30,.33],[.52,.28,.19],
+  [.42,.26,.20],[.34,.36,.34],[.26,.28,.31],[.58,.30,.20],[.24,.36,.34],
+  [.44,.30,.24],[.36,.30,.26],[.50,.26,.18],[.30,.32,.36],[.46,.34,.22],[.28,.26,.28]];
+function buildingColors(b,t){
+  const tags=b.tags||{};
+  let wall=parseColorTag(tags['building:colour']||tags['building:color']||tags.colour);
+  let roof=parseColorTag(tags['roof:colour']||tags['roof:color']);
+  const kind=(tags.building||b.kind||'').toLowerCase();
+  const i=Math.floor(t*WALL_PAL.length)%WALL_PAL.length;
+  if(!wall){
+    if(/^(commercial|retail|office|hotel|supermarket)$/.test(kind)||(b.h>34&&t>0.4)){
+      // Glasfassaden in kühlen Tönen
+      const s=0.5+t*0.2;
+      wall=[s*0.68,s*0.88,s*1.12];
+    } else if(/^(industrial|warehouse|hangar|garage|garages|shed|barn|service)$/.test(kind)){
+      const s=0.5+t*0.22; wall=[s,s*1.01,s*0.98];
+    } else if(/^(church|chapel|cathedral|castle|monastery)$/.test(kind)){
+      wall=[0.88,0.85,0.77];
+    } else {
+      wall=WALL_PAL[i];
+    }
+  }
+  if(!roof){
+    if(/^(church|chapel|cathedral|castle|monastery)$/.test(kind)) roof=[0.28,0.30,0.34];
+    else if(b.h>34) roof=[wall[0]*0.55,wall[1]*0.58,wall[2]*0.6];
+    else roof=ROOF_PAL[(i+Math.floor(t*7))%ROOF_PAL.length];
+  }
+  // etwas Streuung, damit gleiche Farben nicht flächig wirken
+  const f=0.92+t*0.16;
+  return [[clamp(wall[0]*f,0,1),clamp(wall[1]*f,0,1),clamp(wall[2]*f,0,1)],
+          [clamp(roof[0]*f,0,1),clamp(roof[1]*f,0,1),clamp(roof[2]*f,0,1)]];
+}
+
 /* --- Hilfen für Generatoren --- */
 function addTree(B,obs,x,y,z,h,dead){
   const tr=0.14+((x*z)%1+1)%1*0.1;
@@ -2036,10 +2261,7 @@ GEN.real=(map,B,obs,terH,rnd)=>{
       for(const p of pts) base=Math.min(base,terH(p[0],p[1]));
       const top=base+b.h;
       const t=hash2(Math.round(cx),Math.round(cz),11);
-      const shade=0.42+t*0.34;
-      const glass=b.h>26&&t>0.55;
-      const wall=glass?[shade*0.72,shade*0.86,shade*1.06]:[shade+0.14,shade+0.11,shade*0.99];
-      const roof=[wall[0]*0.72,wall[1]*0.72,wall[2]*0.7];
+      const [wall,roof]=buildingColors(b,t);
       // Wände
       B.curCol=wall;
       for(let i=0;i<n;i++){
@@ -2351,13 +2573,32 @@ function buildScene(mapId){
   const plats={};
   for(const k in PLAT_BASE){ const p=PLAT_BASE[k];
     plats[k]={...p, base:gy(p.x,p.z)-0.4, top:gy(p.x,p.z)+p.hAbove}; }
-  // Fußgänger
+  // Fußgänger – auch auf den echten Karten, dort auf freiem, flachem Grund
   const people=[];
   const pm=map.gen==='arctic'?PERSON_MESHES.parka:PERSON_MESHES.std;
-  for(let i=0;i<map.people;i++){
+  const nPeople=(map.people!==undefined)?map.people:(map.real?36:0);
+  const freeSpot=(x,z)=>{
+    for(const o of obs){
+      const dx=x-o.x, dz=z-o.z;
+      if(dx*dx+dz*dz < (o.r+2.5)*(o.r+2.5)) return false;
+    }
+    // nicht am Steilhang
+    return Math.abs(terH(x+4,z)-terH(x-4,z))+Math.abs(terH(x,z+4)-terH(x,z-4))<3.2;
+  };
+  for(let i=0;i<nPeople;i++){
     let x,z;
     if(map.gen==='city'){ const k=Math.floor(rnd()*9)-4, off=(rnd()<0.5?-6.5:6.5);
       if(rnd()<0.5){x=k*42+off;z=(rnd()-0.5)*300;}else{z=k*42+off;x=(rnd()-0.5)*300;}
+    } else if(map.real){
+      // in mehreren Anläufen eine freie Stelle nahe dem Startplatz suchen
+      let ok=false;
+      for(let k=0;k<40&&!ok;k++){
+        const a=rnd()*7, r=16+Math.sqrt(rnd())*340;
+        x=Math.cos(a)*r; z=Math.sin(a)*r;
+        if(map.water&&terH(x,z)<wl+0.6) continue;
+        ok=freeSpot(x,z);
+      }
+      if(!ok) continue;
     } else { const a=rnd()*7,r=18+rnd()*120; x=Math.cos(a)*r; z=Math.sin(a)*r; }
     if(map.water&&terH(x,z)<wl+0.3)continue;
     const dir=rnd()*Math.PI*2, len=12+rnd()*25;
@@ -2538,7 +2779,7 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.q=Q.fromYaw(0); DR.w=[0,0,0];
   DR.motors=[0,0,0,0]; DR.armed=false; DR.onGround=true; DR.crashed=false;
   DR.groundTimer=0; DR.iTerm=[0,0,0]; DR.flightTime=0; DR.pkg=false; DR.driftV=[0,0];
-  DR.bombs=d.bombs||0; BOMBS=[]; BLASTS=[]; APP.shake=0;
+  DR.bombs=d.bombs||0; DR.nukes=d.nukes||0; BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; }
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
   IN.thr=APP.springThr?0:-1; IN.yaw=IN.pit=IN.rol=0;
@@ -2940,12 +3181,83 @@ function dropBomb(){
   updateButtons();
   return true;
 }
+/* --- Nuklearrakete (Easter Egg „Schattenflügel") ---
+   Fliegt angetrieben nach vorn-unten, Sprengradius 100 m. Wer im Umkreis von
+   200 m steht, bekommt hinterher ein paar Gliedmaßen zu viel. */
+// Startgeschwindigkeit der Rakete: kräftig nach vorn-unten aus dem Schacht
+function nukeLaunchVel(){
+  const fwd=Q.rot(DR.q,[0,0,-1]);
+  return [DR.vel[0]+fwd[0]*22, DR.vel[1]-14, DR.vel[2]+fwd[2]*22];
+}
+function fireNuke(){
+  if(!APP.model.nukes||DR.crashed||DR.onGround||APP.state!=='fly')return false;
+  if((DR.nukes||0)<=0){ toast('Keine Nuklearraketen mehr – R/RESET lädt neu'); return false; }
+  DR.nukes--;
+  const v0=nukeLaunchVel();
+  BOMBS.push({kind:'nuke', pos:[DR.pos[0],DR.pos[1]-0.2,DR.pos[2]],
+    vel:[...v0], ang:0, t:0, trail:0});
+  toast('☢️ Nuklearrakete unterwegs – Abstand halten!',2500);
+  updateButtons();
+  return true;
+}
+// Comic-Mutation: mehr Arme, mehr Köpfe, grünlicher Teint
+function mutatePeople(x,z,R){
+  if(!SCENE||!SCENE.people)return 0;
+  let n=0;
+  for(const p of SCENE.people){
+    const dd=Math.hypot(p.x-x,p.z-z);
+    if(dd>R)continue;
+    // je näher, desto kräftiger die Mutation
+    const stage=dd<R*0.35?2:dd<R*0.7?1:0;
+    p.mut=Math.max(p.mut||0,stage+1);
+    p.mesh=PERSON_MESHES.mutant[Math.min(p.mut,PERSON_MESHES.mutant.length)-1];
+    p.spd=Math.abs(p.spd)*1.8;
+    n++;
+  }
+  return n;
+}
+function nukeBlast(x,y,z){
+  const R=100;                                   // Sprengradius
+  const n=destroyAt(x,z,R);
+  const mut=mutatePeople(x,z,200);               // Mutationsradius
+  // Feuerball, Stiel und Pilzkopf
+  BLASTS.push({pos:[x,y+18,z],vel:[0,9,0],r:26,t:0,life:2.2,kind:'fire'});
+  for(let i=0;i<26;i++){
+    const a=Math.random()*7, sp=8+Math.random()*26;
+    BLASTS.push({pos:[x,y+2,z],vel:[Math.cos(a)*sp,6+Math.random()*16,Math.sin(a)*sp],
+      r:7+Math.random()*11,t:0,life:2.4+Math.random()*2,kind:'fire'});
+  }
+  for(let i=0;i<16;i++)                           // Stiel
+    BLASTS.push({pos:[x+(Math.random()-0.5)*14,y+8+i*11,z+(Math.random()-0.5)*14],
+      vel:[0,7+Math.random()*5,0],r:8+i*0.7,t:0,life:6+Math.random()*3,kind:'smoke',col:[0.42,0.4,0.37]});
+  for(let i=0;i<26;i++){                          // Pilzkopf
+    const a=Math.random()*7, rr=Math.random()*52;
+    BLASTS.push({pos:[x+Math.cos(a)*rr,y+165+Math.random()*34,z+Math.sin(a)*rr],
+      vel:[Math.cos(a)*7,2+Math.random()*3,Math.sin(a)*7],
+      r:15+Math.random()*17,t:0,life:8+Math.random()*4,kind:'smoke',col:[0.5,0.47,0.42]});
+  }
+  for(let i=0;i<30;i++){                          // Bodenwelle aus Staub
+    const a=Math.random()*7, sp=26+Math.random()*40;
+    BLASTS.push({pos:[x+Math.cos(a)*12,y+1.5,z+Math.sin(a)*12],
+      vel:[Math.cos(a)*sp,2+Math.random()*4,Math.sin(a)*sp],
+      r:9+Math.random()*13,t:0,life:4+Math.random()*3,kind:'smoke',col:[0.55,0.52,0.46]});
+  }
+  APP.shake=3.2;
+  APP.flashT=1;
+  const fe=document.getElementById('flash');
+  if(fe){ fe.classList.add('on'); setTimeout(()=>fe.classList.remove('on'),140); }
+  if(!DR.crashed&&Math.hypot(DR.pos[0]-x,DR.pos[1]-y,DR.pos[2]-z)<R*1.4)
+    crash('Von der eigenen Druckwelle erwischt');
+  toast('☢️ Detonation: '+n+' Objekte pulverisiert'+(mut?' · '+mut+' Personen mutiert':''),4000);
+  return n;
+}
 // Ballistische Vorhersage: wo landet eine jetzt abgeworfene Bombe?
-function bombImpact(){
-  let p=[DR.pos[0],DR.pos[1],DR.pos[2]], v=[...DR.vel];
+function bombImpact(v0,kd){
+  let p=[DR.pos[0],DR.pos[1],DR.pos[2]], v=v0?[...v0]:[...DR.vel];
+  const kdrag=kd||0.0016;
   for(let i=0;i<600;i++){
     v[1]-=G*0.02;
-    const sp=V3.len(v), k=0.0016*sp*0.02;
+    const sp=V3.len(v), k=kdrag*sp*0.02;
     v=[v[0]*(1-k),v[1]*(1-k),v[2]*(1-k)];
     p=[p[0]+v[0]*0.02,p[1]+v[1]*0.02,p[2]+v[2]*0.02];
     const gy=Math.max(SCENE.terH(p[0],p[2]), SCENE.water?SCENE.water.level:-1e9);
@@ -3048,7 +3360,15 @@ function stepBombs(dt){
     const b=BOMBS[i];
     b.t+=dt;
     b.vel[1]-=G*dt;
-    const sp=V3.len(b.vel), k=0.0016*sp*dt;
+    if(b.kind==='nuke'){
+      // Rauchfahne hinter der Rakete
+      b.trail=(b.trail||0)+dt;
+      if(b.trail>0.05){
+        b.trail=0;
+        BLASTS.push({pos:[...b.pos],vel:[0,1.5,0],r:1.6,t:0,life:1.5,kind:'smoke',col:[0.72,0.72,0.7]});
+      }
+    }
+    const sp=V3.len(b.vel), k=(b.kind==='nuke'?0.0006:0.0016)*sp*dt;
     b.vel=[b.vel[0]*(1-k),b.vel[1]*(1-k),b.vel[2]*(1-k)];
     b.pos=V3.add(b.pos,V3.scale(b.vel,dt));
     b.ang=Math.atan2(Math.hypot(b.vel[0],b.vel[2]),-b.vel[1]);
@@ -3061,7 +3381,8 @@ function stepBombs(dt){
     }
     if(hit||b.t>25){
       BOMBS.splice(i,1);
-      explode(b.pos[0],Math.max(b.pos[1],gy),b.pos[2]);
+      if(b.kind==='nuke') nukeBlast(b.pos[0],Math.max(b.pos[1],gy),b.pos[2]);
+      else explode(b.pos[0],Math.max(b.pos[1],gy),b.pos[2]);
     }
   }
   for(let i=BLASTS.length-1;i>=0;i--){
@@ -3080,6 +3401,7 @@ function stepBombs(dt){
     if(p.pos[1]<gy+p.r*0.5){ p.pos[1]=gy+p.r*0.5; p.vel=[p.vel[0]*0.4,-p.vel[1]*0.25,p.vel[2]*0.4]; p.spin*=0.5; }
   }
   if(APP.shake) APP.shake=Math.max(0,APP.shake-dt*1.6);
+  if(APP.flashT) APP.flashT=Math.max(0,APP.flashT-dt*1.1);
 }
 function crash(msg){
   if(DR.crashed)return;
@@ -3443,16 +3765,26 @@ function render(){
   }
   // Bomben in der Luft + Zielmarkierung, solange welche an Bord sind
   for(const b of BOMBS){
-    const m=M4.mul(M4.fromQuatPos(Q.mul(Q.fromYaw(b.yaw||0),Q.axisAngle([1,0,0],(b.ang||0)-Math.PI/2)),b.pos),
-      M4.scale(1,1,1));
-    drawMesh(bombMesh,m);
+    const rot=M4.fromQuatPos(Q.mul(Q.fromYaw(b.yaw||0),Q.axisAngle([1,0,0],(b.ang||0)-Math.PI/2)),b.pos);
+    if(b.kind==='nuke'){
+      drawMesh(nukeMesh,rot);
+      gl.depthMask(false);
+      drawMesh(blastMesh,M4.mul(M4.translate(b.pos[0],b.pos[1],b.pos[2]),M4.scale(0.5,0.5,0.5)),[3,2,0.6],0.8);
+      gl.depthMask(true);
+    } else drawMesh(bombMesh,rot);
   }
-  if(APP.model.bombs&&DR.bombs>0&&!DR.crashed&&!DR.onGround&&APP.state==='fly'){
-    const t=bombImpact();
+  if(!DR.crashed&&!DR.onGround&&APP.state==='fly'){
+    const nuke=APP.model.nukes&&DR.nukes>0;
+    const t=nuke? bombImpact(nukeLaunchVel(),0.0006)
+        : (APP.model.bombs&&DR.bombs>0? bombImpact() : null);
     if(t){
       gl.depthMask(false);
-      drawMesh(padWpMesh,M4.mul(M4.translate(t[0],t[1]+0.12,t[2]),M4.scale(3.2,1,3.2)),[1,0.42,0.15],0.4);
-      drawMesh(padWpMesh,M4.mul(M4.translate(t[0],t[1]+0.14,t[2]),M4.scale(1.1,1,1.1)),[1,0.85,0.3],0.55);
+      // beim Nuklearsprengkopf zeigt der äußere Ring den 100-m-Sprengradius
+      const R=nuke?100:3.2;
+      drawMesh(padWpMesh,M4.mul(M4.translate(t[0],t[1]+0.12,t[2]),M4.scale(R,1,R)),
+        nuke?[1,0.8,0.15]:[1,0.42,0.15],nuke?0.16:0.4);
+      drawMesh(padWpMesh,M4.mul(M4.translate(t[0],t[1]+0.14,t[2]),M4.scale(nuke?3:1.1,1,nuke?3:1.1)),
+        [1,0.85,0.3],0.55);
       gl.depthMask(true);
     }
   }
@@ -3770,6 +4102,10 @@ function updateButtons(){
   bb.style.display=APP.model.bombs?'block':'none';
   bb.textContent='💣 '+(DR.bombs||0);
   bb.classList.toggle('attn',!!(DR.bombs>0));
+  const nb=$('bNuke');
+  nb.style.display=APP.model.nukes?'block':'none';
+  nb.textContent='☢ '+(DR.nukes||0);
+  nb.classList.toggle('armedNuke',!!(DR.nukes>0));
 }
 function tryArm(){
   if(APP.state!=='fly'||APP.paused)return;
@@ -3811,6 +4147,7 @@ function handleKey(code){
   else if(code==='KeyF'){takePhoto();}
   else if(code==='KeyB'){if(DR.crashed&&WRECK)startRescue();}
   else if(code==='KeyX'){dropBomb();}
+  else if(code==='KeyN'){fireNuke();}
   else if(code==='KeyR'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}
   else if(/^Digit[1-4]$/.test(code)){APP.windLevel=+code.slice(5)-1;toast('💨 '+WIND_NAMES[APP.windLevel]);}
 }
@@ -3820,6 +4157,7 @@ $('bCam').onclick=()=>{if(APP.state==='fly')APP.camera=(APP.camera+1)%3;};
 $('bFoto').onclick=()=>takePhoto();
 $('bRescue').onclick=()=>{if(DR.crashed&&WRECK)startRescue();};
 $('bBomb').onclick=()=>dropBomb();
+$('bNuke').onclick=()=>fireNuke();
 $('bReset').onclick=()=>{if(APP.state==='fly'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}};
 $('bMenu').onclick=()=>{if(APP.paused)closeMenuAndStart();else openMenu();};
 $('startBtn').onclick=closeMenuAndStart;
@@ -3941,8 +4279,11 @@ async function fetchBuildings(lat,lon,span,onMsg){
       a+=p[0]*c[1]-c[0]*p[1]; }
     const area=Math.abs(a)/2;
     if(area<6||area>400000)continue;
-    polys.push({pts, h:estHeight(el.tags||{},area), area,
-      name:(el.tags&&el.tags.name)||null});
+    const tg=el.tags||{};
+    polys.push({pts, h:estHeight(tg,area), area, name:tg.name||null,
+      // nur die für die Einfärbung nötigen Angaben behalten
+      tags:{building:tg.building||tg.man_made||'', 'building:colour':tg['building:colour']||tg['building:color'],
+            'roof:colour':tg['roof:colour']||tg['roof:color']}});
   }
   // Bei sehr dichten Städten die größten behalten, damit es flüssig bleibt
   polys.sort((p,q2)=>q2.area-p.area);
@@ -3979,22 +4320,33 @@ async function geocode(q){
       return await r.json();
     } finally { clearTimeout(to); }
   };
+  // Die Schweiz zuerst: Suchgebiet auf CH begrenzt, danach weltweit.
+  // Dadurch findet „Bahnhofstrasse 1" ohne Zusatz die Schweizer Adressen.
+  const CH='5.9,45.8,10.5,47.9';                  // west,süd,ost,nord
+  const CHV='45.8,5.9,47.9,10.5';                 // Nominatim: süd,west,nord,ost
+  const enc=encodeURIComponent(query);
+  const rounds=[
+    ['https://photon.komoot.io/api/?limit=6&bbox='+CH+'&lat=46.85&lon=8.2&q='+enc,'photon'],
+    ['https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&countrycodes=ch&viewbox='+
+      CHV.split(',').reverse().join(',')+'&q='+enc,'nomi'],
+    ['https://photon.komoot.io/api/?limit=6&q='+enc,'photon'],
+    ['https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q='+enc,'nomi'],
+  ];
   let err=null;
-  // 1) Photon (OSM-basiert, für Suchfelder gedacht)
-  try{
-    const js=await jget('https://photon.komoot.io/api/?limit=6&q='+encodeURIComponent(query));
-    const out=((js&&js.features)||[]).filter(f=>f.geometry&&f.geometry.coordinates).map(f=>({
-      lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0],
-      label:labelFromPhoton(f)||query}));
-    if(out.length) return out;
-  }catch(e){ err=e; }
-  // 2) Nominatim als Ausweichlösung
-  try{
-    const js=await jget('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q='+encodeURIComponent(query));
-    const out=(Array.isArray(js)?js:[]).filter(f=>f.lat&&f.lon)
-      .map(f=>({lat:parseFloat(f.lat), lon:parseFloat(f.lon), label:f.display_name||query}));
-    if(out.length) return out;
-  }catch(e){ err=e; }
+  for(const [url,kind] of rounds){
+    try{
+      const js=await jget(url);
+      let out;
+      if(kind==='photon')
+        out=((js&&js.features)||[]).filter(f=>f.geometry&&f.geometry.coordinates).map(f=>({
+          lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0],
+          label:labelFromPhoton(f)||query}));
+      else
+        out=(Array.isArray(js)?js:[]).filter(f=>f.lat&&f.lon)
+          .map(f=>({lat:parseFloat(f.lat), lon:parseFloat(f.lon), label:f.display_name||query}));
+      if(out.length) return out;
+    }catch(e){ err=e; }
+  }
   if(err) throw err;
   throw new Error('nichts gefunden');
 }
