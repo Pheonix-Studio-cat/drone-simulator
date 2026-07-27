@@ -66,8 +66,8 @@ Braucht Internet. Klappt der Abruf nicht, sagt der Simulator das klar und die ei
 - 🏚️ **Lostplace** – verlassenes Industriegelände mit 60-m-Schornstein, offener Halle und Bürogerippe (perfekt für FPV-Dives)
 - 🧊 **Antarktis** – Eiswüste mit Forschungsstation
 - 🏔️ **Berge & Seen** – alpine Gipfel mit Schneegrenze und Bergseen (Wasserlandung = Totalverlust!)
-- 🌾 **Flachland** – Felder, Windräder, Bauernhof
-- 🏙️ **Großstadt** – Hochhaus-Schluchten, Straßen, Autos und viele Fußgänger
+- 🌾 **Flachland** – Felder, Windräder, Bauernhof und eine Hochspannungstrasse
+- 🏙️ **Großstadt** – Hochhaus-Schluchten, Straßen mit fahrenden Autos und viele Fußgänger
 
 Auf allen Karten laufen Menschen herum – wer sie anfliegt, crasht. Alle Karten sind prozedural generiert und komplett offline.
 
@@ -156,6 +156,15 @@ Vier kurze Lektionen als eigene Missionen, jede mit Note (1–6) und gespeichert
 4. **Rückwärtsanflug** – 50 m rückwärts, ohne die Nase zu drehen
 
 Wer alle vier besteht, bekommt den 🎓 **Flugschein** als Abzeichen.
+
+### 🐄 Leben in der Landschaft
+**Tiere:** Auf Wiese, Flachland und in den Bergen weiden Kühe, Rehe und Hunde und ziehen ihre Bahnen. Sie erschrecken vor Explosionen, vor der Katze und vor Wespen – und beruhigen sich danach wieder. In der Eiswüste und in der Innenstadt gibt es keine.
+
+**🐦 Vögel:** Alle paar Minuten kreist irgendwo ein Schwarm. Bleibst du **über 40 m**, lassen sie dich in Ruhe. Kommst du tief in ihr Revier, greifen sie an – vier Treffer und die Drohne geht runter. Ein Wespen- oder Hornissenschwarm vertreibt sie wieder.
+
+**⚡ Stromleitungen:** Über das Flachland spannt sich eine Hochspannungstrasse, und im Map-Builder gibt es den **Strommast** als Werkzeug. Die durchhängenden Leitungen sind gegen den Himmel kaum zu sehen und haben eine eigene Kollisionsprüfung: Abstand des Punktes zur Strecke entlang der Kettenlinie, nicht der grobe Zylinder der übrigen Hindernisse. Langsam heranschweben schiebt dich weg – mit Tempo hineinfliegen bedeutet Absturz. Die klassische Drohnenfalle.
+
+**🚗 Verkehr:** In der Großstadt fahren Autos über das Straßenraster, in beide Richtungen und auf ihren Spuren. Auf den **echten Karten gibt es keinen Verkehr** – in den Geodaten sind Gebäude und Gelände eingebacken, aber keine Straßenverläufe.
 
 ### Grafik-Umschalter
 Im Menü zwischen **✨ Realistisch** (glatte, produktnahe Rümpfe mit Glanzlicht) und **🧱 Blockig (Retro)** wählen. Die Auswahl wird gespeichert.
