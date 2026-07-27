@@ -26,7 +26,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #btnbar button:active{background:var(--panel2)}
 #btnbar button.armed{background:#67251f;border-color:#c25047;color:#ffd9d5}
 #btnbar button.attn{background:#0f4a2d;border-color:#2fae6b;color:#c9ffe0}
-#bRescue,#bBomb,#bNuke,#bFw,#bCargo,#bCann,#bHorn,#bScout,#bWasp,#bCat,#bLight{display:none}
+#bRescue,#bBomb,#bNuke,#bFw,#bCargo,#bCann,#bHorn,#bScout,#bWasp,#bCat,#bLight,#bGim,#bRTH{display:none}
+#bRTH.attn{background:#0d3a52;border-color:#3fb6e6;color:#cceeff}
 #bLight.attn{background:#5a4a10;border-color:#e8d04a;color:#fff6c8}
 #bWasp.attn{background:#4a4406;border-color:#d8cf3c;color:#fbf7bb}
 #bCat.attn{background:#4a2d13;border-color:#d08c4a;color:#ffe2c4}
@@ -191,6 +192,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <button id="bWasp" title="Wespenschwarm loslassen (J)">🪰 0</button>
   <button id="bCat" title="Katze miauen lassen (Y)">🐱</button>
   <button id="bLight" title="Scheinwerfer (L)">🔦</button>
+  <button id="bGim" title="Kamera neigen (, und .)">🎥 0°</button>
+  <button id="bRTH" title="Return-to-Home (T)">🏠</button>
   <button id="bArm">ARM</button>
   <button id="bMode">GPS</button>
   <button id="bCam">KAM</button>
@@ -263,6 +266,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     <span class="k">J</span> Wespenschwarm loslassen ·
     <span class="k">Y</span> Katze miauen lassen ·
     <span class="k">L</span> Scheinwerfer an/aus ·
+    <span class="k">T</span> Return-to-Home ·
+    <span class="k">,</span> / <span class="k">.</span> Kamera neigen ·
     <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
     <b>Gamepad:</b> Linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2) – wird automatisch erkannt.<br>
     <b>Touch:</b> Virtuelle Sticks unten links (Gas/Yaw) und rechts (Nick/Roll), Buttons oben rechts.
@@ -1557,6 +1562,21 @@ function rainBatchFor(kind){
   if(!rainBatch)rainBatch=makeRainBatch('rain',300);
   return rainBatch;
 }
+/* Windsack am Startplatz: Mast, Ring und Tuch. Das Tuch zeigt in +z und
+   wird beim Zeichnen gedreht und je nach Windstärke abgesenkt. */
+const sockPoleMesh=mesh(b=>{
+  b.cyl(0.055,0.045,3.4,[0,0,0],8,[0.85,0.86,0.88]);
+  b.box(0.5,0.06,0.5,[0,0.02,0],0,[0.4,0.41,0.44]);
+  b.tube([0,3.3,0],[0,3.3,0.16],0.22,0.22,10,[0.9,0.55,0.1]);
+});
+const sockFlagMesh=mesh(b=>{
+  const seg=5, L=2.6;
+  for(let i=0;i<seg;i++){
+    const z0=i*L/seg, z1=(i+1)*L/seg;
+    const r0=0.21-0.021*i, r1=0.21-0.021*(i+1);
+    b.tube([0,0,z0],[0,0,z1],r0,r1,10,(i%2)?[0.95,0.95,0.95]:[0.93,0.36,0.1]);
+  }
+});
 // Lichtkegel des Scheinwerfers (Spitze oben, Öffnung unten)
 const lightConeMesh=mesh(b=>{ b.cyl(0.06,1,1,[0,-1,0],16,[1,0.96,0.82]); });
 // Einzelne Wespe: schlanker und blasser als die Hornisse, mit Wespentaille
@@ -3555,6 +3575,8 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.cannon=d.cannon||0; DR.hornets=d.hornets||0; DR.wasps=d.wasps||0;
   SWARMS=[]; SCOUT=null; DR.scoutOut=false; DR.meowT=0;
   DR.lightOn=!!d.light; wxReset();
+  RTH.on=false; RTH.phase=''; HOME.set=false; LINK.q=1;
+  DR.warn25=0; DR.warnT=0; DR.warnManual=0; GIM.user=0;
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST; }
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
@@ -3580,6 +3602,134 @@ function windAt(t,y){
   const hf=Math.min(1,0.5+y/40);
   const dx=Math.cos(windDir),dz=Math.sin(windDir);
   return [ (dx*gust - dz*cross)*s*hf, 0.15*s*Math.sin(t*1.9+3)*hf, (dz*gust + dx*cross)*s*hf ];
+}
+
+/* ---------------- Return-to-Home ----------------
+   Kein zweiter Regler: RTH setzt nur den Sollwert, den der GPS-Zweig
+   des Flight Controllers ohnehin schon verarbeitet. */
+const HOME={x:0,y:0,z:0,set:false};
+const RTH={on:false, phase:'', reason:''};
+const RTH_ALT=35;              // Sicherheitshöhe über dem Startpunkt
+const RTH_SOC=0.15;            // darunter kommt sie von allein zurück
+function setHome(){
+  HOME.x=DR.pos[0]; HOME.z=DR.pos[2];
+  HOME.y=SCENE?SCENE.terH(HOME.x,HOME.z):DR.pos[1];
+  HOME.set=true;
+}
+function homeDist(){ return HOME.set?Math.hypot(DR.pos[0]-HOME.x,DR.pos[2]-HOME.z):0; }
+function canRTH(){ return APP.model.modes.includes('GPS'); }
+function startRTH(reason){
+  if(!canRTH()){ toast('⚠ Diese Drohne hat kein GPS – kein Return-to-Home'); return false; }
+  if(APP.state!=='fly'||DR.crashed)return false;
+  if(!HOME.set) setHome();
+  if(RTH.on)return true;
+  RTH.on=true; RTH.phase='climb'; RTH.reason=reason||'';
+  if(APP.mode!=='GPS') APP.modeIdx=APP.model.modes.indexOf('GPS');
+  beep(880,0.18); setTimeout(()=>beep(1320,0.22),160);
+  toast('🏠 Return-to-Home'+(reason?' – '+reason:'')+' · '+homeDist().toFixed(0)+' m',3000);
+  updateButtons();
+  return true;
+}
+function stopRTH(silent){
+  if(!RTH.on)return false;
+  RTH.on=false; RTH.phase=''; RTH.reason='';
+  if(!silent) toast('🏠 Return-to-Home abgebrochen',1500);
+  updateButtons();
+  return true;
+}
+// Sollgeschwindigkeit für den GPS-Regler, in Phasen
+function rthCommand(d){
+  const dist=homeDist();
+  const alt=DR.pos[1]-HOME.y;
+  if(RTH.phase==='climb'){
+    if(alt>=RTH_ALT-1||dist<4) RTH.phase='cruise';
+    return {vx:0,vz:0,vy:d.climb*0.7};
+  }
+  if(RTH.phase==='cruise'){
+    if(dist<3){ RTH.phase='land'; return {vx:0,vz:0,vy:0}; }
+    const sp=Math.min(d.maxSpeed*0.8, 6+dist*0.6);
+    return {vx:(HOME.x-DR.pos[0])/dist*sp, vz:(HOME.z-DR.pos[2])/dist*sp,
+      vy:clamp((HOME.y+RTH_ALT-DR.pos[1])*0.5,-d.desc_*0.5,d.climb*0.7)};
+  }
+  // landen: langsam sinken, über dem Boden abbremsen
+  const h=DR.pos[1]-HOME.y;
+  return {vx:(HOME.x-DR.pos[0])*0.6, vz:(HOME.z-DR.pos[2])*0.6,
+    vy:-Math.min(d.desc_*0.5, 0.8+h*0.35)};
+}
+/* Failsafe: leerer Akku oder Reichweitengrenze holen sie von allein zurück.
+   Nur aus dem GPS-Modus heraus – wer bewusst in ANGLE oder ACRO fliegt,
+   bekommt seine Drohne nicht mitten im Manöver umgeschaltet. Gewarnt wird
+   trotzdem. */
+function rthWatch(dt){
+  if(APP.state!=='fly'||DR.crashed||!canRTH())return;
+  if(!DR.armed||DR.onGround)return;
+  if(RTH.on)return;
+  if(APP.mode!=='GPS'){
+    if(DR.soc<RTH_SOC&&DR.soc>0&&!DR.warnManual){
+      DR.warnManual=1;
+      toast('⚠ Akku unter '+Math.round(RTH_SOC*100)+' % – im '+APP.mode+
+        '-Modus kein automatischer Rückflug (T drücken)',4000);
+    }
+    return;
+  }
+  if(DR.soc<RTH_SOC&&DR.soc>0){ startRTH('Akku unter '+Math.round(RTH_SOC*100)+' %'); return; }
+  const RMAX=Math.min((SCENE&&SCENE.map.range)||500, APP.model.range||1e9);
+  if(Math.hypot(DR.pos[0],DR.pos[2])>RMAX*0.97) startRTH('Reichweitengrenze');
+}
+
+/* --- Videolink: Entfernung und Sichtlinie zum Startpunkt --- */
+let LINK={q:1, t:0};
+function linkQuality(){ return LINK.q; }
+function stepLink(dt){
+  LINK.t-=dt;
+  if(LINK.t>0)return;
+  LINK.t=0.2;                     // 5x pro Sekunde reicht völlig
+  if(!SCENE||APP.state!=='fly'||!HOME.set){ LINK.q=1; return; }
+  const RMAX=Math.min((SCENE&&SCENE.map.range)||500, APP.model.range||1e9);
+  const dist=Math.hypot(DR.pos[0]-HOME.x,DR.pos[1]-HOME.y,DR.pos[2]-HOME.z);
+  // bis 55 % der Reichweite voll, danach fällt es ab
+  let q=clamp(1-(dist/RMAX-0.55)/0.5,0,1);
+  // Sichtlinie: Gebäude dazwischen dämpfen zusätzlich
+  let blocked=0;
+  const N=10;
+  for(let i=1;i<N;i++){
+    const f=i/N;
+    const px=HOME.x+(DR.pos[0]-HOME.x)*f, py=HOME.y+1.6+(DR.pos[1]-HOME.y-1.6)*f,
+          pz=HOME.z+(DR.pos[2]-HOME.z)*f;
+    for(const o of SCENE.obstacles){
+      if(py>o.h||o.r<2)continue;
+      if(Math.hypot(px-o.x,pz-o.z)<o.r){ blocked++; break; }
+    }
+  }
+  q*=Math.max(0.12,1-blocked/N*1.6);
+  LINK.q=LINK.q+(q-LINK.q)*0.5;
+}
+
+/* --- Kurzer Warnton über denselben AudioContext wie das Motorengeräusch --- */
+function beep(freq,dur,vol){
+  initAudio();
+  const ac=SND.ctx;
+  if(!ac)return false;
+  try{
+    const t=ac.currentTime;
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.type='square'; o.frequency.setValueAtTime(freq,t);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol||0.12,t+0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+(dur||0.15));
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t+(dur||0.15)+0.05);
+    return true;
+  }catch(e){ return false; }
+}
+// Akkuwarnungen: einmal bei 25 %, dann ab 15 % im Sekundentakt
+function batteryWarn(dt){
+  if(APP.state!=='fly'||!DR.armed||DR.crashed)return;
+  if(DR.soc<0.25&&!DR.warn25){ DR.warn25=1; beep(660,0.2); toast('🔋 Akku unter 25 %',2000); }
+  if(DR.soc<RTH_SOC){
+    DR.warnT=(DR.warnT||0)+dt;
+    if(DR.warnT>1){ DR.warnT=0; beep(440,0.16,0.16); }
+  }
 }
 
 /* ---------------- Flight Controller ---------------- */
@@ -3611,6 +3761,13 @@ function flightController(dt){
     if(mode==='GPS'){
       let vtx=(h[0]*sPit+rh[0]*sRol)*d.maxSpeed,
           vtz=(h[2]*sPit+rh[2]*sRol)*d.maxSpeed;
+      // Return-to-Home schreibt nur den Sollwert vor, geregelt wird wie sonst.
+      // Ein Stickausschlag bricht ab – die Kontrolle bleibt beim Piloten.
+      let rthVy=null;
+      if(RTH.on){
+        if(Math.abs(sPit)>0.25||Math.abs(sRol)>0.25||Math.abs(IN.thr)>0.45) stopRTH();
+        else { const c=rthCommand(d); vtx=c.vx; vtz=c.vz; rthVy=c.vy; }
+      }
       const slop=1-d.gpsQ;
       if(slop>0){
         DR.driftV[0]+= (Math.random()-0.5)*slop*4*dt; DR.driftV[1]+=(Math.random()-0.5)*slop*4*dt;
@@ -3636,13 +3793,16 @@ function flightController(dt){
       const am=G*maxT, al=Math.hypot(ax,az);
       if(al>am){ ax*=am/al; az*=am/al; }
       const db=0.08;
-      const vzT=IN.thr>db? (IN.thr-db)/(1-db)*d.climb*(0.5+0.5*sf) : IN.thr<-db? (IN.thr+db)/(1-db)*d.desc_*(0.5+0.5*sf) : 0;
+      const vzT=rthVy!==null? rthVy
+        : IN.thr>db? (IN.thr-db)/(1-db)*d.climb*(0.5+0.5*sf) : IN.thr<-db? (IN.thr+db)/(1-db)*d.desc_*(0.5+0.5*sf) : 0;
       const ay=clamp(3.2*(vzT-DR.vel[1]),-G*0.8,G*1.2);
       const F=[m*ax, m*(G+ay), m*az];
       const Fl=V3.len(F);
       ud=V3.scale(F,1/(Fl||1));
       T=Fl;
-      if(DR.onGround&&vzT<=0.02){ T=0.03*d.tmax; rateT=[0,0,0]; ud=null; }
+      if(DR.onGround&&vzT<=0.02){ T=0.03*d.tmax; rateT=[0,0,0]; ud=null;
+        if(RTH.on&&RTH.phase==='land'){ RTH.on=false; RTH.phase=''; DR.armed=false;
+          toast('🏠 Zu Hause gelandet',2600); updateButtons(); } }
     }else{
       const tx=(h[0]*sPit+rh[0]*sRol)*maxT, tz=(h[2]*sPit+rh[2]*sRol)*maxT;
       ud=V3.norm([tx,1,tz]);
@@ -4662,6 +4822,7 @@ function stepBombs(dt){
   }
   stepCrate(dt);
   stepAI(dt); stepHornets(dt); stepScout(dt); stepWeather(dt);
+  rthWatch(dt); stepLink(dt); batteryWarn(dt);
   if(APP.shake) APP.shake=Math.max(0,APP.shake-dt*1.6);
   if(DR.meowT) DR.meowT=Math.max(0,DR.meowT-dt);
   if(APP.flashT) APP.flashT=Math.max(0,APP.flashT-dt*1.1);
@@ -4853,7 +5014,16 @@ function stepPeople(dt){
 
 /* ---------------- Kamera & Renderbild ---------------- */
 let chasePos=null;
-let GIM={p:0,r:0};
+// p/r folgen der Fluglage, user ist die vom Piloten eingestellte Kameraneigung
+let GIM={p:0,r:0,user:0};
+const GIM_MIN=-90*deg, GIM_MAX=30*deg;
+function gimbalTilt(dv){
+  if(APP.state!=='fly')return false;
+  GIM.user=clamp(GIM.user+dv,GIM_MIN,GIM_MAX);
+  toast('🎥 Kamera '+(GIM.user*180/Math.PI).toFixed(0)+'°',900);
+  updateButtons();
+  return true;
+}
 let FRAME_DT=0.016;
 function bodyEuler(){
   const up=Q.rot(DR.q,[0,1,0]),fw=Q.rot(DR.q,[0,0,-1]),rt=Q.rot(DR.q,[1,0,0]);
@@ -4880,11 +5050,11 @@ function computeCamera(){
       GIM.p+=(e.pitch*0.35-GIM.p)*k;
       GIM.r+=(e.roll*0.18-GIM.r)*k;
       const yaw=Math.atan2(-h[0],-h[2]);
-      const qc=Q.mul(Q.fromYaw(yaw+Math.PI),Q.mul(Q.axisAngle([1,0,0],GIM.p-0.06),Q.axisAngle([0,0,1],-GIM.r)));
+      const qc=Q.mul(Q.fromYaw(yaw+Math.PI),Q.mul(Q.axisAngle([1,0,0],GIM.p-0.06+GIM.user),Q.axisAngle([0,0,1],-GIM.r)));
       const dir=Q.rot(qc,[0,0,-1]), up=Q.rot(qc,[0,1,0]);
       return {eye,at:V3.add(eye,dir),up,fov:d.fovFpv*deg,name:cm};
     }
-    const a=d.camAngle*deg;
+    const a=d.camAngle*deg+GIM.user;
     const dir=Q.rot(q,[0,Math.sin(a),-Math.cos(a)]);
     const up=Q.rot(q,[0,Math.cos(a),Math.sin(a)]);
     return {eye,at:V3.add(eye,dir),up,fov:d.fovFpv*deg,name:cm};
@@ -5072,6 +5242,18 @@ function render(){
         [1,0.85,0.3],0.55);
       gl.depthMask(true);
     }
+  }
+  // Windsack am Startplatz: dreht sich mit dem Wind und hängt bei Flaute
+  { const gy=SCENE.terH(6,-6);
+    drawMesh(sockPoleMesh,M4.translate(6,gy,-6));
+    const wv=windAt(APP.time,gy+3.3);
+    const ws=Math.hypot(wv[0],wv[2]);
+    const yaw=Math.atan2(wv[0],wv[2]);
+    // 0 m/s: hängt senkrecht nach unten, ab ~8 m/s steht er waagerecht
+    const lift=Math.min(1,ws/8);
+    const droop=(1-lift)*Math.PI/2;
+    drawMesh(sockFlagMesh,M4.mul(M4.translate(6,gy+3.3,-6),
+      M4.mul(M4.rotY(yaw),M4.rotX(droop))));
   }
   // Scheinwerferkegel: als durchscheinender Kegel nach unten-vorn
   if(DR.lightOn&&d.light&&!DR.crashed&&cam.name!=='FPV'){
@@ -5278,10 +5460,41 @@ function buildGallery(){
 }
 
 /* ---------------- HUD ---------------- */
+/* Bildstörung bei schwachem Videolink: waagerechte Streifen und Rauschen
+   auf dem HUD-Canvas – billiger als im WebGL-Pfad und leicht zu prüfen. */
+function drawLinkNoise(w,hh,u){
+  const q=linkQuality();
+  if(q>0.75)return 0;
+  const bad=1-(q-0.12)/0.63;                 // 0 bei gutem, 1 bei sehr schlechtem Link
+  const k=clamp(bad,0,1);
+  hud.save();
+  // waagerechte Aussetzer
+  const bands=Math.round(2+k*9);
+  for(let i=0;i<bands;i++){
+    const by=(Math.sin(APP.time*(3+i)*1.7+i*2.3)*0.5+0.5)*hh;
+    const bh=(2+Math.random()*10)*u*k;
+    hud.fillStyle='rgba(190,210,235,'+(0.05+0.25*k*Math.random()).toFixed(3)+')';
+    hud.fillRect(0,by,w,bh);
+  }
+  // grobes Rauschen
+  const n=Math.round(90*k);
+  hud.fillStyle='rgba(220,235,255,'+(0.10+0.22*k).toFixed(3)+')';
+  for(let i=0;i<n;i++)
+    hud.fillRect(Math.random()*w,Math.random()*hh,(2+Math.random()*16)*u,2*u);
+  // kompletter Bildausfall, wenn fast nichts mehr ankommt
+  if(k>0.9&&Math.sin(APP.time*11)>0.55){
+    hud.fillStyle='rgba(12,16,22,0.72)';hud.fillRect(0,0,w,hh);
+    hud.fillStyle='#ff8a7a';hud.font=`bold ${18*u}px sans-serif`;hud.textAlign='center';
+    hud.fillText('SIGNAL VERLOREN',w/2,hh*0.5);
+  }
+  hud.restore();
+  return k;
+}
 function drawHUD(){
   const w=hudc.width,hh=hudc.height;
   hud.clearRect(0,0,w,hh);
   if(APP.state!=='fly')return;
+  if(HOME.set&&!DR.crashed) drawLinkNoise(w,hh,clamp(Math.min(w,hh)/760,0.7,2.1));
   const u=clamp(Math.min(w,hh)/760,0.7,2.1);
   const d=APP.model;
   hud.textBaseline='middle';
@@ -5343,7 +5556,20 @@ function drawHUD(){
   chip(DR.crashed?'💥 ABGESTÜRZT – R = Reset · B = Bergen':DR.armed?(DR.onGround?'ARMED · am Boden':'IN DER LUFT'):'DISARMED – Leertaste/ARM',
        DR.crashed?'#ff6b5d':DR.armed?'#7bff9e':'#ffd479');
   if(APP.windLevel>0)chip('💨 '+WIND_NAMES[APP.windLevel],'#cfe3f2');
-  chip('KAMERA: '+VIEW.name+'  ·  '+APP.sens,'#9fb6c9');
+  chip('KAMERA: '+VIEW.name+'  ·  '+APP.sens+(GIM.user?'  ·  🎥 '+(GIM.user*180/Math.PI).toFixed(0)+'°':''),'#9fb6c9');
+  // Videolink und Heimatrichtung
+  if(HOME.set&&!DR.crashed){
+    const q=linkQuality();
+    const bars='▁▃▅▇'.slice(0,Math.max(1,Math.ceil(q*4)));
+    chip('📶 Link '+(q*100).toFixed(0)+' %  '+bars,q>0.6?'#7bff9e':q>0.3?'#ffd479':'#ff6b5d');
+    const dh=homeDist();
+    if(dh>8){
+      // Pfeil als Uhrzeigerrichtung relativ zur Blickrichtung
+      const ang=Math.atan2(HOME.x-DR.pos[0],HOME.z-DR.pos[2])-Math.atan2(-VIEW.fwd[0],-VIEW.fwd[2]);
+      const arr=['↑','↗','→','↘','↓','↙','←','↖'][((Math.round(ang/(Math.PI/4))%8)+8)%8];
+      chip('🏠 '+arr+'  '+dh.toFixed(0)+' m'+(RTH.on?'  ·  RTH '+RTH.phase:''),RTH.on?'#7cd6ff':'#9fb6c9');
+    }
+  }
   if(RESCUE&&WRECK&&!DR.crashed){
     y+=4*u;
     if(RESCUE.carrying) chip('🪝 Wrack am Haken – sanft am Startplatz landen','#ffe27a');
@@ -5577,6 +5803,13 @@ function updateButtons(){
   lb.style.display=APP.model.light?'block':'none';
   lb.textContent=DR.lightOn?'🔦 an':'🔦 aus';
   lb.classList.toggle('attn',!!DR.lightOn);
+  const gb2=$('bGim');
+  gb2.style.display=(APP.model.cls==='cam'||APP.model.camAngle)?'block':'none';
+  gb2.textContent='🎥 '+(GIM.user*180/Math.PI).toFixed(0)+'°';
+  const rb=$('bRTH');
+  rb.style.display=canRTH()?'block':'none';
+  rb.textContent=RTH.on?'🏠 stop':'🏠';
+  rb.classList.toggle('attn',RTH.on);
   const kb=$('bCat');
   kb.style.display=APP.model.cat?'block':'none';
   kb.textContent='🐱';
@@ -5585,10 +5818,11 @@ function updateButtons(){
 function tryArm(){
   if(APP.state!=='fly'||APP.paused)return;
   if(DR.crashed){toast('Erst zurücksetzen (R) oder bergen (B)');return;}
-  if(DR.armed){DR.armed=false;toast('Disarmed');}
+  if(DR.armed){DR.armed=false;stopRTH(true);toast('Disarmed');}
   else{
     if(!APP.springThr&&IN.thr>-0.85){toast('⚠ Gas auf Minimum, dann armen!');updateButtons();return;}
     DR.armed=true;DR.iTerm=[0,0,0];
+    setHome();                       // Startpunkt für Return-to-Home merken
     toast(APP.springThr?'Motoren gestartet – Gas-Stick nach oben zum Abheben':'Armed! Vorsichtig Gas geben');
   }
   updateButtons();
@@ -5632,6 +5866,9 @@ function handleKey(code){
   else if(code==='KeyJ'){releaseWasps();}
   else if(code==='KeyY'){catMeow();}
   else if(code==='KeyL'){toggleLight();}
+  else if(code==='Comma'){gimbalTilt(-6*deg);}
+  else if(code==='Period'){gimbalTilt(6*deg);}
+  else if(code==='KeyT'){ RTH.on?stopRTH():startRTH(); }
   else if(code==='KeyR'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}
   else if(/^Digit[1-4]$/.test(code)){APP.windLevel=+code.slice(5)-1;toast('💨 '+WIND_NAMES[APP.windLevel]);}
 }
@@ -5650,6 +5887,16 @@ $('bScout').onclick=()=>toggleScout();
 $('bWasp').onclick=()=>releaseWasps();
 $('bCat').onclick=()=>catMeow();
 $('bLight').onclick=()=>toggleLight();
+// Ein Knopf für Touch: schaltet durch die üblichen Kamerawinkel
+$('bGim').onclick=()=>{
+  const steps=[0,-30,-60,-90];
+  const cur=Math.round(GIM.user*180/Math.PI);
+  let i=steps.findIndex(v=>Math.abs(v-cur)<8);
+  i=(i<0?0:i+1)%steps.length;
+  GIM.user=steps[i]*deg; updateButtons();
+  toast('🎥 Kamera '+steps[i]+'°',900);
+};
+$('bRTH').onclick=()=>{ RTH.on?stopRTH():startRTH(); };
 $('bReset').onclick=()=>{if(APP.state==='fly'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}};
 $('bMenu').onclick=()=>{if(APP.paused)closeMenuAndStart();else openMenu();};
 $('startBtn').onclick=closeMenuAndStart;
