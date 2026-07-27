@@ -140,6 +140,23 @@ Passend dazu gibt es den 🔦 **Scheinwerfer** als Zubehör (190 g, Taste `L`): 
 
 **Windsack** am Startplatz: dreht sich mit dem Wind und hängt bei Flaute schlaff herunter – so siehst du den Wind, statt ihn nur zu spüren.
 
+### 🏅 Abzeichen, Flugbuch und Geisterrennen
+**20 Abzeichen** zum Freispielen – von „Fliege 200 km/h" über „Landung bei Sturm", „10 Objekte mit einem Kanonenschuss", „Fremde Drohne mit dem Hornissenschwarm holen" bis „Jedes Easter Egg freischalten". Im Menü stehen alle im Raster: gefundene farbig, offene grau mit ihrem Hinweis – man weiß also immer, was noch zu holen ist.
+
+**Flugbuch:** Gesamtflugzeit, Strecke, Starts, Abstürze, Topspeed, höchste Höhe – und eine Tabelle pro Drohne. Bleibt im Browser gespeichert.
+
+**👻 Geisterrennen:** Fliegst du auf einer Karte eine neue Bestzeit, wird die Bahn dazu mitgespeichert (20 Hz, rund 200 Zeichen pro Flugsekunde). Beim nächsten Rennen fliegt dein eigener Bestlauf als halbtransparente Drohne mit, und das HUD sagt dir, ob du vorn oder hinten liegst.
+
+### 🎓 Flugschule
+Vier kurze Lektionen als eigene Missionen, jede mit Note (1–6) und gespeichertem Bestwert:
+
+1. **Schweben** – 30 s auf 10 m Höhe halten; die Note kommt aus der mittleren Abweichung
+2. **Achter fliegen** – zwei Runden über vier Punkte, sauber und ohne Bodenkontakt
+3. **Punktlandung** – 60 m wegfliegen, zurückkommen und mittig sanft aufsetzen
+4. **Rückwärtsanflug** – 50 m rückwärts, ohne die Nase zu drehen
+
+Wer alle vier besteht, bekommt den 🎓 **Flugschein** als Abzeichen.
+
 ### Grafik-Umschalter
 Im Menü zwischen **✨ Realistisch** (glatte, produktnahe Rümpfe mit Glanzlicht) und **🧱 Blockig (Retro)** wählen. Die Auswahl wird gespeichert.
 
