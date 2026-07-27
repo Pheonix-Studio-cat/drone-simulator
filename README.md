@@ -211,9 +211,48 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 | `1`–`4` | Windstärke |
 | `Esc` | Menü |
 
-**Gamepad:** Wird automatisch erkannt – linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2).
+`Shift` gedrückt halten steuert fein – der Knüppel geht dann nur bis 40 % Ausschlag.
 
-**Touch:** Zwei virtuelle Sticks (links Gas/Yaw, rechts Nick/Roll) plus Buttons – voll spielbar auf dem Smartphone.
+**Gamepad / RC-Sender:** Wird automatisch erkannt. Ohne Kalibrierung gilt die übliche Belegung (Achsen 0–3); echte RC-Sender am USB-Adapter liegen meist anders und lassen sich im Menü kalibrieren.
+
+**Touch:** Zwei virtuelle Sticks plus Buttons – voll spielbar auf dem Smartphone. Wahlweise fest in den Ecken (blind zuverlässiger zu treffen) oder schwebend unter dem Finger.
+
+### Steuerung einstellen
+
+Im Menü unter **🎮 Steuerung einstellen**; alles wirkt sofort und wird unter `ds_ctrl` gespeichert.
+
+| Einstellung | Was sie tut |
+|---|---|
+| **Mode 1–4** | Knüppelbelegung. Gilt für Gamepad, Touch und Tastatur gleichermaßen. Mode 2 ist im deutschsprachigen Raum am verbreitetsten. |
+| **Ratenkurve** | Entweder aus dem Drohnenmodell abgeleitet oder eigene Betaflight-Werte (rcRate, superRate, expo) pro Achse. |
+| **Gaskurve** | Expo um den Schwebepunkt. Enden und Mitte bleiben fix. |
+| **Totzone, Trimmung, Umkehr** | Pro Achse. Hinter der Totzone wird der Rest des Wegs wieder auf voll gestreckt, statt oben abzuschneiden. |
+| **Übertragung** | Verzögerung von Funke, Empfänger und Flugregler, 0–120 ms. |
+| **Tastatur** | Wie schnell die Knüppel auf Tastendruck auf- und zurücklaufen. |
+| **Touch-Sticks** | Fest oder schwebend, Größe. |
+| **Gamepad** | Kalibrier-Assistent für Achsnummer, Richtung, Mitte und Endausschläge. |
+
+**Die Ratenkurve ist echt** – dieselbe Formel wie in Betaflight: `expo` verflacht die Mitte, `superRate` zieht die Enden hoch. Bei Empfindlichkeit **Schnell** ergibt voller Ausschlag genau die Höchstrate des Modells, halber Ausschlag aber nur **22 %** davon. Die Vorschau im Menü zeigt, was bei der eingestellten Empfindlichkeit **tatsächlich** ankommt, und die gestrichelte Linie daneben, was ohne diese Bremse möglich wäre:
+
+| Empfindlichkeit | Rollrate der Pocket Mini bei vollem Ausschlag |
+|---|---|
+| Langsam | 53 °/s |
+| Normal | 150 °/s |
+| Schnell | 400 °/s (= Katalogwert) |
+
+**Die Verzögerung ist spürbar, nicht kosmetisch.** Gemessen an einer Race 5 Zoll in ACRO – Drehrate 60 ms nach einem vollen Rollausschlag aus der Ruhe:
+
+| Verzögerung | Drehrate nach 60 ms |
+|---|---|
+| 0 ms | 318 °/s |
+| 28 ms (Standard) | 134 °/s |
+| 90 ms | 13 °/s |
+
+Voreingestellt sind **28 ms** – das entspricht einer guten realen Anlage. 60–90 ms sind eine träge, 0 ms ist unrealistisch, aber für den Einstieg leichter.
+
+Eine Drohne erreicht ihre befohlene Rate übrigens nicht immer: eine Race 5 Zoll bekommt bei vollem Ausschlag 862 °/s befohlen und dreht tatsächlich 651 °/s. Das ist keine Schummelei, sondern die Drehmoment- und Dämpfungsgrenze – echte Quads verhalten sich bei wenig Gas genauso.
+
+Auf der Tastatur laufen die Knüppel in **0,22 s** von der Mitte auf vollen Ausschlag; Tasten kennen ja nur an und aus.
 
 ## Technik
 
