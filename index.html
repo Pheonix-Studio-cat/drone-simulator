@@ -97,6 +97,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .ctrl .chk{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:#b9cbdc;margin:7px 0}
 .ctrl .chk label{display:flex;align-items:center;gap:5px;cursor:pointer}
 .ctrl .ok{color:#7fe0a0}
+#chatbar{position:absolute;left:0;right:0;bottom:calc(74px + env(safe-area-inset-bottom));z-index:30;
+  display:none;justify-content:center;pointer-events:none}
+#chatbar input{pointer-events:auto;width:min(560px,86vw);background:rgba(10,16,24,.92);
+  border:1px solid var(--acc);color:#fff;border-radius:11px;padding:11px 14px;font-size:14px}
 .rowbtns{display:flex;gap:8px;flex-wrap:wrap}
 .rowbtns button{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:9px;
   padding:9px 16px;font-size:13px;cursor:pointer}
@@ -236,6 +240,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <button id="bReset">RESET</button>
   <button id="bMenu">MENÜ</button>
 </div>
+<div id="chatbar"><input id="chatInp" maxlength="120" placeholder="Nachricht … (Enter senden, Esc abbrechen)"></div>
 <div id="menu"><div class="wrap">
   <h1>DROHNEN-<span>SIMULATOR</span></h1>
   <div class="sub">Realistische Flugphysik · 11 Modelle · 6 Karten · Missionen · Tastatur, Gamepad &amp; Touch</div>
@@ -275,12 +280,17 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <div class="rowbtns" id="gfxRow"></div>
   <h2>Steuerempfindlichkeit</h2>
   <div class="rowbtns" id="sensRow"></div>
-  <h2>Mehrspieler (lokal)</h2>
-  <div class="rowbtns" id="mpRow"></div>
+  <h2>👥 Mehrspieler</h2>
+  <div class="rowbtns" id="mpRow" style="flex-direction:column;align-items:stretch"></div>
   <div class="help" style="margin-top:8px;font-size:12px">
-    Öffne den Simulator in einem <b>zweiten Fenster oder Tab</b> desselben Browsers und schalte dort ebenfalls
-    ein – ihr seht euch dann gegenseitig fliegen. Für ein Spiel über das Internet bräuchte es einen Server;
-    diese Seite liegt auf rein statischem Hosting und hat keinen.
+    <b>Gleiches Gerät:</b> Simulator in einem <b>zweiten Fenster oder Tab</b> öffnen und dort ebenfalls
+    einschalten – ihr seht euch gegenseitig fliegen.<br>
+    <b>Übers Internet:</b> Gleicher <b>Raumcode</b> genügt. Schick den Link per „🔗 Link kopieren"
+    weiter, dann landen alle automatisch im selben Raum.<br>
+    Im Flug: <span class="k">Q</span> für den Chat, <span class="k">Z</span> startet ein gemeinsames
+    Rennen mit Countdown und Live-Rangliste.<br>
+    <i>Dafür braucht es einen kleinen Gratis-Server – wie du den in fünf Minuten einrichtest, steht in
+    <code>server/README.md</code>. Ohne ihn läuft alles wie bisher auf dem eigenen Gerät.</i>
   </div>
   <h2>🏅 Abzeichen <span id="badgeCount" style="color:var(--dim);font-size:12px"></span></h2>
   <div class="bgrid" id="badgeGrid"></div>
@@ -309,6 +319,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     <span class="k">Y</span> Katze miauen lassen ·
     <span class="k">L</span> Scheinwerfer an/aus ·
     <span class="k">T</span> Return-to-Home ·
+    <span class="k">Q</span> Chat (Mehrspieler) ·
+    <span class="k">Z</span> Rennen starten (Mehrspieler) ·
     <span class="k">,</span> / <span class="k">.</span> Kamera neigen ·
     <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
     <span class="k">Shift</span> gedrückt halten = Feinsteuerung (kleinere Ausschläge).<br>
@@ -5993,11 +6005,15 @@ function makeMission(id){
           if(!this.started){ ghostStart(); }   // ab jetzt läuft die Uhr und der Geist
           this.started=true;
           this.idx++;
+          // Im Mehrspieler zählt nur die Torzahl und die Zeit – daraus baut
+          // jeder Client dieselbe Rangliste.
+          mpReportGate(this.lap*SCENE.race.length+this.idx, Math.round(this.t*1000), false);
           toast('Tor '+this.idx+'/'+SCENE.race.length+(this.idx===SCENE.race.length?' – Runde!':''));
           if(this.idx>=SCENE.race.length){
             this.idx=0;this.lap++;
             if(this.lap>=this.laps){
               this.done=true;
+              mpReportGate(this.laps*SCENE.race.length, Math.round(this.t*1000), true);
               const best=this.best;
               fact('raceDone');
               const gt=GHOST.play&&GHOST.play.t;
@@ -6747,11 +6763,74 @@ function drawLinkNoise(w,hh,u){
   hud.restore();
   return k;
 }
+/* Mehrspieler im HUD: Countdown, Live-Rangliste und die letzten Chatzeilen.
+   Alles auf dem 2D-Canvas, kostet den Renderer nichts. */
+function drawMpHud(w,hh,u){
+  if(!MP.on)return;
+  const pad=14*u;
+  // Countdown vor dem Rennstart
+  const cd=mpCountdown();
+  if(cd>0){
+    hud.textAlign='center';
+    hud.fillStyle='rgba(10,16,24,0.72)';
+    hud.fillRect(w/2-70*u,hh*0.3-46*u,140*u,64*u);
+    hud.fillStyle='#5fd4ff'; hud.font=`bold ${40*u}px sans-serif`;
+    hud.fillText(Math.ceil(cd),w/2,hh*0.3);
+    hud.fillStyle='rgba(255,255,255,0.7)'; hud.font=`${11*u}px sans-serif`;
+    hud.fillText('Rennen startet',w/2,hh*0.3+16*u);
+  }
+  // Rangliste rechts
+  const rank=mpRanking();
+  if(rank.length){
+    hud.textAlign='left';
+    const x=w-pad-124*u, y0=hh*0.32;
+    hud.fillStyle='rgba(10,16,24,0.6)';
+    hud.fillRect(x-8*u,y0-16*u,132*u,(rank.length*15+22)*u);
+    hud.fillStyle='#7cd6ff'; hud.font=`bold ${10.5*u}px sans-serif`;
+    hud.fillText('🏁 RANGLISTE',x,y0-4*u);
+    hud.font=`${11.5*u}px sans-serif`;
+    rank.slice(0,8).forEach((r,i)=>{
+      hud.fillStyle=r.me?'#fff':'rgba(255,255,255,0.72)';
+      const t=(r.ms/1000).toFixed(1)+' s';
+      hud.fillText((i+1)+'. '+r.name.slice(0,9),x,y0+14*u+i*15*u);
+      hud.textAlign='right';
+      hud.fillText('T'+r.i+' · '+t,x+116*u,y0+14*u+i*15*u);
+      hud.textAlign='left';
+    });
+  }
+  // Chat unten links
+  if(MP.chat.length){
+    hud.textAlign='left';
+    hud.font=`${12*u}px sans-serif`;
+    const now=performance.now();
+    let y=hh-96*u;
+    for(let i=MP.chat.length-1;i>=0;i--){
+      const c=MP.chat[i];
+      const age=(now-c.t)/1000;
+      if(age>18)continue;
+      const a=clamp(1-(age-14)/4,0,1);
+      hud.fillStyle='rgba(120,210,255,'+(0.85*a)+')';
+      hud.fillText(c.name.slice(0,12)+':',pad,y);
+      const nw=hud.measureText(c.name.slice(0,12)+':').width;
+      hud.fillStyle='rgba(255,255,255,'+(0.92*a)+')';
+      hud.fillText(' '+c.msg,pad+nw,y);
+      y-=16*u;
+    }
+  }
+  // Verbindungszustand oben links, nur wenn etwas nicht rund läuft
+  if(MP.net&&MP.state!=='online'){
+    hud.textAlign='left';
+    hud.fillStyle=MP.state==='verbinde'?'rgba(255,200,90,0.9)':'rgba(255,160,150,0.9)';
+    hud.font=`${11*u}px sans-serif`;
+    hud.fillText(MP.state==='verbinde'?'👥 verbinde …':'👥 gleiches Gerät',pad,hh*0.24);
+  }
+}
 function drawHUD(){
   const w=hudc.width,hh=hudc.height;
   hud.clearRect(0,0,w,hh);
   if(APP.state!=='fly')return;
   if(HOME.set&&!DR.crashed) drawLinkNoise(w,hh,clamp(Math.min(w,hh)/760,0.7,2.1));
+  drawMpHud(w,hh,clamp(Math.min(w,hh)/760,0.7,2.1));
   const u=clamp(Math.min(w,hh)/760,0.7,2.1);
   const d=APP.model;
   hud.textBaseline='middle';
@@ -6985,23 +7064,53 @@ function buildMenu(){
   const mr=$('mpRow');
   if(mr){
     mr.innerHTML='';
-    const supported=(typeof BroadcastChannel!=='undefined');
+    const supported=(typeof BroadcastChannel!=='undefined')||!!MP_SERVER;
+    const inpStyle='background:var(--panel);border:1px solid var(--line);color:var(--txt);'+
+      'border-radius:9px;padding:9px 12px;font-size:13px';
+    const row=(el)=>{ const d=document.createElement('div');
+      d.style.cssText='display:flex;gap:8px;flex-wrap:wrap;width:100%';
+      for(const x of el) d.appendChild(x); mr.appendChild(d); return d; };
     const b=document.createElement('button');
     b.textContent=MP.on?'👥 An':'👤 Aus';
     if(MP.on)b.className='sel';
     b.disabled=!supported;
     b.onclick=()=>mpSetOn(!MP.on);
-    mr.appendChild(b);
     const inp=document.createElement('input');
     inp.id='mpName'; inp.maxLength=16; inp.value=MP.name; inp.placeholder='Dein Pilotenname';
-    inp.style.cssText='flex:1 1 180px;background:var(--panel);border:1px solid var(--line);color:var(--txt);'+
-      'border-radius:9px;padding:9px 12px;font-size:13px';
+    inp.style.cssText='flex:1 1 180px;'+inpStyle;
     inp.oninput=()=>{ MP.name=inp.value.slice(0,16)||'Pilot'; mpSave(); };
-    mr.appendChild(inp);
-    const info=document.createElement('span');
-    info.style.cssText='align-self:center;font-size:12.5px;color:var(--dim)';
-    info.textContent=!supported?'Dein Browser kann das nicht.':
-      (MP.on?(MP.peers.size?MP.peers.size+' andere(r) verbunden':'Warte auf ein zweites Fenster …'):'Aus');
+    row([b,inp]);
+
+    // Übers Internet oder nur auf diesem Gerät
+    const net=document.createElement('button');
+    net.id='mpNet';
+    net.textContent=MP.net?'🌐 Übers Internet':'💻 Gleiches Gerät';
+    if(MP.net)net.className='sel';
+    net.onclick=()=>mpSetNet(!MP.net);
+    const roomInp=document.createElement('input');
+    roomInp.id='mpRoom'; roomInp.maxLength=8; roomInp.value=MP.room;
+    roomInp.placeholder='Raumcode';
+    roomInp.style.cssText='flex:0 1 120px;text-transform:uppercase;letter-spacing:2px;'+
+      'font-weight:700;text-align:center;'+inpStyle;
+    roomInp.onchange=()=>{ if(!mpSetRoom(roomInp.value)) roomInp.value=MP.room; buildMenu(); };
+    const dice=document.createElement('button');
+    dice.textContent='🎲'; dice.title='Neuer Raumcode';
+    dice.onclick=()=>{ mpSetRoom(mpRandomRoom()); buildMenu(); };
+    const copy=document.createElement('button');
+    copy.id='mpCopy'; copy.textContent='🔗 Link kopieren';
+    copy.onclick=()=>{ const l=mpLink();
+      if(navigator.clipboard) navigator.clipboard.writeText(l).then(()=>toast('Link kopiert'),()=>toast(l,4000));
+      else toast(l,4000); };
+    row([net,roomInp,dice,copy]);
+
+    const info=document.createElement('div');
+    info.id='mpInfo';
+    info.style.cssText='font-size:12.5px;color:var(--dim);width:100%';
+    const st={aus:'Aus',verbinde:'Verbinde …',online:'🌐 Online',lokal:'💻 Gleiches Gerät'}[MP.state]||'Aus';
+    info.textContent=!supported?'Dein Browser kann das nicht.'
+      :!MP.on?'Aus'
+      :(MP.net&&!MP_SERVER)?'Es ist kein Server eingetragen – läuft auf diesem Gerät. Siehe server/README.md.'
+      :st+' · Raum '+MP.room+' · '+(MP.peers.size?MP.peers.size+' andere(r) verbunden':'noch niemand sonst da');
     mr.appendChild(info);
   }
   buildGallery();
@@ -7430,8 +7539,19 @@ function cycleMode(){
   toast('Modus '+m+' – '+info);
   updateButtons();
 }
+/* --- Chat-Eingabe im Flug --- */
+function chatOpen(){
+  if(!MP.on||APP.state!=='fly')return false;
+  const bar=$('chatbar'), inp=$('chatInp');
+  bar.style.display='flex'; inp.value=''; inp.focus();
+  return true;
+}
+function chatClose(){ $('chatbar').style.display='none'; $('chatInp').blur(); }
+function chatIsOpen(){ return $('chatbar').style.display==='flex'; }
 function handleKey(code){
+  if(chatIsOpen()&&code!=='Escape')return;      // während des Tippens keine Aktionen
   if(code==='Escape'){
+    if(chatIsOpen()){ chatClose(); return; }
     if($('pview').style.display==='block'){$('pview').style.display='none';return;}
     if($('world').style.display==='block'){closeWorld();return;}
     if($('mapb').style.display==='block'){closeMapBuilder();return;}
@@ -7458,6 +7578,12 @@ function handleKey(code){
   else if(code==='Comma'){gimbalTilt(-6*deg);}
   else if(code==='Period'){gimbalTilt(6*deg);}
   else if(code==='KeyT'){ RTH.on?stopRTH():startRTH(); }
+  else if(code==='KeyQ'){ if(!chatOpen()) toast('Chat gibt es nur im Mehrspieler'); }
+  else if(code==='KeyZ'){
+    if(!MP.on) toast('Rennen gibt es nur im Mehrspieler');
+    else if(!MP.peers.size) toast('Noch ist niemand sonst im Raum');
+    else mpRaceStart();
+  }
   else if(code==='KeyR'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}
   else if(/^Digit[1-4]$/.test(code)){APP.windLevel=+code.slice(5)-1;toast('💨 '+WIND_NAMES[APP.windLevel]);}
 }
@@ -7917,49 +8043,200 @@ $('wmap').addEventListener('click',e=>{
    Ohne eigenen Server geht kein Spiel über das Internet – diese Seite liegt
    auf statischem Hosting. Was ohne Server geht: alle Fenster/Tabs desselben
    Browsers sehen sich gegenseitig. Zwei Fenster nebeneinander, zwei Piloten. */
+/* ---------------- Mehrspieler ----------------
+   Zwei Transporte, dieselbe Logik dahinter: TR_LOCAL über BroadcastChannel
+   (zwei Fenster desselben Browsers) und TR_NET über einen WebSocket zum
+   eigenen Cloudflare-Worker (echtes Internet, siehe server/README.md).
+   mpStep und mpVisible interessiert der Unterschied nicht.
+
+   Ist MP_SERVER leer oder der Server nicht erreichbar, läuft alles wie
+   bisher lokal weiter – es geht also nie etwas kaputt. */
+let MP_SERVER='';         // <- workers.dev-Adresse hier eintragen
+const MP_ROOM_CHARS='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // ohne I/O/0/1
+function mpRandomRoom(){
+  let r=''; for(let i=0;i<4;i++) r+=MP_ROOM_CHARS[Math.floor(Math.random()*MP_ROOM_CHARS.length)];
+  return r;
+}
 const MP={on:false, ch:null, id:Math.random().toString(36).slice(2,9),
-  name:'', peers:new Map(), lastSend:0};
+  name:'', peers:new Map(), lastSend:0,
+  net:false,           // true = übers Internet gewünscht
+  room:'',             // Raumcode
+  ws:null, state:'aus',// aus | verbinde | online | lokal
+  chat:[], chatSeq:0,  // die letzten Nachrichten
+  race:null,           // {startAt, times:Map}
+  reconn:0, tries:0};
 function mpLoad(){
   try{
     MP.name=localStorage.getItem('ds_mpname')||('Pilot '+MP.id.slice(0,3).toUpperCase());
     MP.on=localStorage.getItem('ds_mp')==='1';
+    MP.net=localStorage.getItem('ds_mpnet')==='1';
+    MP.room=(localStorage.getItem('ds_mproom')||'').toUpperCase();
   }catch(e){ MP.name='Pilot'; }
+  // Raumcode aus der Adresse übernimmt Vorrang – so lassen sich Links teilen
+  try{
+    const q=new URLSearchParams(location.search).get('room');
+    if(q){ MP.room=q.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8); MP.net=true; MP.on=true; }
+  }catch(e){}
+  if(!MP.room) MP.room=mpRandomRoom();
 }
 function mpSave(){
-  try{ localStorage.setItem('ds_mpname',MP.name); localStorage.setItem('ds_mp',MP.on?'1':'0'); }catch(e){}
+  try{ localStorage.setItem('ds_mpname',MP.name); localStorage.setItem('ds_mp',MP.on?'1':'0');
+       localStorage.setItem('ds_mpnet',MP.net?'1':'0'); localStorage.setItem('ds_mproom',MP.room);
+  }catch(e){}
 }
-function mpStart(){
+function mpLink(){
+  try{ const u=new URL(location.href); u.searchParams.set('room',MP.room); return u.toString(); }
+  catch(e){ return '?room='+MP.room; }
+}
+/* --- Empfang: identisch für beide Transporte --- */
+function mpOnMessage(m){
+  if(!m||m.id===MP.id)return;
+  if(m.bye){ MP.peers.delete(m.id); return; }
+  if(m.t==='chat'){ mpAddChat(m.name||'?', String(m.msg||'').slice(0,120)); return; }
+  if(m.t==='go'){ mpRaceGo(m.at, m.name); return; }
+  if(m.t==='gate'){ mpGate(m.id, m.name, m.i, m.ms, m.done); return; }
+  MP.peers.set(m.id,{...m,seen:performance.now()});
+}
+// Verschickt ohne Rücksicht auf den Ein-/Aus-Schalter – nötig für die
+// Abmeldung, die ja genau beim Ausschalten noch rausgehen muss.
+function mpRaw(o){
+  o.id=MP.id;
+  if(MP.ws&&MP.ws.readyState===1){ try{ MP.ws.send(JSON.stringify(o)); return true; }catch(e){} }
+  if(MP.ch){ try{ MP.ch.postMessage(o); return true; }catch(e){} }
+  return false;
+}
+function mpSend(o){ return MP.on? mpRaw(o) : false; }
+/* --- TR_LOCAL: zwei Fenster desselben Browsers --- */
+function mpStartLocal(){
   if(MP.ch||typeof BroadcastChannel==='undefined')return;
   try{ MP.ch=new BroadcastChannel('ds_multiplayer'); }catch(e){ MP.ch=null; return; }
-  MP.ch.onmessage=(ev)=>{
-    const m=ev.data;
-    if(!m||m.id===MP.id)return;
-    if(m.bye){ MP.peers.delete(m.id); return; }
-    MP.peers.set(m.id,{...m,seen:performance.now()});
-  };
+  MP.ch.onmessage=(ev)=>mpOnMessage(ev.data);
+  MP.state='lokal';
+}
+/* --- TR_NET: WebSocket zum eigenen Worker --- */
+function mpStartNet(){
+  if(!MP_SERVER){ MP.state='lokal'; mpStartLocal(); return; }
+  if(MP.ws)return;
+  let url;
+  try{
+    url=new URL(MP_SERVER);
+    url.protocol=url.protocol==='https:'?'wss:':'ws:';
+    url.pathname='/room'; url.searchParams.set('r',MP.room);
+  }catch(e){ MP.state='lokal'; mpStartLocal(); return; }
+  MP.state='verbinde';
+  let ws;
+  try{ ws=new WebSocket(url.toString()); }catch(e){ mpNetFailed(); return; }
+  MP.ws=ws;
+  ws.onopen=()=>{ MP.state='online'; MP.tries=0; if(typeof buildMenu==='function')buildMenu(); };
+  ws.onmessage=(ev)=>{ try{ mpOnMessage(JSON.parse(ev.data)); }catch(e){} };
+  ws.onerror=()=>{};
+  ws.onclose=()=>{ MP.ws=null; if(MP.on&&MP.net) mpNetFailed(); };
+}
+// Server nicht erreichbar: zurück auf den lokalen Transport, aber sagen warum
+function mpNetFailed(){
+  MP.ws=null;
+  MP.tries++;
+  if(MP.tries<=3){ MP.state='verbinde'; MP.reconn=Math.min(8,2**MP.tries); return; }
+  if(MP.state!=='lokal'){
+    MP.state='lokal';
+    toast('Mehrspieler-Server nicht erreichbar – zurück auf „gleiches Gerät"',3200);
+  }
+  mpStartLocal();
+  if(typeof buildMenu==='function')buildMenu();
+}
+function mpStart(){
+  if(MP.net) mpStartNet(); else mpStartLocal();
 }
 function mpStop(){
-  if(MP.ch){ try{ MP.ch.postMessage({id:MP.id,bye:1}); MP.ch.close(); }catch(e){} }
-  MP.ch=null; MP.peers.clear();
+  mpRaw({bye:1});
+  if(MP.ws){ try{ MP.ws.close(); }catch(e){} MP.ws=null; }
+  if(MP.ch){ try{ MP.ch.close(); }catch(e){} }
+  MP.ch=null; MP.peers.clear(); MP.state='aus'; MP.tries=0; MP.race=null;
 }
 function mpSetOn(v){
   MP.on=v; mpSave();
   if(v) mpStart(); else mpStop();
   buildMenu();
 }
+function mpSetNet(v){
+  MP.net=v; mpSave();
+  if(MP.on){ mpStop(); MP.on=true; mpStart(); }
+  buildMenu();
+}
+function mpSetRoom(code){
+  const c=String(code||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
+  if(c.length<3)return false;
+  MP.room=c; mpSave();
+  if(MP.on&&MP.net){ mpStop(); MP.on=true; mpStart(); }
+  return true;
+}
+/* --- Chat --- */
+function mpAddChat(name,msg){
+  if(!msg)return;
+  MP.chat.push({name,msg,t:performance.now(),n:++MP.chatSeq});
+  while(MP.chat.length>6) MP.chat.shift();
+}
+function mpChatSend(msg){
+  const m=String(msg||'').trim().slice(0,120);
+  if(!m)return false;
+  mpAddChat(MP.name,m);
+  return mpSend({t:'chat',name:MP.name,msg:m});
+}
+/* --- Rennen: der Server weiss davon nichts, jeder meldet seine Torzeiten --- */
+const MP_COUNTDOWN=3000;
+function mpRaceStart(){
+  if(!MP.on)return false;
+  // Immer relativ verschicken UND relativ setzen – die Uhren der Spieler
+  // stehen verschieden, absolute Zeitstempel wären wertlos.
+  mpRaceGo(MP_COUNTDOWN,MP.name);
+  mpSend({t:'go',at:MP_COUNTDOWN,name:MP.name});
+  return true;
+}
+function mpRaceGo(rel,who){
+  // rel ist immer eine Dauer in Millisekunden, nie ein Zeitstempel
+  const ms=(typeof rel==='number'&&rel>=0&&rel<=20000)?rel:MP_COUNTDOWN;
+  const at=performance.now()+ms;
+  MP.race={startAt:at, times:new Map(), done:new Map()};
+  toast('🏁 Rennen startet'+(who?' ('+who+')':'')+' – Countdown läuft',2600);
+}
+function mpGate(id,name,i,ms,done){
+  if(!MP.race)MP.race={startAt:performance.now(),times:new Map(),done:new Map()};
+  MP.race.times.set(id,{name:name||'?',i,ms});
+  if(done)MP.race.done.set(id,ms);
+}
+function mpReportGate(i,ms,done){
+  if(!MP.on||!MP.race)return;
+  mpGate(MP.id,MP.name,i,ms,done);
+  mpSend({t:'gate',name:MP.name,i,ms,done:done?1:0});
+}
+// Rangliste: wer weiter ist, steht oben; bei gleichem Tor zählt die Zeit
+function mpRanking(){
+  if(!MP.race)return [];
+  const out=[];
+  for(const [id,r] of MP.race.times) out.push({id,name:r.name,i:r.i,ms:r.ms,me:id===MP.id});
+  out.sort((a,b)=> b.i-a.i || a.ms-b.ms);
+  return out;
+}
+function mpCountdown(){
+  if(!MP.race)return 0;
+  const d=(MP.race.startAt-performance.now())/1000;
+  return d>0?d:0;
+}
 function mpStep(){
-  if(!MP.on||!MP.ch)return;
+  if(!MP.on)return;
   const now=performance.now();
+  if(MP.net&&MP_SERVER&&!MP.ws&&MP.reconn>0){
+    MP.reconn-=FRAME_DT;
+    if(MP.reconn<=0) mpStartNet();
+  }
   // eigene Lage senden (etwa 20-mal pro Sekunde)
   if(now-MP.lastSend>50&&APP.state==='fly'&&SCENE){
     MP.lastSend=now;
-    try{
-      MP.ch.postMessage({id:MP.id, name:MP.name, map:SCENE.map.id, model:APP.model.id,
-        pos:[+DR.pos[0].toFixed(2),+DR.pos[1].toFixed(2),+DR.pos[2].toFixed(2)],
-        q:[+DR.q[0].toFixed(3),+DR.q[1].toFixed(3),+DR.q[2].toFixed(3),+DR.q[3].toFixed(3)],
-        spin:(DR.motors[0]+DR.motors[1]+DR.motors[2]+DR.motors[3])/4,
-        crashed:DR.crashed});
-    }catch(e){}
+    mpSend({t:'p', name:MP.name, map:SCENE.map.id, model:APP.model.id,
+      pos:[+DR.pos[0].toFixed(2),+DR.pos[1].toFixed(2),+DR.pos[2].toFixed(2)],
+      q:[+DR.q[0].toFixed(3),+DR.q[1].toFixed(3),+DR.q[2].toFixed(3),+DR.q[3].toFixed(3)],
+      spin:(DR.motors[0]+DR.motors[1]+DR.motors[2]+DR.motors[3])/4,
+      crashed:DR.crashed});
   }
   // alte Einträge vergessen
   for(const [id,p] of MP.peers) if(now-p.seen>2500) MP.peers.delete(id);
@@ -8362,6 +8639,11 @@ $('buildBtn').onclick=openEditor;
 $('eClose').onclick=closeEditor;
 $('eSaveBtn').onclick=saveDIY;
 $('eName').addEventListener('input',()=>{ if(EDIT.drone)EDIT.drone.name=$('eName').value; });
+$('chatInp').addEventListener('keydown',e=>{
+  e.stopPropagation();
+  if(e.key==='Enter'){ mpChatSend($('chatInp').value); chatClose(); }
+  else if(e.key==='Escape'){ chatClose(); }
+});
 $('ePromptBtn').onclick=onPrompt;
 $('ePrompt').addEventListener('keydown',e=>{if(e.key==='Enter')onPrompt();});
 
@@ -8428,6 +8710,9 @@ window.T={
   lagReset,inDelayed,padRaw,padCalStart,get PADCAL(){return PADCAL;},
   fixedCenter,touchRad,buildCtrlUI,buildMenu,acroRateAt,
   hitPeopleAt,revivePeople,crashSpeed,touchLimits,get STATS(){return STATS;},get FACT(){return FACT;},
+  MP,get MP_SERVER(){return MP_SERVER;},mpSetServer(u){MP_SERVER=u||'';},
+  mpSetOn,mpSetNet,mpSetRoom,mpRandomRoom,mpLink,mpOnMessage,mpSend,mpChatSend,
+  mpRaceStart,mpRanking,mpCountdown,mpReportGate,mpVisible,mpNetFailed,chatOpen,chatClose,chatIsOpen,
   keydown(c){KEYS[c]=true;if(IN.src!=='test')IN.src='keys';},
   keyup(c){KEYS[c]=false;},
   tick(sec){
