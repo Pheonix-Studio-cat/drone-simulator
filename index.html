@@ -61,6 +61,21 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .card .sp{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:10.5px;color:#b9cbdc}
 .card .sp b{color:var(--txt);font-weight:600}
 .mcard .ds{min-height:unset}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.badge{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:9px 11px;
+  display:flex;gap:9px;align-items:flex-start;opacity:.4;filter:grayscale(1)}
+.badge.got{opacity:1;filter:none;border-color:rgba(255,200,80,.55);
+  box-shadow:0 0 0 1px rgba(255,200,80,.28)}
+.badge .bi{font-size:20px;line-height:1.1}
+.badge .bn{display:block;font-weight:700;font-size:12.5px}
+.badge .bh{display:block;color:var(--dim);font-size:11px;line-height:1.3;margin-top:3px}
+.logbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.logbox .lrow{display:flex;flex-wrap:wrap;gap:6px 20px;font-size:12.5px;color:#b9cbdc}
+.logbox .lrow b{color:var(--txt)}
+.logbox table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px}
+.logbox th{text-align:left;color:var(--acc);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line)}
+.logbox td{padding:4px 6px;color:#b9cbdc;border-bottom:1px solid rgba(120,160,200,.08)}
+.logbox .none{color:var(--dim);font-size:12.5px}
 .rowbtns{display:flex;gap:8px;flex-wrap:wrap}
 .rowbtns button{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:9px;
   padding:9px 16px;font-size:13px;cursor:pointer}
@@ -246,6 +261,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     ein – ihr seht euch dann gegenseitig fliegen. Für ein Spiel über das Internet bräuchte es einen Server;
     diese Seite liegt auf rein statischem Hosting und hat keinen.
   </div>
+  <h2>🏅 Abzeichen <span id="badgeCount" style="color:var(--dim);font-size:12px"></span></h2>
+  <div class="bgrid" id="badgeGrid"></div>
+  <h2>📓 Flugbuch</h2>
+  <div class="logbox" id="logBox"></div>
   <h2>Foto-Galerie</h2>
   <div id="photoGrid"></div>
   <h2>Steuerung</h2>
@@ -1172,6 +1191,53 @@ const WEATHER=[
 ];
 function daytimeById(id){ return DAYTIMES.find(t=>t.id===id)||DAYTIMES[1]; }
 function weatherById(id){ return WEATHER.find(w=>w.id===id)||WEATHER[0]; }
+/* ---------------- Abzeichen ----------------
+   test(F) bekommt die Fakten des laufenden Fluges und darf nur lesen.
+   Ereignisse (ein Kanonenschuss, ein Hornissentreffer) setzen Marken in F. */
+const BADGES=[
+  {id:'fast200', icon:'🚀', name:'Schallmauer light', hint:'Fliege 200 km/h',
+   test:F=>F.topSpeed*3.6>=200},
+  {id:'high1000', icon:'☁️', name:'Über den Wolken', hint:'1000 m über Grund erreichen',
+   test:F=>F.maxAlt>=1000},
+  {id:'far700', icon:'📡', name:'Am Rand der Reichweite', hint:'700 m vom Startpunkt entfernt fliegen',
+   test:F=>F.maxHomeDist>=700},
+  {id:'water', icon:'🛟', name:'Wasserflieger', hint:'Mit Schwimmern auf dem Wasser landen',
+   test:F=>F.waterLanding},
+  {id:'night', icon:'🌙', name:'Nachtschicht', hint:'3 Minuten am Stück bei Nacht fliegen',
+   test:F=>F.nightTime>=180},
+  {id:'storm', icon:'🌪️', name:'Sturmerprobt', hint:'Bei starkem Wind sanft landen',
+   test:F=>F.stormLanding},
+  {id:'rain', icon:'🌧️', name:'Schlechtwetterpilot', hint:'2 Minuten bei Regen oder Schnee fliegen',
+   test:F=>F.badWxTime>=120},
+  {id:'rth', icon:'🏠', name:'Sicher heim', hint:'Return-to-Home bis zur Landung durchlaufen lassen',
+   test:F=>F.rthLanded},
+  {id:'nocrash10', icon:'🎯', name:'Ruhige Hand', hint:'10 Minuten am Stück fliegen, ohne zu crashen',
+   test:F=>F.cleanTime>=600},
+  {id:'clear10', icon:'🎇', name:'Kahlschlag', hint:'10 Objekte mit einem einzigen Kanonenschuss zerlegen',
+   test:F=>F.bestCannon>=10},
+  {id:'hornet', icon:'🐝', name:'Luftabwehr', hint:'Eine fremde Drohne mit dem Hornissenschwarm holen',
+   test:F=>F.hornetKill},
+  {id:'wasps', icon:'🪰', name:'Platz gemacht', hint:'Mit einem Wespenschwarm 5 Menschen verscheuchen',
+   test:F=>F.waspsScared>=5},
+  {id:'delivery', icon:'📦', name:'Zusteller', hint:'Die Liefermission ohne Crash abschließen',
+   test:F=>F.deliveryDone},
+  {id:'race', icon:'🏁', name:'Zieldurchfahrt', hint:'Ein Rennen zu Ende fliegen',
+   test:F=>F.raceDone},
+  {id:'ghost', icon:'👻', name:'Schneller als das Gestern', hint:'Im Rennen den eigenen Geist schlagen',
+   test:F=>F.beatGhost},
+  {id:'photo50', icon:'📷', name:'Bildband', hint:'50 Fotos aufnehmen',
+   test:F=>F.photos>=50},
+  {id:'builder', icon:'🔧', name:'Eigenbau', hint:'Eine selbst gebaute Drohne fliegen',
+   test:F=>F.flewDiy},
+  {id:'mapper', icon:'🛠️', name:'Kartograf', hint:'Eine selbst gebaute Karte fliegen',
+   test:F=>F.flewOwnMap},
+  {id:'school', icon:'🎓', name:'Flugschein', hint:'Alle vier Lektionen der Flugschule bestehen',
+   test:F=>F.schoolDone>=4},
+  {id:'allEggs', icon:'🥚', name:'Alles gefunden', hint:'Jedes Easter Egg freischalten',
+   test:F=>F.eggsFound>=EGG_SPECS.length+EGG_UNLOCKS.length},
+];
+function badgeById(id){ return BADGES.find(b=>b.id===id); }
+
 const MISSIONS=[
  {id:'free', name:'Freiflug', icon:'∞',
   desc:'Kein Ziel, keine Zeit – einfach fliegen und üben.'},
@@ -1183,7 +1249,18 @@ const MISSIONS=[
   desc:'Paket an der gelben Plattform aufnehmen (2 s darüber hovern) und auf der grünen Plattform sanft absetzen. Die Zuladung verändert die Flugphysik spürbar.'},
  {id:'landing', name:'Präzisionslandung', icon:'🎯',
   desc:'Mit nur 22 % Akku starten und auf der kleinen Plattform so sanft wie möglich landen.'},
+ // Flugschule: vier kurze Lektionen mit Note und Bestwert
+ {id:'sch_hover', name:'Schule 1: Schweben', icon:'🎓', school:1,
+  desc:'30 s auf 10 m Höhe halten – je genauer, desto besser die Note.'},
+ {id:'sch_eight', name:'Schule 2: Achter fliegen', icon:'🎓', school:1,
+  desc:'Eine liegende Acht um zwei Tore fliegen, sauber und ohne Bodenkontakt.'},
+ {id:'sch_spot', name:'Schule 3: Punktlandung', icon:'🎓', school:1,
+  desc:'Auf den Startplatz zurückkehren und mittig sanft aufsetzen.'},
+ {id:'sch_back', name:'Schule 4: Rückwärtsanflug', icon:'🎓', school:1,
+  desc:'50 m rückwärts fliegen, ohne die Nase zu drehen – Orientierung üben.'},
 ];
+function missionById(id){ return MISSIONS.find(m=>m.id===id); }
+const SCHOOL_IDS=MISSIONS.filter(m=>m.school).map(m=>m.id);
 const RACE_BASE=(()=>{const g=[];const R=62;
   for(let i=0;i<8;i++){
     const a=i/8*Math.PI*2;
@@ -3577,6 +3654,7 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.lightOn=!!d.light; wxReset();
   RTH.on=false; RTH.phase=''; HOME.set=false; LINK.q=1;
   DR.warn25=0; DR.warnT=0; DR.warnManual=0; GIM.user=0;
+  resetFacts(); STATS.flights++; saveStats(); ghostStart();
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST; }
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
@@ -3603,6 +3681,136 @@ function windAt(t,y){
   const dx=Math.cos(windDir),dz=Math.sin(windDir);
   return [ (dx*gust - dz*cross)*s*hf, 0.15*s*Math.sin(t*1.9+3)*hf, (dz*gust + dx*cross)*s*hf ];
 }
+
+/* ---------------- Flugbuch, Abzeichen, Geist ----------------
+   STATS und BADGES_FOUND liegen im localStorage, FACT sammelt die Fakten
+   des laufenden Fluges. Geprüft wird einmal pro Sekunde, nicht pro Bild. */
+let STATS={time:0,dist:0,flights:0,crashes:0,topSpeed:0,maxAlt:0,photos:0,per:{}};
+let BADGES_FOUND=[];
+const FACT={};
+function loadStats(){
+  try{ const o=JSON.parse(localStorage.getItem('ds_stats')||'null');
+    if(o&&typeof o==='object') STATS={...STATS,...o,per:o.per||{}}; }catch(e){}
+  try{ const b=JSON.parse(localStorage.getItem('ds_badges')||'[]');
+    BADGES_FOUND=Array.isArray(b)?b:[]; }catch(e){ BADGES_FOUND=[]; }
+}
+function saveStats(){
+  try{ localStorage.setItem('ds_stats',JSON.stringify(STATS)); }catch(e){}
+}
+function saveBadges(){
+  try{ localStorage.setItem('ds_badges',JSON.stringify(BADGES_FOUND)); }catch(e){}
+}
+function resetFacts(){
+  for(const k of Object.keys(FACT)) delete FACT[k];
+  FACT.topSpeed=0; FACT.maxAlt=0; FACT.maxHomeDist=0;
+  FACT.nightTime=0; FACT.badWxTime=0; FACT.cleanTime=0; FACT.bestCannon=0;
+  FACT.waspsScared=0; FACT.schoolDone=schoolPassedCount();
+  FACT.photos=(typeof PHOTOS!=='undefined'?PHOTOS.length:0);
+  FACT.eggsFound=EGGS_FOUND.length;
+  FACT.flewDiy=false; FACT.flewOwnMap=false;
+}
+function schoolPassedCount(){
+  let n=0;
+  for(const id of SCHOOL_IDS){
+    try{ if(localStorage.getItem('ds_school_'+id)) n++; }catch(e){}
+  }
+  return n;
+}
+// Ereignisse aus dem Spiel melden hier ihre Fakten
+function fact(k,v){
+  if(v===undefined) FACT[k]=true;
+  else if(FACT[k]===undefined||v>FACT[k]) FACT[k]=v;
+}
+function unlockBadge(id){
+  if(BADGES_FOUND.includes(id))return null;
+  const b=badgeById(id); if(!b)return null;
+  BADGES_FOUND.push(id); saveBadges();
+  toast('🏅 Abzeichen: '+b.icon+' '+b.name,4000);
+  beep(1046,0.12); setTimeout(()=>beep(1568,0.2),130);
+  return b;
+}
+let badgeT=0;
+function badgeCheck(dt){
+  if(APP.state!=='fly')return;
+  badgeT-=dt;
+  if(badgeT>0)return;
+  badgeT=1;
+  FACT.photos=PHOTOS.length;
+  FACT.eggsFound=EGGS_FOUND.length;
+  for(const b of BADGES){
+    if(BADGES_FOUND.includes(b.id))continue;
+    let ok=false;
+    try{ ok=!!b.test(FACT); }catch(e){}
+    if(ok) unlockBadge(b.id);
+  }
+}
+// Laufende Fakten und Statistik mitschreiben
+function statsStep(dt){
+  if(APP.state!=='fly'||!DR.armed||DR.crashed)return;
+  const v=Math.hypot(DR.vel[0],DR.vel[2]);
+  const alt=DR.pos[1]-groundHeightAt(DR.pos[0],DR.pos[2]);
+  fact('topSpeed',v); fact('maxAlt',alt);
+  if(HOME.set) fact('maxHomeDist',homeDist());
+  if(!DR.onGround){
+    STATS.time+=dt; STATS.dist+=v*dt;
+    FACT.cleanTime=(FACT.cleanTime||0)+dt;
+    if(ENV.night>0.5) FACT.nightTime=(FACT.nightTime||0)+dt;
+    if(WX.kind) FACT.badWxTime=(FACT.badWxTime||0)+dt;
+    const pid=APP.model.id;
+    const pd=STATS.per[pid]||(STATS.per[pid]={time:0,dist:0,flights:0,top:0});
+    pd.time+=dt; pd.dist+=v*dt; pd.top=Math.max(pd.top,v);
+  }
+  STATS.topSpeed=Math.max(STATS.topSpeed,v);
+  STATS.maxAlt=Math.max(STATS.maxAlt,alt);
+  if(APP.model.diy) FACT.flewDiy=true;
+  if(SCENE&&SCENE.map.custom) FACT.flewOwnMap=true;
+}
+
+/* --- Geisterrennen: Bahn des Bestlaufs aufzeichnen und mitfliegen --- */
+const GHOST={rec:null, play:null, t:0, acc:0, key:''};
+const GHOST_HZ=20;
+function ghostKey(){ return 'ds_ghost_'+APP.mapId; }
+function ghostLoad(){
+  GHOST.play=null; GHOST.key=ghostKey();
+  try{ const o=JSON.parse(localStorage.getItem(GHOST.key)||'null');
+    if(o&&Array.isArray(o.p)&&o.p.length>3) GHOST.play=o; }catch(e){}
+}
+function ghostStart(){
+  GHOST.rec={p:[],t:0}; GHOST.t=0; GHOST.acc=0;
+  ghostLoad();
+}
+function ghostStep(dt){
+  if(GHOST.rec){
+    GHOST.rec.t+=dt; GHOST.acc+=dt;
+    if(GHOST.acc>=1/GHOST_HZ){
+      GHOST.acc=0;
+      GHOST.rec.p.push(+DR.pos[0].toFixed(2),+DR.pos[1].toFixed(2),+DR.pos[2].toFixed(2),
+        +bodyEuler().yaw.toFixed(2));
+      if(GHOST.rec.p.length>4*GHOST_HZ*600) GHOST.rec=null;   // Notbremse: 10 Minuten
+    }
+  }
+  if(GHOST.play) GHOST.t+=dt;
+}
+// Position des Geistes zur aktuellen Zeit (linear interpoliert)
+function ghostAt(t){
+  const g=GHOST.play;
+  if(!g)return null;
+  const n=g.p.length/4;
+  const f=t*GHOST_HZ;
+  if(f>=n-1)return null;                    // Geist ist im Ziel
+  const i=Math.floor(f), k=f-i, j=i*4, j2=j+4;
+  const lp=(a,b)=>a+(b-a)*k;
+  return {pos:[lp(g.p[j],g.p[j2]),lp(g.p[j+1],g.p[j2+1]),lp(g.p[j+2],g.p[j2+2])],
+    yaw:g.p[j+3]};
+}
+function ghostSave(time){
+  if(!GHOST.rec)return false;
+  try{ localStorage.setItem(GHOST.key,JSON.stringify({t:time,p:GHOST.rec.p})); }catch(e){ return false; }
+  ghostLoad();
+  return true;
+}
+
+loadStats();
 
 /* ---------------- Return-to-Home ----------------
    Kein zweiter Regler: RTH setzt nur den Sollwert, den der GPS-Zweig
@@ -3802,6 +4010,7 @@ function flightController(dt){
       T=Fl;
       if(DR.onGround&&vzT<=0.02){ T=0.03*d.tmax; rateT=[0,0,0]; ud=null;
         if(RTH.on&&RTH.phase==='land'){ RTH.on=false; RTH.phase=''; DR.armed=false;
+          fact('rthLanded');
           toast('🏠 Zu Hause gelandet',2600); updateButtons(); } }
     }else{
       const tx=(h[0]*sPit+rh[0]*sRol)*maxT, tz=(h[2]*sPit+rh[2]*sRol)*maxT;
@@ -4066,6 +4275,8 @@ function groundAndCollisions(dt,m){
 function onTouchdownAll(impact,vh){
   if(APP.mission)APP.mission.onTouchdown(impact,vh);
   rescueTouchdown(impact);
+  if(DR.floating) fact('waterLanding');
+  if(APP.windLevel>=3&&impact<2.5&&vh<3) fact('stormLanding');
 }
 
 /* --- Crash: Drohne zerlegt sich in Einzelteile --- */
@@ -4222,6 +4433,7 @@ function cannonHit(x,y,z,col){
   if(!DR.crashed&&Math.hypot(DR.pos[0]-x,DR.pos[1]-y,DR.pos[2]-z)<5.5)
     crash('Eigenen Kanonenschuss abbekommen!');
   toast(n>0? '🎇 '+n+(n===1?' Objekt':' Objekte')+' zerlegt' : '🎇 Volltreffer ins Leere',1400);
+  fact('bestCannon',n);
   return n;
 }
 
@@ -4354,7 +4566,7 @@ function stepHornets(dt){
     }
     // Erst wenn genug Hornissen gleichzeitig dran sind, geht die Drohne runter
     if(alive) sw.hit+=dt*Math.min(1,onTarget/10);
-    if(alive&&sw.hit>HORNET_BITE) aiKill(tg,'🐝 Vom Schwarm heruntergeholt');
+    if(alive&&sw.hit>HORNET_BITE){ aiKill(tg,'🐝 Vom Schwarm heruntergeholt'); fact('hornetKill'); }
     // nach dem Angriff lösen sie sich auf
     if(sw.t>22||(!alive&&sw.t>3.5)) SWARMS.splice(i,1);
   }
@@ -4444,6 +4656,7 @@ function stepWaspSwarm(sw,dt){
       if(tg.stung>WASP_STING&&SCENE){
         tg.removed=true;
         SCENE.people=SCENE.people.filter(x=>x!==tg);
+        FACT.waspsScared=(FACT.waspsScared||0)+1;
       }
     }
   }
@@ -4823,6 +5036,7 @@ function stepBombs(dt){
   stepCrate(dt);
   stepAI(dt); stepHornets(dt); stepScout(dt); stepWeather(dt);
   rthWatch(dt); stepLink(dt); batteryWarn(dt);
+  statsStep(dt); badgeCheck(dt); ghostStep(dt);
   if(APP.shake) APP.shake=Math.max(0,APP.shake-dt*1.6);
   if(DR.meowT) DR.meowT=Math.max(0,DR.meowT-dt);
   if(APP.flashT) APP.flashT=Math.max(0,APP.flashT-dt*1.1);
@@ -4830,6 +5044,7 @@ function stepBombs(dt){
 function crash(msg){
   if(DR.crashed)return;
   DR.crashed=true; DR.armed=false; DR.motors=[0,0,0,0];
+  STATS.crashes++; saveStats(); FACT.cleanTime=0; GHOST.rec=null;
   spawnDebris();
   // Kamikaze-Sprengsatz: der Aufschlag selbst ist die Zündung
   // (crashed steht schon auf true, die Explosion kann also nicht zurückschlagen)
@@ -4890,7 +5105,9 @@ function makeMission(id){
     M.laps=2;
     M.init=function(){this.idx=0;this.lap=0;this.started=false;this.prev=[...DR.pos];
       this.key='ds_best_'+APP.mapId;
-      this.best=parseFloat(localStorage.getItem(this.key)||'0')||null;};
+      this.best=parseFloat(localStorage.getItem(this.key)||'0')||null;
+      ghostStart(); GHOST.rec=null;            // Aufzeichnung startet am ersten Tor
+      this.ghostT=0;};
     M.step=function(dt){
       if(this.done)return;
       if(this.started)this.t+=dt;
@@ -4902,6 +5119,7 @@ function makeMission(id){
       if(s0<0&&s1>=0){
         const lat=Math.abs(rel1[0]*n[2]-rel1[2]*n[0]);
         if(lat<g.w/2&&Math.abs(rel1[1])<g.hgt/2){
+          if(!this.started){ ghostStart(); }   // ab jetzt läuft die Uhr und der Geist
           this.started=true;
           this.idx++;
           toast('Tor '+this.idx+'/'+SCENE.race.length+(this.idx===SCENE.race.length?' – Runde!':''));
@@ -4910,8 +5128,13 @@ function makeMission(id){
             if(this.lap>=this.laps){
               this.done=true;
               const best=this.best;
+              fact('raceDone');
+              const gt=GHOST.play&&GHOST.play.t;
+              if(gt&&this.t<gt) fact('beatGhost');
               if(!best||this.t<best){localStorage.setItem(this.key,this.t);this.best=this.t;
-                toast('🏁 Ziel! Neue Bestzeit: '+fmtTime(this.t));}
+                const saved=ghostSave(this.t);
+                toast('🏁 Ziel! Neue Bestzeit: '+fmtTime(this.t)+
+                  (saved?'<br><small>Dein Geist fliegt ab jetzt mit</small>':''),4000);}
               else toast('🏁 Ziel! Zeit: '+fmtTime(this.t)+' (Bestzeit '+fmtTime(best)+')');
             }
           }
@@ -4919,8 +5142,17 @@ function makeMission(id){
       }
       this.prev=[...DR.pos];
       const dist=Math.hypot(DR.pos[0]-g.x,DR.pos[2]-g.z);
+      let gl='';
+      if(GHOST.play&&this.started&&!this.done){
+        const gp=ghostAt(GHOST.t);
+        if(gp){
+          const mine=Math.hypot(DR.pos[0]-SCENE.race[0].x,DR.pos[2]-SCENE.race[0].z);
+          const his=Math.hypot(gp.pos[0]-SCENE.race[0].x,gp.pos[2]-SCENE.race[0].z);
+          gl='  ·  👻 '+(mine<his?'vorn':'hinten');
+        } else gl='  ·  👻 im Ziel';
+      }
       this.lines=[this.done?'🏁 Ziel! '+fmtTime(this.t):'Runde '+(this.lap+1)+'/'+this.laps+' · Tor '+(this.idx+1)+'/'+SCENE.race.length+' ('+dist.toFixed(0)+' m)',
-        (this.started?'⏱ '+fmtTime(this.t):'⏱ startet am 1. Tor')+(this.best?' · Best '+fmtTime(this.best):'')];
+        (this.started?'⏱ '+fmtTime(this.t):'⏱ startet am 1. Tor')+(this.best?' · Best '+fmtTime(this.best):'')+gl];
     };
   }
   if(id==='photo'){
@@ -4972,6 +5204,109 @@ function makeMission(id){
           toast('✅ Paket zugestellt in '+fmtTime(this.t)+' (Aufsetzen: '+impact.toFixed(1)+' m/s)');this.lines=['✅ Zugestellt!','⏱ '+fmtTime(this.t)];}
         else toast('📦 Zu hart! ('+impact.toFixed(1)+' m/s) – nochmal anheben und sanft absetzen');
       }
+    };
+  }
+  /* --- Flugschule: vier kurze Lektionen mit Note und Bestwert --- */
+  if(id.startsWith('sch_')){
+    M.school=true;
+    M.key='ds_school_'+id;
+    M.best=(()=>{ try{ return parseFloat(localStorage.getItem('ds_school_'+id))||null; }catch(e){ return null; } })();
+    M.grade=function(score){
+      // Note 1 (sehr gut) bis 6, wie im Schweizer System umgekehrt: 6 ist top
+      const g=clamp(Math.round(score*10)/10,1,6);
+      return g;
+    };
+    M.finish=function(score){
+      this.done=true;
+      const g=this.grade(score);
+      this.score=g;
+      if(!this.best||g>this.best){ this.best=g;
+        try{ localStorage.setItem(this.key,String(g)); }catch(e){}
+        toast('🎓 Bestanden mit '+g.toFixed(1)+' – neuer Bestwert!',3600); }
+      else toast('🎓 Bestanden mit '+g.toFixed(1)+' (Bestwert '+this.best.toFixed(1)+')',3600);
+      if(g>=4) FACT.schoolDone=schoolPassedCount();
+    };
+  }
+  if(id==='sch_hover'){
+    M.init=function(){this.hold=0;this.err=0;this.n=0;this.target=10;};
+    M.step=function(dt){
+      if(this.done)return;
+      this.t+=dt;
+      const alt=DR.pos[1]-groundHeightAt(DR.pos[0],DR.pos[2]);
+      const off=Math.abs(alt-this.target);
+      if(!DR.onGround&&DR.armed&&off<4){ this.hold+=dt; this.err+=off*dt; this.n+=dt; }
+      else if(this.hold>0&&off>=4) this.hold=Math.max(0,this.hold-dt*2);
+      if(this.hold>=30){
+        const avg=this.n>0?this.err/this.n:9;
+        this.finish(6-clamp(avg,0,4)*1.25);
+      }
+      this.lines=[this.done?'🎓 Fertig':'Auf '+this.target+' m halten – '+this.hold.toFixed(0)+'/30 s'
+        +' (jetzt '+alt.toFixed(1)+' m)',
+        (this.n>0?'Ø Abweichung '+(this.err/this.n).toFixed(2)+' m':'noch nichts gemessen')
+        +(this.best?' · Bestnote '+this.best.toFixed(1):'')];
+    };
+  }
+  if(id==='sch_eight'){
+    M.init=function(){
+      const y=SCENE.terH(0,0)+14;
+      this.pts=[{x:0,z:-40},{x:34,z:-70},{x:0,z:-100},{x:-34,z:-70}];
+      this.y=y; this.idx=0; this.round=0; this.miss=0;
+    };
+    M.step=function(dt){
+      if(this.done)return;
+      this.t+=dt;
+      const p=this.pts[this.idx];
+      const d3=Math.hypot(DR.pos[0]-p.x,DR.pos[1]-this.y,DR.pos[2]-p.z);
+      if(d3<9){
+        this.idx=(this.idx+1)%4;
+        if(this.idx===0){ this.round++;
+          if(this.round>=2){ this.finish(6-clamp(this.t-55,0,45)/12-this.miss*0.4); return; } }
+        toast('🎓 Punkt '+(this.idx||4)+'/4 · Runde '+(this.round+1)+'/2',1200);
+      }
+      if(DR.onGround&&DR.armed) this.miss+=dt*0.5;
+      this.lines=[this.done?'🎓 Fertig':'Punkt '+(this.idx+1)+'/4 anfliegen ('+d3.toFixed(0)+' m), Runde '+(this.round+1)+'/2',
+        '⏱ '+fmtTime(this.t)+(this.best?' · Bestnote '+this.best.toFixed(1):'')];
+    };
+  }
+  if(id==='sch_spot'){
+    M.init=function(){this.away=false;};
+    M.step=function(dt){
+      if(this.done)return;
+      this.t+=dt;
+      const dh=Math.hypot(DR.pos[0],DR.pos[2]);
+      if(dh>60&&!DR.onGround) this.away=true;
+      this.lines=[this.done?'🎓 Fertig':this.away?'Zurück zum Startplatz ('+dh.toFixed(0)+' m) und mittig aufsetzen'
+        :'Erst mindestens 60 m wegfliegen ('+dh.toFixed(0)+' m)',
+        '⏱ '+fmtTime(this.t)+(this.best?' · Bestnote '+this.best.toFixed(1):'')];
+    };
+    M.onTouchdown=function(impact){
+      if(this.done||!this.away)return;
+      const dh=Math.hypot(DR.pos[0],DR.pos[2]);
+      if(dh>6){ toast('🎓 '+dh.toFixed(1)+' m daneben – nochmal abheben und mittig aufsetzen'); return; }
+      this.finish(6-clamp(dh,0,5)*0.6-clamp(impact-0.6,0,3)*0.5);
+    };
+  }
+  if(id==='sch_back'){
+    M.init=function(){this.start=null;this.yaw0=null;this.drift=0;};
+    M.step=function(dt){
+      if(this.done)return;
+      this.t+=dt;
+      const yaw=bodyEuler().yaw;
+      if(!DR.onGround&&DR.armed){
+        if(this.start===null){ this.start=[DR.pos[0],DR.pos[2]]; this.yaw0=yaw; }
+        // Rückwärts heißt: Bewegung entgegen der Nasenrichtung
+        const fwd=Q.rot(DR.q,[0,0,-1]);
+        const back=-(DR.vel[0]*fwd[0]+DR.vel[2]*fwd[2]);
+        let dy=Math.abs(yaw-this.yaw0); if(dy>Math.PI) dy=2*Math.PI-dy;
+        this.drift=Math.max(this.drift,dy);
+        if(back<-1.5) this.start=[DR.pos[0],DR.pos[2]];    // vorwärts = von vorn
+        const d=Math.hypot(DR.pos[0]-this.start[0],DR.pos[2]-this.start[1]);
+        if(d>=50&&this.drift<25*deg) this.finish(6-this.drift/(25*deg)*1.6-clamp(this.t-40,0,40)/20);
+        this.lines=[this.done?'🎓 Fertig':'Rückwärts fliegen: '+d.toFixed(0)+'/50 m',
+          'Nase halten – Abweichung '+(this.drift*180/Math.PI).toFixed(0)+'°/25°'
+          +(this.best?' · Bestnote '+this.best.toFixed(1):'')];
+      } else this.lines=['Abheben und rückwärts fliegen (Nick nach hinten)',
+        this.best?'Bestnote '+this.best.toFixed(1):''];
     };
   }
   if(id==='landing'){
@@ -5027,7 +5362,9 @@ function gimbalTilt(dv){
 let FRAME_DT=0.016;
 function bodyEuler(){
   const up=Q.rot(DR.q,[0,1,0]),fw=Q.rot(DR.q,[0,0,-1]),rt=Q.rot(DR.q,[1,0,0]);
-  return {pitch:Math.asin(clamp(fw[1],-1,1)), roll:Math.atan2(-rt[1],up[1])};
+  // yaw so, dass M4.rotY(yaw) die Nase (-z) auf die Blickrichtung dreht
+  return {pitch:Math.asin(clamp(fw[1],-1,1)), roll:Math.atan2(-rt[1],up[1]),
+    yaw:Math.atan2(-fw[0],-fw[2])};
 }
 function computeCamera(){
   // Die Mini-Andockdrohne fotografiert aus ihrer eigenen Sicht
@@ -5348,6 +5685,20 @@ function render(){
     for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]])
       drawMesh(scoutPropMesh,M4.mul(sm,M4.mul(M4.translate(sx*0.15,0.04,sz*0.15),
         M4.rotY(SCOUT.propAng))),[1,1,1],0.5);
+  }
+  // Geist des eigenen Bestlaufs
+  if(APP.missionId==='race'&&GHOST.play&&APP.mission&&APP.mission.started&&!DR.crashed){
+    const gp=ghostAt(GHOST.t);
+    if(gp){
+      const gm=DRONE_MESH[d.id];
+      if(gm){
+        const mm=M4.mul(M4.translate(gp.pos[0],gp.pos[1],gp.pos[2]),M4.rotY(gp.yaw));
+        gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+        drawMesh(gm.body,mm,[0.6,0.85,1.1],0.42);
+        for(const [sx,sz] of [[1,-1],[1,1],[-1,1],[-1,-1]])
+          drawMesh(gm.disc,M4.mul(mm,M4.translate(sx*d.arm,gm.propY,sz*d.arm)),[0.6,0.85,1.1],0.25);
+      }
+    }
   }
   // Mitspieler aus anderen Fenstern
   for(const p of mpVisible()){
@@ -5711,6 +6062,8 @@ function buildMenu(){
     b.onclick=()=>{APP.sens=s;localStorage.setItem('ds_sens',s);buildMenu();};
     sr.appendChild(b);
   }
+  buildBadges();
+  buildLogbook();
   const mr=$('mpRow');
   if(mr){
     mr.innerHTML='';
@@ -5756,6 +6109,11 @@ function closeMenuAndStart(){
     flownConfig=configKey();
     resetDrone(true);
     toast(SCENE.map.name+' · '+APP.model.name+' bereit – '+(IS_TOUCH?'ARM drücken und Gas geben!':'Leertaste zum Armen, dann W für Gas'),3600);
+  }
+  else if(APP.mission&&(APP.mission.done||APP.mission.failed)){
+    // Erledigte Mission aus dem Menü heraus noch einmal starten können
+    resetDrone(true);
+    toast(APP.mission.name||'Mission neu gestartet',2000);
   }
   APP.paused=false;
   updateButtons();
@@ -5814,6 +6172,57 @@ function updateButtons(){
   kb.style.display=APP.model.cat?'block':'none';
   kb.textContent='🐱';
   kb.classList.toggle('attn',!!DR.meowT);
+}
+/* --- Abzeichen-Raster: Gefundene farbig, Offene grau mit Hinweis --- */
+function buildBadges(){
+  const g=$('badgeGrid');
+  g.innerHTML='';
+  for(const b of BADGES){
+    const got=BADGES_FOUND.includes(b.id);
+    const el=document.createElement('div');
+    el.className='badge'+(got?' got':'');
+    el.innerHTML=`<span class="bi">${b.icon}</span><span><span class="bn">${b.name}</span>`+
+      `<span class="bh">${got?'✔ gefunden':b.hint}</span></span>`;
+    g.appendChild(el);
+  }
+  $('badgeCount').textContent=BADGES_FOUND.length+' / '+BADGES.length;
+}
+/* --- Flugbuch --- */
+function buildLogbook(){
+  const box=$('logBox');
+  const h=Math.floor(STATS.time/3600), min=Math.floor((STATS.time%3600)/60);
+  const rows=Object.entries(STATS.per)
+    .sort((a,b)=>b[1].time-a[1].time).slice(0,8);
+  let html=`<div class="lrow">
+    <span>⏱ Flugzeit: <b>${h}h ${min}min</b></span>
+    <span>📏 Strecke: <b>${(STATS.dist/1000).toFixed(1)} km</b></span>
+    <span>🛫 Starts: <b>${STATS.flights}</b></span>
+    <span>💥 Abstürze: <b>${STATS.crashes}</b></span>
+    <span>🚀 Topspeed: <b>${(STATS.topSpeed*3.6).toFixed(0)} km/h</b></span>
+    <span>☁️ Höchste Höhe: <b>${STATS.maxAlt.toFixed(0)} m</b></span>
+    <span>🏅 Abzeichen: <b>${BADGES_FOUND.length}/${BADGES.length}</b></span>
+  </div>`;
+  if(rows.length){
+    html+='<table><tr><th>Drohne</th><th>Flugzeit</th><th>Strecke</th><th>Topspeed</th></tr>';
+    for(const [id,v] of rows){
+      const dr=droneById(id);
+      html+=`<tr><td>${dr?dr.name:id}</td><td>${Math.floor(v.time/60)}:${String(Math.floor(v.time%60)).padStart(2,'0')} min</td>`+
+        `<td>${(v.dist/1000).toFixed(1)} km</td><td>${(v.top*3.6).toFixed(0)} km/h</td></tr>`;
+    }
+    html+='</table>';
+  } else html+='<div class="none" style="margin-top:8px">Noch nichts geflogen.</div>';
+  // Flugschule
+  const sch=SCHOOL_IDS.map(id=>{
+    let v=null; try{ v=parseFloat(localStorage.getItem('ds_school_'+id))||null; }catch(e){}
+    return {m:missionById(id), v};
+  });
+  if(sch.some(x=>x.v)){
+    html+='<table><tr><th>Flugschule</th><th>Bestnote</th></tr>';
+    for(const x of sch)
+      html+=`<tr><td>${x.m.name}</td><td>${x.v?x.v.toFixed(1):'–'}</td></tr>`;
+    html+='</table>';
+  }
+  box.innerHTML=html;
 }
 function tryArm(){
   if(APP.state!=='fly'||APP.paused)return;
