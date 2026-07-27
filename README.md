@@ -71,6 +71,18 @@ Braucht Internet. Klappt der Abruf nicht, sagt der Simulator das klar und die ei
 
 Auf allen Karten laufen Menschen herum – wer sie anfliegt, crasht. Alle Karten sind prozedural generiert und komplett offline.
 
+### Tiny Whoop: klein sein hat Folgen
+Der **Typhoon20** (50 g, 2S 300 mAh) fliegt nicht einfach wie eine kleinere große Drohne – die Größe ändert die Physik:
+
+| Was | Wirkung |
+|---|---|
+| **Akku-Innenwiderstand** | Ein 300-mAh-Pack hat rund **60 mΩ** pro Zelle, ein 6S-Rennakku nur **2,4 mΩ**. Beim Vollgasstoß bricht die Spannung des Whoops um **0,50 V pro Zelle** ein, die einer großen Kameradrohne um **0,02 V**. Genau das ist das „Absacken" beim Punch-out. |
+| **Luftkanäle** | Der Kanalrand bremst (Luftwiderstand ×2,2) und der Schub fällt mit der Fahrt: **0,89 N** im Schweben, **0,74 N** bei 12 m/s. Ummantelte Rotoren sind Stand-, keine Reiseflug-Antriebe. |
+| **Bodeneffekt** | Der Kanal staut die Luft zusätzlich: dicht über dem Boden trägt der Whoop **13 %** mehr, ein offener Propeller nur **7 %**. Whoops saugen sich beim Landen fest. |
+| **Propellerschutz** | Der Whoop verträgt einen Anstoß mit **13,2 m/s**, ein 5-Zoll-Racer nur **2,2 m/s**, ein schweres Kinorig **1,9 m/s** – die Aufprallenergie geht mit Masse mal Geschwindigkeit im Quadrat. Mit 6 m/s gegen eine Wand prallt der Whoop ab, der Racer zerlegt sich. |
+
+Der Baukasten kann jetzt auch wirklich einen Whoop bauen: **Micro-Motoren** (4 g statt 14 g), **Whoop-Propeller** (40 mm) und ein **300-mAh-Pack**. Der Prompt „klein" oder „indoor" baut damit **75 g** statt vorher 226 g.
+
 ### Crash, Trümmer & Bergung
 Bei einem Absturz zerlegt sich die Drohne in Einzelteile (Propeller, Arme, Akku, Rumpf), die physikalisch korrekt durch die Gegend fliegen. Das Wrack bleibt liegen – und kann mit einer **Bergungsdrohne** (Taste `B`) abgeholt werden: hinfliegen, 2 s darüber hovern, zurücktragen. Das Wrack am Haken verändert die Flugphysik spürbar.
 
