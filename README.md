@@ -23,8 +23,8 @@ Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffn
 | **ANGLE** | Selbstaufrichtend mit Neigungsbegrenzung, Gas manuell |
 | **ACRO** | Volle manuelle Raten-Steuerung wie im FPV-Racing |
 
-### 13 Drohnenmodelle
-Von der winzigen Tiny-Whoop-Klasse (**Typhoon20**) über die 249-g-Ultraleichtdrohne und klassische/professionelle Kameradrohnen bis zu Cinewhoop und 5-Zoll-Racer – jedes Modell mit eigenen, realen Vorbildern nachempfundenen Kennwerten. Die Modelle sind zudem **unterschiedlich stabil**: leichte, agile Drohnen (Whoops, Micros) tanzen im Wind spürbar, schwere Kameraplattformen liegen wie festgenagelt in der Luft.
+### 15 Drohnenmodelle
+Von der winzigen Tiny-Whoop-Klasse (**Typhoon20**) über die 249-g-Ultraleichtdrohne und klassische/professionelle Kameradrohnen bis zu Cinewhoop, 5-Zoll-Racer und zwei Marsfluggeräten – jedes Modell mit eigenen, realen Vorbildern nachempfundenen Kennwerten. Die Modelle sind zudem **unterschiedlich stabil**: leichte, agile Drohnen (Whoops, Micros) tanzen im Wind spürbar, schwere Kameraplattformen liegen wie festgenagelt in der Luft.
 
 Ganz oben in der Tempo-Liste steht die **PHÖNIX DRONES SPEEDY** – ein 3D-gedruckter Eigenbau mit hohem weißem Kastenrumpf, Keilnase und rotem Nasenstreifen: 6S-Antrieb, **über 160 km/h im GPS-Modus** (bei voller Empfindlichkeit 225 km/h) und **über 210 km/h in ANGLE/ACRO**, im Sturzflug mehr. Ihr Rahmen steht auch im DIY-Editor zur Auswahl.
 
@@ -60,6 +60,26 @@ Alternativ über **„Weltkarte öffnen"** einen Punkt auf der Weltkarte anklick
 Braucht Internet. Klappt der Abruf nicht, sagt der Simulator das klar und die eingebauten Karten funktionieren weiterhin. Adresssuche über die offenen OSM-Dienste **Photon** und (als Ausweichlösung) **Nominatim**.
 
 **Datenquellen:** Geländehöhen aus offenen Terrain-Tiles (SRTM u. a.), Gebäudegrundrisse © **Overture Maps / OpenStreetMap-Mitwirkende** (ODbL). Bewusst **keine** Satellitenbilder – die sind proprietär; der Boden wird stattdessen aus echter Höhe, Hangneigung und Wasserlinie eingefärbt.
+
+### 🔴 Mars · Jezero-Krater
+Eine Karte auf einem anderen Himmelskörper – und die Physik ändert sich wirklich mit:
+
+| Grösse | Erde | Mars |
+|---|---|---|
+| Schwerkraft | 9,81 m/s² | **3,721 m/s²** |
+| Luftdichte am Boden | 1,225 kg/m³ | **0,020 kg/m³** (1,6 %) |
+| Skalenhöhe der Atmosphäre | 8,5 km | **11,1 km** |
+| Satellitennavigation | ja | **nein** |
+
+Gemessen im Simulator: ein Fall aus 10 m dauert auf der Erde **1,46 s**, auf dem Mars **2,38 s** (theoretisch 1,43 und 2,32 s).
+
+**Eine normale Drohne hebt dort nicht ab.** Sie bekommt in 1,6 % Luftdichte auch nur 1,6 % ihres Schubs – gemessen **0,30 N gegen 3,3 N Eigengewicht**. Dafür gibt es zwei marstaugliche Fluggeräte mit riesigen Rotoren (1,2 m und 2,4 m Durchmesser), die genau dort schweben, wo alles andere liegen bleibt. Umgekehrt tut sich der Marshubschrauber auf der Erde schwer: dreimal so viel Gewicht, und mehr Luft bringt ihm nichts, weil sein Motordrehmoment begrenzt.
+
+**Kein GPS**: Auf dem Mars gibt es keine Navigationssatelliten. Der GPS-Modus verschwindet aus der Liste, Return-to-Home sagt klar, warum es nicht geht – geflogen wird in ATTI und ANGLE.
+
+Dazu ein **Staubsturm** als neue Wetterlage: nimmt vor allem die Sicht. Marswind ist schnell, aber kraftlos – die Kraft geht mit der Luftdichte, und die ist fast nicht da.
+
+**Zur Ehrlichkeit:** Die acht Erdkarten stammen aus echten Höhendaten. Das Marsgelände ist dagegen **nachempfunden**, nicht aus Messdaten gebacken – die Geländeform folgt dem Jezero-Krater (Deltafront, Streukrater nach der üblichen Grössenverteilung, Blockfelder, Windrippel), weil die Bauumgebung die NASA- und USGS-Server nicht erreicht. Echt ist die Physik, nicht die Topografie.
 
 ### 6 erfundene Karten mit prozeduralem Terrain
 - 🌳 **Standard** – Wiesen, Wälder, sanfte Hügel

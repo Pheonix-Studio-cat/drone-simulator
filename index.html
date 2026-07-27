@@ -503,7 +503,10 @@ const M4 = {
 const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
 const lerp=(a,b,t)=>a+(b-a)*t;
 const deg=Math.PI/180;
-const G=9.81, RHO=1.225;
+// Schwerkraft und Luftdichte hängen an der Welt (Erde/Mars) und werden von
+// applyWorld gesetzt. G_EARTH/RHO_EARTH bleiben die Auslegungswerte.
+const G_EARTH=9.81, RHO_EARTH=1.225;
+let G=G_EARTH, RHO=RHO_EARTH;
 
 /* ---- Deterministisches 2D-Value-Noise (Terrain) ---- */
 // Achtung: der letzte Schritt nutzt >> (Vorzeichen-Shift), dadurch fällt das
@@ -530,6 +533,30 @@ const MAPDATA={"zurich":{"elev":{"n":128,"lo":396.96,"q":0.25,"d":"ArArAtAuAuAvA
 
 /* ---------------- Drohnen-Katalog ----------------
    Kennwerte sind realen Drohnenklassen nachempfunden (neutrale Namen). */
+/* ---------------- Welten ----------------
+   Nur zwei Grössen entscheiden, ob eine Drohne fliegt: Schwerkraft und
+   Luftdichte. H ist die Skalenhöhe der Atmosphäre für die barometrische
+   Formel, gps sagt, ob es ein Satellitennetz gibt.
+   Marswerte: 3,721 m/s², 0,020 kg/m³ an der Oberfläche (rund 1,6 % der Erde),
+   Skalenhöhe 11,1 km. */
+const WORLDS={
+  earth:{id:'earth', name:'Erde', g:9.81,  rho:1.225, H:8500,  gps:1},
+  mars: {id:'mars',  name:'Mars', g:3.721, rho:0.020, H:11100, gps:0},
+};
+let WORLD=WORLDS.earth;
+function worldOf(map){ return WORLDS[(map&&map.world)||'earth']||WORLDS.earth; }
+function applyWorld(map){
+  WORLD=worldOf(map);
+  G=WORLD.g; RHO=WORLD.rho;
+}
+/* Welche Flugmodi hier überhaupt gehen. Ohne Satellitennetz kein GPS-Modus –
+   auf dem Mars gibt es schlicht keine. */
+function modesFor(d){
+  if(WORLD.gps) return d.modes;
+  const m=d.modes.filter(x=>x!=='GPS');
+  return m.length?m:['ANGLE'];
+}
+
 const DRONES=[
  {id:'mini1', name:'Pocket Mini', cls:'cam',
   desc:'249-g-Ultraleichtdrohne. Ruhig und sparsam, aber windempfindlich.',
@@ -615,6 +642,20 @@ const DRONES=[
   batt:{cells:2, mah:300, min:4.5}, modes:['ANGLE','ACRO'], gpsQ:0, agility:1.7, stab:0.22,
   rates:{max:620,expo:.62}, camAngle:18, fovFpv:100, meshKind:'tinywhoop',
   style:{c1:[.15,.16,.19],c2:[.92,.55,.15],bodyL:.05,bodyW:.045,bodyH:.03,ducts:1,canopy:1}},
+ {id:'marsheli', name:'Mars-Hubschrauber', cls:'cam', world:'mars',
+  desc:'Vier 1,2-m-Rotoren mit rund 2500 U/min – so viel Blattfläche braucht es in 1,6 % Luftdichte. Wenige Minuten Flugzeit, kein GPS.',
+  mass:1.8, arm:0.6, twr:1.5, tauUp:0.5, tauDn:0.7, propR:0.6,
+  maxTilt:18, maxSpeed:10, climb:3, desc_:2.5, yawRate:45,
+  batt:{cells:6, mah:2600, min:3}, modes:['ATTI','ANGLE'], gpsQ:0, agility:.35, stab:0.75,
+  rates:{max:110,expo:.5}, camAngle:0, fovFpv:78, meshKind:'marsheli',
+  style:{c1:[.82,.8,.76],c2:[.35,.36,.4],bodyL:.22,bodyW:.14,bodyH:.16,legs:1,solar:1}},
+ {id:'marshexa', name:'Mars-Schwerlastflieger', cls:'cam', world:'mars',
+  desc:'Grosser Forschungsflieger nach heutigen Studien: 20 kg, 2,4-m-Rotoren, trägt Instrumente über zig Kilometer.',
+  mass:20, arm:1.3, twr:1.35, tauUp:0.6, tauDn:0.85, propR:1.2,
+  maxTilt:22, maxSpeed:16, climb:4, desc_:3, yawRate:35,
+  batt:{cells:12, mah:9000, min:9}, modes:['ATTI','ANGLE'], gpsQ:0, agility:.3, stab:0.85,
+  rates:{max:90,expo:.5}, camAngle:0, fovFpv:74, meshKind:'marshexa',
+  style:{c1:[.86,.85,.82],c2:[.4,.28,.22],bodyL:.5,bodyW:.34,bodyH:.3,legs:1,solar:1}},
  {id:'speedy', name:'PHÖNIX DRONES SPEEDY', cls:'fpv',
   desc:'Eigenbau aus dem 3D-Drucker: hoher weißer Kastenrumpf mit Keilnase und rotem Streifen. Kompromisslose 6S-Speedmaschine – schon bei normaler Empfindlichkeit über 160 km/h im GPS-Modus, in ANGLE/ACRO über 210 km/h.',
   mass:0.6, arm:0.09, twr:7.4, tauUp:0.05, tauDn:0.08, propR:0.0635,
@@ -627,7 +668,11 @@ function finalizeDrone(d){
   // Stabilität (0=zappelig/windanfällig … 1=felsenfest): schwere/große Drohnen sind ruhiger
   if(d.stab===undefined)
     d.stab = clamp(0.32 + Math.log(d.mass/0.05)*0.17 - (d.agility-1)*0.06, 0.2, 1);
-  d.tmax = d.twr*d.mass*G;
+  // tmax ist ein Schub in Newton und darf sich nicht mit der Welt ändern:
+  // gerechnet wird mit der Welt, für die die Drohne ausgelegt ist.
+  d.world = d.world||'earth';
+  const W0 = WORLDS[d.world];
+  d.tmax = d.twr*d.mass*W0.g;
   d.tmaxMotor = d.tmax/4;
   const r=d.arm*1.5;
   d.Ix = d.mass*r*r*0.45; d.Iz = d.mass*r*r*0.45; d.Iy = d.mass*r*r*0.8;
@@ -637,7 +682,8 @@ function finalizeDrone(d){
   if(d.dragH===undefined){
     d.dragH = d.cls==='fpv'
       ? d.tmax*0.85*Math.sin(55*deg)/(d.maxSpeed>30? d.maxSpeed*1.35 : d.maxSpeed*1.3)**2
-      : d.mass*G*Math.tan(tilt)/(d.maxSpeed**2);
+      : d.mass*W0.g*Math.tan(tilt)/(d.maxSpeed**2);
+    d.dragH *= W0.rho/RHO_EARTH;   // in dünner Luft bremst auch weniger
     if(d.dragF) d.dragH*=d.dragF;     // Rahmen mit besonderem Windschlupf
   }
   // Der Kanalrand bremst immer, auch bei Modellen mit eigenem dragH – deshalb
@@ -1072,6 +1118,16 @@ const MAPS=[
   pal:{low:[0.36,0.37,0.38], high:[0.38,0.39,0.4], rock:[0.4,0.4,0.42], snow:0, city:1},
   water:null, fog:[0.7,0.72,0.76], fogD:0.002, sky:[0.4,0.55,0.78],
   trees:25, people:36, gen:'city', range:760, grass:{n:500,col:[0.26,0.48,0.2],parkOnly:1}},
+ // Der Jezero-Krater ist der Landeplatz von Perseverance und Ingenuity.
+ // Die Geländeform ist nachempfunden, nicht aus Messdaten gebacken – dafür
+ // ist die Physik echt (siehe README).
+ {id:'mars', name:'Mars · Jezero', icon:'🔴', world:'mars',
+  desc:'Deltafront im Jezero-Krater. 3,721 m/s², 1,6 % Luftdichte, kein GPS – hier hebt nur ein Marsfluggerät ab.',
+  ter:{amp:26, freq:0.0042, ramp:120, seed:301},
+  // Boden deutlich dunkler als der Himmel, sonst verschwindet der Horizont
+  pal:{low:[0.40,0.24,0.16], high:[0.47,0.29,0.19], rock:[0.32,0.20,0.14], snow:0},
+  water:null, fog:[0.80,0.62,0.45], fogD:0.00016, sky:[0.82,0.64,0.46],
+  trees:0, people:0, gen:'mars', range:2600},
 ];
 
 /* ---------------- Selbstgebaute Karten (Map-Builder) ----------------
@@ -1165,7 +1221,7 @@ const REAL_MAPS=[
   grass:{n:1400,col:[0.30,0.46,0.2],maxAlt:1900}},
  {id:'r_everest', name:'Mount Everest', icon:'🗻', real:true, key:'everest',
   desc:'Das echte Everest-Massiv: gebackene Höhen bis 8748 m, 13 km Sichtfeld. Dünne Luft inklusive.',
-  ter:{seed:104}, gen:'real', range:6000, trees:0, thinAir:0.62,
+  ter:{seed:104}, gen:'real', range:6000, trees:0,
   land:{grass:[0.42,0.42,0.36], forest:[0.3,0.34,0.26], rock:[0.38,0.36,0.35],
         scree:[0.52,0.50,0.48], treeLine:4200, snowLine:5600},
   fog:[0.78,0.84,0.92], fogD:0.0001, sky:[0.10,0.30,0.72]},
@@ -1312,6 +1368,8 @@ const WEATHER=[
   {id:'schnee', name:'❄️ Schnee', desc:'Dichtes Flockengestöber, kalter Akku hält kürzer',
    fogD:2.6, kind:'snow', rate:950, drag:1.04, amp:1.14,
    tint:[0.84,0.87,0.92], tintK:0.55},
+  {id:'staub', name:'🟠 Staubsturm', desc:'Marsstaub: kaum Sicht, aber die dünne Luft schiebt kaum',
+   fogD:9, tint:[0.72,0.5,0.34], tintK:0.85, drag:1.0, amp:1.06, kind:'dust', rate:0.7},
   {id:'nebel', name:'🌫️ Nebel', desc:'Kaum 80 m Sicht – fliegen nach Instrumenten',
    fogD:4.2, kind:null, rate:0, drag:1, amp:1,
    tint:[0.70,0.73,0.77], tintK:0.6},
@@ -1748,7 +1806,10 @@ function makeRainBatch(kind,n){
       const x=hash2(i,7,1)*2*RAIN_B, z=hash2(i,13,2)*2*RAIN_B, y=hash2(i,29,3)*2*RAIN_T;
       const s=0.75+hash2(i,31,4)*1.2;
       for(const dy of [0,2*RAIN_T]){
-        if(kind==='snow'){
+        if(kind==='dust'){
+          // Staub: kleine Körner, keine Striche – sie treiben quer statt zu fallen
+          b.box(0.09*s,0.09*s,0.09*s,[x,y+dy,z],0,[0.78,0.6,0.42]);
+        }else if(kind==='snow'){
           const c=[1,1,1];
           b.box(0.26*s,0.05,0.05,[x,y+dy,z],0,c);
           b.box(0.05,0.05,0.26*s,[x,y+dy,z],0,c);
@@ -1760,9 +1821,10 @@ function makeRainBatch(kind,n){
     }
   });
 }
-let rainBatch=null, snowBatch=null;
+let rainBatch=null, snowBatch=null, dustBatch=null;
 function rainBatchFor(kind){
   if(kind==='snow'){ if(!snowBatch)snowBatch=makeRainBatch('snow',240); return snowBatch; }
+  if(kind==='dust'){ if(!dustBatch)dustBatch=makeRainBatch('dust',420); return dustBatch; }
   if(!rainBatch)rainBatch=makeRainBatch('rain',300);
   return rainBatch;
 }
@@ -2219,6 +2281,37 @@ function buildDroneMesh(d){
       leds();
       bladeCol=d.id==='legacy'?[0.85,0.85,0.88]:[0.1,0.1,0.12];
       hubCol=d.id==='legacy'?silver:[0.2,0.2,0.22];
+      break;
+    }
+    case 'marsheli': {
+      // Marshubschrauber: Kastenrumpf unter einem Solardach, koaxialer Mast,
+      // vier dünne Landebeine. Die Rotoren sind riesig – anders geht es in
+      // 1,6 % Luftdichte nicht.
+      const body=st.c1, dark=st.c2, gold=[0.72,0.58,0.24];
+      b.box(W,H,L,[0,0,0],0,body);
+      b.box(W*0.9,H*0.16,L*0.9,[0,H*0.62,0],0,dark);              // Elektronikdeck
+      b.box(W*2.2,0.012,L*2.0,[0,H*1.05,0],0,[0.16,0.2,0.36]);    // Solarpaneel
+      b.cyl(0.018,0.018,H*2.2,[0,H*0.6,0],8,dark);                // Mast
+      b.ellipsoid(0.03,0.028,0.03,[0,H*0.2,-L*0.62],10,7,gold);   // Kamerakopf
+      for(const [dx,dz] of [[1,1],[1,-1],[-1,1],[-1,-1]]){
+        b.cyl(0.008,0.008,H*3.2,[dx*W*0.5,-H*1.7,dz*L*0.5],6,dark);
+        b.box(0.03,0.01,0.03,[dx*W*0.5,-H*3.3,dz*L*0.5],0,dark);
+      }
+      bladeCol=[0.85,0.85,0.88]; hubCol=dark;
+      break;
+    }
+    case 'marshexa': {
+      // Sechsrotor-Forschungsflieger: flacher Rumpf, Solardeck, Instrumentenkorb
+      const body=st.c1, dark=st.c2;
+      b.box(W,H*0.7,L,[0,0,0],0,body);
+      b.box(W*1.9,0.02,L*1.5,[0,H*0.6,0],0,[0.16,0.2,0.36]);       // Solardeck
+      b.box(W*0.5,H*0.5,L*0.4,[0,-H*0.6,L*0.1],0,dark);            // Instrumentenkorb
+      b.ellipsoid(0.05,0.045,0.05,[0,-H*0.4,-L*0.6],10,7,[0.72,0.58,0.24]);
+      for(const [dx,dz] of [[1,1],[1,-1],[-1,1],[-1,-1]]){
+        b.cyl(0.02,0.02,H*3,[dx*W*0.45,-H*1.7,dz*L*0.45],6,dark);
+        b.box(0.07,0.02,0.07,[dx*W*0.45,-H*3.2,dz*L*0.45],0,dark);
+      }
+      bladeCol=[0.86,0.86,0.9]; hubCol=dark;
       break;
     }
     case 'cine': {
@@ -2688,7 +2781,8 @@ function buildDroneMeshBlocky(d){
   let bladeCol=[0.16,0.17,0.19], tipCol=null, hubCol=st.c2;
 
   let bmk=d.meshKind||d.id;
-  if(bmk==='deadcat'||bmk==='toothpick'||bmk==='rocket')bmk='race5';
+  if(bmk==='marsheli'||bmk==='marshexa')bmk='cine';
+  else if(bmk==='deadcat'||bmk==='toothpick'||bmk==='rocket')bmk='race5';
   else if(bmk==='bomber')bmk='cine';
   else if(bmk==='reaper'){
     // Retro-Variante: Kastenrumpf, gerader Balkenflügel, V-Leitwerk
@@ -3575,6 +3669,59 @@ GEN.flat=(map,B,obs,terH,rnd)=>{
     addTree(B,obs,x,terH(x,z)-0.2,z,4+rnd()*4);
   }
 };
+/* Mars, Jezero-Krater: Deltafront, Streukrater, Blockfelder, Windrippel.
+   Kratermasse nach der üblichen Regel für einfache Krater – Tiefe rund 0,2
+   des Durchmessers, Wallhöhe rund 0,04. Keine Bäume, kein Wasser, niemand da. */
+GEN.mars=(map,B,obs,terH,rnd)=>{
+  const rock=[0.44,0.29,0.21], dark=[0.31,0.21,0.16], light=[0.66,0.45,0.31];
+  // Deltafront: eine Stufe quer durch die Karte, wie der Sedimentfächer im Krater
+  for(let i=0;i<26;i++){
+    const t=i/25, x=-260+t*520, z=-150+Math.sin(t*3.1)*40;
+    if(zoneBlocked(x,z))continue;
+    const y0=terH(x,z), h=6+rnd()*9;
+    B.box(26+rnd()*14, h, 14+rnd()*10, [x,y0+h/2,z], rnd()*0.5, i%3?rock:dark);
+    obs.push({x,z,r:14,h:y0+h});
+  }
+  // Streukrater: Wall aus Segmenten, Boden dunkler
+  const craters=[];
+  for(let i=0;i<16;i++){
+    const a=rnd()*Math.PI*2, r=40+Math.sqrt(rnd())*420;
+    const x=Math.cos(a)*r, z=Math.sin(a)*r;
+    if(zoneBlocked(x,z))continue;
+    const D=8+rnd()*46;                       // Durchmesser
+    const rim=D*0.04, y0=terH(x,z);
+    craters.push([x,z,D]);
+    const n=Math.max(10,Math.round(D*0.7));
+    for(let k=0;k<n;k++){
+      const b=k/n*Math.PI*2, rr=D/2;
+      B.box(D*0.16, rim*2, D*0.16, [x+Math.cos(b)*rr, y0+rim, z+Math.sin(b)*rr], b, light);
+    }
+    B.cyl(D*0.46, D*0.42, 0.12, [x,y0-0.06,z], 16, dark);
+  }
+  // Blockfelder: verstreute Felsbrocken, die grösseren sind Hindernisse
+  for(let i=0;i<220;i++){
+    const a=rnd()*Math.PI*2, r=6+Math.sqrt(rnd())*480;
+    const x=Math.cos(a)*r, z=Math.sin(a)*r;
+    if(zoneBlocked(x,z))continue;
+    const sz=0.3+rnd()*rnd()*4.2, y0=terH(x,z);
+    B.ellipsoid(sz, sz*0.62, sz*0.86, [x,y0+sz*0.4,z], 7, 5, rnd()<0.3?dark:rock);
+    if(sz>1.8) obs.push({x,z,r:sz*0.9,h:y0+sz});
+  }
+  // Windrippel: flache Dünenrücken, alle in dieselbe Richtung
+  for(let i=0;i<90;i++){
+    const x=-420+rnd()*840, z=-420+rnd()*840;
+    if(zoneBlocked(x,z))continue;
+    const y0=terH(x,z), L=8+rnd()*22;
+    B.box(L, 0.35+rnd()*0.4, 1.6+rnd()*1.4, [x,y0+0.2,z], 0.34, light);
+  }
+  // Landestufe der Mission als Wahrzeichen am Startplatz
+  { const x=26, z=18, y0=terH(x,z);
+    B.cyl(2.6,2.2,1.1,[x,y0,z],10,[0.72,0.7,0.66]);
+    B.box(1.2,0.9,1.2,[x,y0+1.5,z],0.3,[0.5,0.5,0.54]);
+    for(const [dx,dz] of [[1,1],[1,-1],[-1,1],[-1,-1]])
+      B.cyl(0.12,0.12,1.6,[x+dx*2.2,y0-0.4,z+dz*2.2],6,[0.42,0.43,0.46]);
+    obs.push({x,z,r:3,h:y0+2.4}); }
+};
 GEN.city=(map,B,obs,terH,rnd)=>{
   const SP=42,RW=9,EXT=5;
   // Straßen + Mittelstreifen
@@ -3644,14 +3791,23 @@ function applyDaytime(map){
     fog=[fog[0]+(W.tint[0]*(1-T.night*0.85)-fog[0])*k,
          fog[1]+(W.tint[1]*(1-T.night*0.85)-fog[1])*k,
          fog[2]+(W.tint[2]*(1-T.night*0.85)-fog[2])*k]; }
+  let sunC=[...T.sunC], ambC=[...T.ambC], night=T.night;
+  if(worldOf(map).id==='mars'){
+    // Der Mars bekommt 43 % der irdischen Sonnenleistung, das Streulicht ist
+    // rostfarben, und in der dünnen Luft stehen auch tagsüber Sterne am Himmel.
+    sunC=[sunC[0]*0.78,sunC[1]*0.70,sunC[2]*0.62];
+    ambC=[ambC[0]*0.62,ambC[1]*0.48,ambC[2]*0.40];
+    night=Math.max(night,0.22);
+  }
   ENV={fog, fogD:map.fogD*W.fogD, sky:mul(map.sky,T.skyMul),
-    sunC:[...T.sunC], ambC:[...T.ambC], night:T.night,
+    sunC, ambC, night,
     // Wasser wird mitgedunkelt, sonst leuchtet der See nachts
-    watMul:(T.ambC[0]+T.ambC[1]+T.ambC[2])/3};
+    watMul:(ambC[0]+ambC[1]+ambC[2])/3};
   WX={drag:W.drag, amp:W.amp, kind:W.kind, rate:W.rate};
 }
 function buildScene(mapId){
   const map=mapById(mapId)||MAPS[0];
+  applyWorld(map);          // Schwerkraft und Luftdichte zuerst
   applyDaytime(map);
   const terH=makeTerFn(map);
   let s=map.ter.seed*7919+13;
@@ -3758,7 +3914,9 @@ function buildScene(mapId){
   }
   // Tiere: gleiche Wegpunkt-Logik wie die Fußgänger, nur vierbeinig
   const animals=[];
-  const nAn=map.animals!==undefined?map.animals:(map.real?0:(map.gen==='arctic'||map.gen==='city'?0:10));
+  // Ausserhalb der Erde lebt nichts – die Regel gilt für jede künftige Welt.
+  const nAn=map.animals!==undefined?map.animals
+    :(map.real||worldOf(map).id!=='earth'?0:(map.gen==='arctic'||map.gen==='city'?0:10));
   for(let i=0;i<nAn;i++){
     const a=rnd()*Math.PI*2, r=45+rnd()*260;
     const x=Math.cos(a)*r, z=Math.sin(a)*r;
@@ -4102,7 +4260,9 @@ const APP={
   daytime:localStorage.getItem('ds_time')||'mittag',
   weather:localStorage.getItem('ds_wx')||'klar',
   time:0,
-  get mode(){ return this.model.modes[this.modeIdx]; },
+  // Welche Modi hier gehen (auf dem Mars fällt GPS weg) und welcher aktiv ist
+  get modes(){ return modesFor(this.model); },
+  get mode(){ const m=this.modes; return m[Math.min(this.modeIdx,m.length-1)]; },
   get springThr(){ const m=this.mode; return m==='GPS'||m==='ATTI'; },
   get sensF(){ return SENS_LEVELS[this.sens]||0.72; },
 };
@@ -4321,14 +4481,18 @@ function setHome(){
   HOME.set=true;
 }
 function homeDist(){ return HOME.set?Math.hypot(DR.pos[0]-HOME.x,DR.pos[2]-HOME.z):0; }
-function canRTH(){ return APP.model.modes.includes('GPS'); }
+// Ohne Satellitennetz (Mars) hilft auch eine GPS-Drohne nicht weiter.
+function canRTH(){ return APP.modes.includes('GPS'); }
 function startRTH(reason){
-  if(!canRTH()){ toast('⚠ Diese Drohne hat kein GPS – kein Return-to-Home'); return false; }
+  if(!canRTH()){
+    toast(WORLD.gps? '⚠ Diese Drohne hat kein GPS – kein Return-to-Home'
+                   : '⚠ Kein Satellitennetz – Return-to-Home gibt es hier nicht');
+    return false; }
   if(APP.state!=='fly'||DR.crashed)return false;
   if(!HOME.set) setHome();
   if(RTH.on)return true;
   RTH.on=true; RTH.phase='climb'; RTH.reason=reason||'';
-  if(APP.mode!=='GPS') APP.modeIdx=APP.model.modes.indexOf('GPS');
+  if(APP.mode!=='GPS') APP.modeIdx=APP.modes.indexOf('GPS');
   beep(880,0.18); setTimeout(()=>beep(1320,0.22),160);
   toast('🏠 Return-to-Home'+(reason?' – '+reason:'')+' · '+homeDist().toFixed(0)+' m',3000);
   updateButtons();
@@ -4603,7 +4767,11 @@ function physStep(dt){
   const ge=1+(d.ducted?0.25:0.10)*Math.exp(-Math.max(alt,0)/(d.propR*4));
   const bf=DR.battF;
   // Luftdichte nach barometrischer Höhenformel: in 5000 m nur noch ~60 % Schub
-  const rho=Math.exp(-Math.max(DR.pos[1],0)/8500);
+  // Luftdichte nach barometrischer Formel der jeweiligen Welt, bezogen auf die
+  // Welt, für die die Drohne ausgelegt ist. Nach oben gedeckelt: in dichterer
+  // Luft als vorgesehen begrenzt das Motordrehmoment, nicht die Luft.
+  const rhoDesign=WORLDS[d.world||'earth'].rho;
+  const rho=Math.min(1.6, (RHO/rhoDesign)*Math.exp(-Math.max(DR.pos[1],0)/WORLD.H));
   let Tsum=0;
   const MOT=[[1,-1,1],[1,1,-1],[-1,1,1],[-1,-1,-1]];
   const thr=[0,0,0,0];
@@ -5126,11 +5294,12 @@ const WXS={fall:0, dx:0, dz:0};
 function wxReset(){ WXS.fall=0; WXS.dx=0; WXS.dz=0; }
 function stepWeather(dt){
   if(!WX.kind)return;
-  const snow=WX.kind==='snow';
+  const snow=WX.kind==='snow', dust=WX.kind==='dust';
   const c=(VIEW&&VIEW.cam)||DR.pos;
   const wind=windAt(APP.time,c[1]);
-  const wf=snow?0.9:0.35;
-  WXS.fall=(WXS.fall+(snow?1.7:19)*dt)%(2*RAIN_T);
+  // Staub sinkt kaum, wird aber weit getragen – in dünner Luft schwebt er lange
+  const wf=dust?2.4:snow?0.9:0.35;
+  WXS.fall=(WXS.fall+(dust?0.8:snow?1.7:19)*dt)%(2*RAIN_T);
   WXS.dx+=wind[0]*wf*dt;
   WXS.dz+=wind[2]*wf*dt;
 }
@@ -5145,6 +5314,7 @@ const BIRD_HITS=4;          // so viele Treffer hält die Drohne aus
 let birdTimer=25;
 function birdSpawn(){
   if(!SCENE)return null;
+  if(!WORLD.gps&&WORLD.id!=='earth')return null;   // ausserhalb der Erde fliegt kein Vogel
   const R=(SCENE.map.range||500)*0.7;
   const a=Math.random()*Math.PI*2, r=60+Math.random()*R;
   const x=Math.cos(a)*r, z=Math.sin(a)*r;
@@ -6350,9 +6520,10 @@ function render(){
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
     gl.depthMask(false);
-    const col=snow?[1,1,1.05]:[0.7,0.8,0.98];
+    const dust=WX.kind==='dust';
+    const col=dust?[0.86,0.66,0.46]:snow?[1,1,1.05]:[0.7,0.8,0.98];
     for(let i=0;i<2;i++)for(let k=0;k<2;k++)
-      drawMesh(bm,M4.translate(bx+i*S,by,bz+k*S),col,snow?0.95:0.6);
+      drawMesh(bm,M4.translate(bx+i*S,by,bz+k*S),col,dust?0.5:snow?0.95:0.6);
     gl.depthMask(true);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
   }
   // Abgeworfene Kiste liegt in der Landschaft
@@ -7244,7 +7415,7 @@ function tryArm(){
 }
 function cycleMode(){
   if(APP.state!=='fly')return;
-  APP.modeIdx=(APP.modeIdx+1)%APP.model.modes.length;
+  APP.modeIdx=(APP.modeIdx+1)%APP.modes.length;
   const m=APP.mode;
   if(!APP.springThr&&IN.src!=='pad'&&!TOUCH.l){
     const hover=Math.sqrt((APP.model.mass*G)/(APP.model.tmax));
