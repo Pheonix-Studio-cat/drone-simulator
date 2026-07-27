@@ -127,6 +127,19 @@ Regen und Schnee kosten **ehrlich, aber wenig**: gemessen an einem Race-5-Zölle
 
 Passend dazu gibt es den 🔦 **Scheinwerfer** als Zubehör (190 g, Taste `L`): ein Lichtkegel, der den Boden anleuchtet.
 
+### 🏠 Return-to-Home, Videolink und Gimbal
+**Return-to-Home** (Taste `T` oder 🏠 im HUD): Beim Armen merkt sich die Drohne ihren Startpunkt. Auf Knopfdruck steigt sie erst auf 35 m Sicherheitshöhe, fliegt dann heim und landet dort selbstständig – im Test aus 281 m Entfernung 0,1 m neben dem Startpunkt. Ein Stickausschlag bricht ab, die Kontrolle bleibt jederzeit bei dir.
+
+**Failsafe:** Unter 15 % Akku oder an der Reichweitengrenze kommt sie von allein zurück – aber **nur aus dem GPS-Modus heraus**. Wer bewusst in ANGLE oder ACRO fliegt, bekommt seine Drohne nicht mitten im Manöver umgeschaltet, sondern nur eine deutliche Warnung. Drohnen ohne GPS haben gar kein RTH.
+
+**Videolink** 📶: Die Verbindung zum Startpunkt wird mitgerechnet. Bis etwa zur halben Reichweite ist sie voll, danach fällt sie ab; **Gebäude in der Sichtlinie** dämpfen zusätzlich. Gemessen in der Großstadt (Reichweite 760 m): 100 % in der Nähe, 78 % bei 500 m, 16 % bei 740 m – und zwischen Hochhäusern auf Bodenhöhe 52 % statt 84 % darüber. Bei schwachem Link flimmert das Bild, bei fast weggebrochenem Signal setzt es ganz aus.
+
+**Gimbal-Neigung:** Mit `,` und `.` die Kamera zwischen −90° (senkrecht nach unten) und +30° schwenken; der 🎥-Knopf schaltet für Touch durch 0/−30/−60/−90°. Wirkt bei Gimbal-Drohnen genauso wie bei fester FPV-Kamera.
+
+**Akkuwarnungen** mit Ton bei 25 % und ab 15 % im Sekundentakt – über denselben Klangerzeuger wie das Motorengeräusch, es wird nichts nachgeladen.
+
+**Windsack** am Startplatz: dreht sich mit dem Wind und hängt bei Flaute schlaff herunter – so siehst du den Wind, statt ihn nur zu spüren.
+
 ### Grafik-Umschalter
 Im Menü zwischen **✨ Realistisch** (glatte, produktnahe Rümpfe mit Glanzlicht) und **🧱 Blockig (Retro)** wählen. Die Auswahl wird gespeichert.
 
@@ -166,6 +179,8 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 | `J` | Wespenschwarm loslassen (mit Wespennest) |
 | `Y` | Katze miauen lassen (mit Katze im Tragegurt) |
 | `L` | Scheinwerfer an/aus (mit Scheinwerfer) |
+| `T` | Return-to-Home starten / abbrechen |
+| `,` / `.` | Kamera nach unten / oben neigen |
 | `R` | Zurücksetzen |
 | `1`–`4` | Windstärke |
 | `Esc` | Menü |
