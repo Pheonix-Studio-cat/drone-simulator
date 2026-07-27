@@ -1878,6 +1878,20 @@ function personMesh(shirt,pants,parka){
     b.ellipsoid(0.11,0.1,0.115,[0,1.56,0],12,6,parka?shirt:[0.3,0.25,0.2],0.5,1);
   });
 }
+/* Getroffene Person: dieselbe Figur, aber am Boden liegend und gedämpft.
+   Bewusst schlicht – kein Blut, keine Einzelteile. */
+function personDownMesh(shirt,pants){
+  const dim=c=>[c[0]*0.62,c[1]*0.62,c[2]*0.62];
+  const sh=dim(shirt), pa=dim(pants), skin=[0.6,0.5,0.42];
+  return mesh(b=>{
+    b.box(0.16,0.13,0.78,[-0.09,0.07,0.2],0,pa);
+    b.box(0.16,0.13,0.78,[ 0.09,0.07,0.2],0,pa);
+    b.box(0.4,0.24,0.62,[0,0.12,-0.28],0,sh);
+    b.box(0.12,0.1,0.55,[-0.26,0.06,-0.3],0,sh);
+    b.box(0.12,0.1,0.55,[ 0.26,0.06,-0.3],0,sh);
+    b.ellipsoid(0.105,0.11,0.12,[0,0.12,-0.68],12,8,skin);
+  });
+}
 // Mutanten: nach einer Nuklearexplosion wachsen zusätzliche Gliedmaßen
 // (Comic-Effekt, wie der dreiäugige Fisch im Zeichentrick)
 function mutantMesh(stage){
@@ -1915,6 +1929,8 @@ const PERSON_MESHES={
        personMesh([0.85,0.8,0.4],[0.3,0.35,0.3]),personMesh([0.4,0.6,0.4],[0.25,0.25,0.3])],
   parka:[personMesh([0.95,0.45,0.1],[0.2,0.22,0.28],1),personMesh([0.9,0.2,0.15],[0.18,0.2,0.25],1)],
   mutant:[mutantMesh(1),mutantMesh(2),mutantMesh(3)],
+  down:[personDownMesh([0.7,0.3,0.3],[0.25,0.28,0.35]),personDownMesh([0.3,0.45,0.7],[0.2,0.2,0.22]),
+        personDownMesh([0.85,0.8,0.4],[0.3,0.35,0.3]),personDownMesh([0.4,0.6,0.4],[0.25,0.25,0.3])],
 };
 
 // Einzelnes Dreieck mit Farbe; flip dreht die Umlaufrichtung (gespiegelte Hälften)
@@ -3730,14 +3746,14 @@ function buildScene(mapId){
     if(map.water&&terH(x,z)<wl+0.3)continue;
     const dir=rnd()*Math.PI*2, len=12+rnd()*25;
     people.push({x0:x,z0:z,x1:x+Math.cos(dir)*len,z1:z+Math.sin(dir)*len,
-      t:rnd(),spd:(0.5+rnd()*0.7)/len,mesh:pm[i%pm.length],x,z,yaw:0,phase:rnd()*7});
+      t:rnd(),spd:(0.5+rnd()*0.7)/len,mesh:pm[i%pm.length],mi:i,x,z,yaw:0,phase:rnd()*7});
   }
   // von Hand gesetzte Personen (Map-Builder)
   for(const o of (map.objects||[])){
     if(o.k!=='person')continue;
     const dir=rnd()*Math.PI*2, len=10+rnd()*18;
     people.push({x0:o.x,z0:o.z,x1:o.x+Math.cos(dir)*len,z1:o.z+Math.sin(dir)*len,
-      t:rnd(),spd:(0.5+rnd()*0.6)/len,mesh:pm[people.length%pm.length],
+      t:rnd(),spd:(0.5+rnd()*0.6)/len,mesh:pm[people.length%pm.length],mi:people.length,
       x:o.x,z:o.z,yaw:0,phase:rnd()*7});
   }
   // Tiere: gleiche Wegpunkt-Logik wie die Fußgänger, nur vierbeinig
@@ -4127,7 +4143,8 @@ function resetDrone(fullBatt=true,clearWreck=true){
   resetFacts(); STATS.flights++; saveStats(); ghostStart();
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST;
-    BIRDS=[]; birdTimer=25; }
+    BIRDS=[]; birdTimer=25;
+    revivePeople(); }
   DR.birdHits=0;
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
   IN.thr=APP.springThr?0:-1; IN.yaw=IN.pit=IN.rol=0;
@@ -4164,7 +4181,7 @@ function windAt(t,y){
 /* ---------------- Flugbuch, Abzeichen, Geist ----------------
    STATS und BADGES_FOUND liegen im localStorage, FACT sammelt die Fakten
    des laufenden Fluges. Geprüft wird einmal pro Sekunde, nicht pro Bild. */
-let STATS={time:0,dist:0,flights:0,crashes:0,topSpeed:0,maxAlt:0,photos:0,per:{}};
+let STATS={time:0,dist:0,flights:0,crashes:0,topSpeed:0,maxAlt:0,photos:0,killed:0,per:{}};
 let BADGES_FOUND=[];
 const FACT={};
 function loadStats(){
@@ -4183,7 +4200,7 @@ function resetFacts(){
   for(const k of Object.keys(FACT)) delete FACT[k];
   FACT.topSpeed=0; FACT.maxAlt=0; FACT.maxHomeDist=0;
   FACT.nightTime=0; FACT.badWxTime=0; FACT.cleanTime=0; FACT.bestCannon=0;
-  FACT.waspsScared=0; FACT.schoolDone=schoolPassedCount();
+  FACT.waspsScared=0; FACT.killed=0; FACT.schoolDone=schoolPassedCount();
   FACT.photos=(typeof PHOTOS!=='undefined'?PHOTOS.length:0);
   FACT.eggsFound=EGGS_FOUND.length;
   FACT.flewDiy=false; FACT.flewOwnMap=false;
@@ -4960,6 +4977,7 @@ function cannonHit(x,y,z,col){
   APP.shake=Math.max(APP.shake||0,0.45);
   if(!DR.crashed&&Math.hypot(DR.pos[0]-x,DR.pos[1]-y,DR.pos[2]-z)<5.5)
     crash('Eigenen Kanonenschuss abbekommen!');
+  hitPeopleAt(x,z,CANNON_R*0.6);
   toast(n>0? '🎇 '+n+(n===1?' Objekt':' Objekte')+' zerlegt' : '🎇 Volltreffer ins Leere',1400);
   fact('bestCannon',n);
   return n;
@@ -5425,6 +5443,7 @@ function mutatePeople(x,z,R){
   if(!SCENE||!SCENE.people)return 0;
   let n=0;
   for(const p of SCENE.people){
+    if(p.dead)continue;                 // Getroffene mutieren nicht mehr
     const dd=Math.hypot(p.x-x,p.z-z);
     if(dd>R)continue;
     // je näher, desto kräftiger die Mutation
@@ -5439,7 +5458,8 @@ function mutatePeople(x,z,R){
 function nukeBlast(x,y,z){
   const R=100;                                   // Sprengradius
   const n=destroyAt(x,z,R);
-  const mut=mutatePeople(x,z,200);               // Mutationsradius
+  hitPeopleAt(x,z,R*0.35);                       // im Feuerball überlebt niemand
+  const mut=mutatePeople(x,z,200);               // im Ring darum: Mutation
   aiBlast(x,y,z,R*2);                            // fremde Drohnen im Umkreis fallen mit
   // Feuerball, Stiel und Pilzkopf
   BLASTS.push({pos:[x,y+18,z],vel:[0,9,0],r:26,t:0,life:2.2,kind:'fire'});
@@ -5540,6 +5560,47 @@ function objectDebris(o,y){
   }
 }
 // Alles im Umkreis zerlegen. Gibt die Zahl der zerstörten Objekte zurück.
+/* Explosionen und Waffen treffen auch Menschen. Innerhalb von R ist es
+   tödlich, bis 2,2*R rennen sie davon. Ein blosser Zusammenstoss mit der
+   Drohne tut das ausdrücklich NICHT – der verletzt nur (groundAndCollisions).
+   Bewusst nüchtern gehalten: die Figur kippt um und bleibt liegen. */
+function hitPeopleAt(x,z,R){
+  if(!SCENE)return 0;
+  let killed=0;
+  for(const p of SCENE.people){
+    const dd=Math.hypot(p.x-x,p.z-z);
+    if(dd>R*2.2)continue;
+    if(dd<R&&!p.dead){
+      p.dead=1; p.fall=0;
+      p.mesh=PERSON_MESHES.down[(p.mi||0)%PERSON_MESHES.down.length];
+      killed++;
+    }else if(!p.dead){
+      scarePersonAway(p);
+    }
+  }
+  if(killed){
+    STATS.killed=(STATS.killed||0)+killed; saveStats();
+    fact('killed',(FACT.killed||0)+killed);
+    beep(180,0.5,0.2);
+    toast(killed===1?'☠️ Eine Person getroffen':'☠️ '+killed+' Personen getroffen',3000);
+  }
+  return killed;
+}
+/* Beim Zurücksetzen steht die Karte wieder wie vorher da – sonst bliebe sie
+   über Neustarts hinweg leer, weil nur buildScene die Menschen neu setzt. */
+function revivePeople(){
+  if(!SCENE||!SCENE.people)return 0;
+  let n=0;
+  const pm=(SCENE.map&&SCENE.map.gen==='arctic')?PERSON_MESHES.parka:PERSON_MESHES.std;
+  for(const p of SCENE.people){
+    if(!p.dead)continue;
+    p.dead=0; p.fall=0; p.gone=0; p.stung=0;
+    p.mesh=p.mut?PERSON_MESHES.mutant[Math.min(p.mut,PERSON_MESHES.mutant.length)-1]
+                :pm[(p.mi||0)%pm.length];
+    n++;
+  }
+  return n;
+}
 function destroyAt(x,z,R){
   const hit=SCENE.obstacles.filter(o=>Math.hypot(o.x-x,o.z-z)<R+o.r*0.5);
   if(!hit.length)return 0;
@@ -5566,10 +5627,7 @@ function explode(x,y,z){
       r:1+Math.random()*1.9,t:0,life:1.6+Math.random()*1.6,kind:'smoke',col:[0.3,0.29,0.28]});
   }
   APP.shake=Math.max(APP.shake||0, 1);
-  // Menschen in der Nähe erschrecken (sie rennen weg, kommen aber nicht zu Schaden)
-  for(const p of SCENE.people){
-    if(Math.hypot(p.x-x,p.z-z)<R*2.2) p.spd=Math.abs(p.spd)*2.6;
-  }
+  hitPeopleAt(x,z,R*0.55);      // im Feuerball tödlich, aussen herum Flucht
   scareAnimals(x,z,R*3,3); birdScare(x,z,R*4);
   // Die eigene Drohne hält den Druck nicht aus, wenn sie zu tief drüber steht
   if(!DR.crashed&&Math.hypot(DR.pos[0]-x,DR.pos[1]-y,DR.pos[2]-z)<9)
@@ -5596,6 +5654,8 @@ function stepBombs(dt){
       if(b.t>=b.fuse||b.pos[1]<=gyf+0.3){
         BOMBS.splice(i,1);
         fireworkBurst(b.pos[0],Math.max(b.pos[1],gyf+0.4),b.pos[2],b.col);
+        // Zerplatzt sie dicht über dem Boden, ist das kein Spass mehr
+        if(b.pos[1]-gyf<6) hitPeopleAt(b.pos[0],b.pos[2],3.5);
       }
       continue;
     }
@@ -5979,6 +6039,7 @@ function makeMission(id){
 function stepPeople(dt){
   if(!SCENE)return;
   for(const p of SCENE.people){
+    if(p.dead){ p.fall=Math.min(1,(p.fall||0)+dt/0.4); continue; }   // kippt um, läuft nicht mehr
     p.t=(p.t+p.spd*dt)%2;
     const k=p.t<1?p.t:2-p.t;
     const nx=lerp(p.x0,p.x1,k), nz=lerp(p.z0,p.z1,k);
@@ -6114,6 +6175,13 @@ function render(){
   // Fußgänger
   for(const p of SCENE.people){
     const y=SCENE.terH(p.x,p.z);
+    if(p.dead){
+      // Das liegende Modell wird über 0,4 s aus dem Stand heruntergekippt:
+      // bei fall=0 steht es aufrecht, bei fall=1 liegt es flach.
+      const tip=(1-(p.fall||0))*Math.PI/2;
+      drawMesh(p.mesh,M4.mul(M4.mul(M4.translate(p.x,y,p.z),M4.rotY(p.yaw)),M4.rotX(tip)));
+      continue;
+    }
     const bob=Math.abs(Math.sin(p.phase))*0.05;
     drawMesh(p.mesh,M4.mul(M4.translate(p.x,y+bob,p.z),M4.rotY(p.yaw)));
   }
@@ -7138,6 +7206,7 @@ function buildLogbook(){
     <span>🚀 Topspeed: <b>${(STATS.topSpeed*3.6).toFixed(0)} km/h</b></span>
     <span>☁️ Höchste Höhe: <b>${STATS.maxAlt.toFixed(0)} m</b></span>
     <span>🏅 Abzeichen: <b>${BADGES_FOUND.length}/${BADGES.length}</b></span>
+    ${STATS.killed?`<span style="color:#ff9a92">☠️ Personen getroffen: <b>${STATS.killed}</b></span>`:''}
   </div>`;
   if(rows.length){
     html+='<table><tr><th>Drohne</th><th>Flugzeit</th><th>Strecke</th><th>Topspeed</th></tr>';
@@ -8187,6 +8256,7 @@ window.T={
   saveCtrl,resetCtrl,bfRate,ratesFor,maxRateOf,thrCurve,shapeAxis,applyStickMode,
   lagReset,inDelayed,padRaw,padCalStart,get PADCAL(){return PADCAL;},
   fixedCenter,touchRad,buildCtrlUI,buildMenu,acroRateAt,
+  hitPeopleAt,revivePeople,crashSpeed,touchLimits,get STATS(){return STATS;},get FACT(){return FACT;},
   keydown(c){KEYS[c]=true;if(IN.src!=='test')IN.src='keys';},
   keyup(c){KEYS[c]=false;},
   tick(sec){
