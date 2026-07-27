@@ -71,6 +71,8 @@ Braucht Internet. Klappt der Abruf nicht, sagt der Simulator das klar und die ei
 
 Auf allen Karten laufen Menschen herum – wer sie anfliegt, crasht. Alle Karten sind prozedural generiert und komplett offline.
 
+**Waffen sind tödlich, ein Zusammenstoss nicht.** Bomben, die Feuerwerkskanone, tief zerplatzende Leuchtkugeln und die Atomrakete können Menschen treffen – im Sprengradius tödlich, im Ring darum rennen sie davon. Ein blosser Zusammenstoss mit der Drohne verletzt dagegen nur: die Person rennt weg, die Drohne ist hin. Getroffene bleiben liegen, bis du zurücksetzt (`R`); gezählt werden sie im Flugbuch. Dargestellt wird das bewusst nüchtern – die Figur kippt um, kein Blut, keine Einzelteile –, und ein Abzeichen gibt es dafür ausdrücklich nicht.
+
 ### Tiny Whoop: klein sein hat Folgen
 Der **Typhoon20** (50 g, 2S 300 mAh) fliegt nicht einfach wie eine kleinere große Drohne – die Größe ändert die Physik:
 
