@@ -76,6 +76,27 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .logbox th{text-align:left;color:var(--acc);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--line)}
 .logbox td{padding:4px 6px;color:#b9cbdc;border-bottom:1px solid rgba(120,160,200,.08)}
 .logbox .none{color:var(--dim);font-size:12.5px}
+/* ---------- Steuerung einstellen ---------- */
+.ctrl{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.ctrl h4{font-size:11.5px;color:var(--acc);text-transform:uppercase;letter-spacing:1.2px;
+  margin:16px 0 7px;font-weight:700}
+.ctrl h4:first-child{margin-top:0}
+.ctrl .crow{display:flex;gap:7px;flex-wrap:wrap}
+.ctrl .cbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;
+  padding:9px 13px;font-size:12.5px;cursor:pointer;line-height:1.25;text-align:left}
+.ctrl .cbtn small{display:block;color:var(--dim);font-size:10px;margin-top:2px}
+.ctrl .cbtn.sel{border-color:var(--acc);color:var(--acc);font-weight:700;box-shadow:0 0 0 1px var(--acc)}
+.ctrl .sl{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#b9cbdc;margin:6px 0}
+.ctrl .sl .nm{flex:0 0 132px}
+.ctrl .sl input[type=range]{flex:1 1 110px;min-width:90px;accent-color:var(--acc)}
+.ctrl .sl .vl{flex:0 0 78px;text-align:right;color:#fff;font-variant-numeric:tabular-nums}
+.ctrl .note{color:var(--dim);font-size:11.5px;line-height:1.55;margin:7px 0 2px}
+.ctrl canvas{width:100%;max-width:330px;height:auto;aspect-ratio:1/1;background:#0d141c;
+  border:1px solid var(--line);border-radius:10px;display:block;margin:9px 0 4px;
+  position:static;inset:auto}
+.ctrl .chk{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:#b9cbdc;margin:7px 0}
+.ctrl .chk label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.ctrl .ok{color:#7fe0a0}
 .rowbtns{display:flex;gap:8px;flex-wrap:wrap}
 .rowbtns button{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:9px;
   padding:9px 16px;font-size:13px;cursor:pointer}
@@ -267,7 +288,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <div class="logbox" id="logBox"></div>
   <h2>Foto-Galerie</h2>
   <div id="photoGrid"></div>
-  <h2>Steuerung</h2>
+  <h2>🎮 Steuerung einstellen</h2>
+  <div class="ctrl" id="ctrlBox"></div>
+  <h2>Tastenbelegung</h2>
   <div class="help" id="helpBox">
     <b>Tastatur (Mode 2):</b> <span class="k">W</span>/<span class="k">S</span> Gas ·
     <span class="k">A</span>/<span class="k">D</span> Gieren (Yaw) ·
@@ -288,8 +311,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     <span class="k">T</span> Return-to-Home ·
     <span class="k">,</span> / <span class="k">.</span> Kamera neigen ·
     <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
-    <b>Gamepad:</b> Linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2) – wird automatisch erkannt.<br>
-    <b>Touch:</b> Virtuelle Sticks unten links (Gas/Yaw) und rechts (Nick/Roll), Buttons oben rechts.
+    <span class="k">Shift</span> gedrückt halten = Feinsteuerung (kleinere Ausschläge).<br>
+    <b>Gamepad / RC-Sender:</b> wird automatisch erkannt; Belegung und Endausschläge lassen sich oben
+    unter <b>Steuerung einstellen</b> kalibrieren.<br>
+    <b>Touch:</b> Zwei virtuelle Sticks, wahlweise fest in den Ecken oder schwebend unter dem Finger.
+    Welcher Stick was macht, bestimmt der gewählte <b>Mode 1–4</b>.
   </div>
   <button id="startBtn">ABHEBEN</button>
   <button id="buildBtn">🔧 Eigene Drohne bauen (DIY-Editor)</button>
@@ -1158,6 +1184,81 @@ function allMaps(){ return MAPS.concat(MY_MAPS); }
 function mapById(id){ return allMaps().find(m=>m.id===id); }
 
 /* ---------------- Missionen (Basisdaten, Höhen werden pro Karte gesetzt) ---------------- */
+/* ---------------- Steuerung ----------------
+   Knüppelbelegung wie bei echten Fernsteuerungen. LV/LH = linker Knüppel
+   senkrecht/waagerecht, RV/RH entsprechend rechts. */
+const STICK_MODES={
+  1:{name:'Mode 1', lv:'pit', lh:'yaw', rv:'thr', rh:'rol'},
+  2:{name:'Mode 2', lv:'thr', lh:'yaw', rv:'pit', rh:'rol'},
+  3:{name:'Mode 3', lv:'pit', lh:'rol', rv:'thr', rh:'yaw'},
+  4:{name:'Mode 4', lv:'thr', lh:'rol', rv:'pit', rh:'yaw'},
+};
+const AXES=['thr','yaw','pit','rol'];
+const AXIS_NAMES={thr:'Gas',yaw:'Gieren',pit:'Nicken',rol:'Rollen'};
+const CTRL_DEFAULT={
+  mode:2,
+  // Betaflight-Ratenkurve; rate=null heißt „vom Drohnenmodell übernehmen"
+  rc:{ custom:0,
+       rol:{rate:1.0,sup:0.55,expo:0.15},
+       pit:{rate:1.0,sup:0.55,expo:0.15},
+       yaw:{rate:0.7,sup:0.50,expo:0.10} },
+  dead:{thr:0.02,yaw:0.04,pit:0.04,rol:0.04},
+  trim:{yaw:0,pit:0,rol:0},
+  invert:{thr:0,yaw:0,pit:0,rol:0},
+  thrExpo:0.35,          // Gaskurve: flacher um den Schwebepunkt
+  latency:28,            // ms Verzögerung Funke + Flugregler
+  key:{up:4.5,down:6.0,thr:1.1,fine:0.4},
+  touch:{fixed:0,rad:70},
+  pad:null,              // {axes:{thr:{i,inv,min,max,mid}, …}, arm:0}
+};
+let CTRL=JSON.parse(JSON.stringify(CTRL_DEFAULT));
+function loadCtrl(){
+  try{
+    const o=JSON.parse(localStorage.getItem('ds_ctrl')||'null');
+    if(o&&typeof o==='object'){
+      // vorsichtig zusammenführen, damit neue Felder Vorgaben behalten
+      const merge=(a,b)=>{ for(const k in b){
+        if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])&&a[k]) merge(a[k],b[k]);
+        else if(b[k]!==undefined) a[k]=b[k]; } };
+      merge(CTRL,o);
+    }
+  }catch(e){}
+}
+function saveCtrl(){ try{ localStorage.setItem('ds_ctrl',JSON.stringify(CTRL)); }catch(e){} }
+function resetCtrl(){ CTRL=JSON.parse(JSON.stringify(CTRL_DEFAULT)); saveCtrl(); }
+loadCtrl();
+
+/* Betaflight-Ratenkurve: erst Expo auf den Knüppelweg, dann RC-Rate,
+   dann Super-Rate, die den Ausschlag am Ende stark aufsteilt.
+   Liefert die Solldrehrate in Grad/s. */
+function bfRate(x,rcRate,superRate,expo){
+  const a=Math.min(1,Math.abs(x));
+  const sgn=Math.sign(x);
+  const expoed=sgn*(a*a*a*expo + a*(1-expo));
+  let rate=200*rcRate*Math.abs(expoed);
+  if(superRate>0){
+    const f=1/Math.max(0.01,1-Math.abs(expoed)*Math.min(0.99,superRate));
+    rate*=f;
+  }
+  return sgn*Math.min(rate,2000);
+}
+/* Werte für eine Achse: entweder eigene oder aus dem Drohnenmodell abgeleitet.
+   Ohne eigene Raten ist rcRate so gewählt, dass voller Ausschlag genau die
+   Höchstrate des Modells ergibt – die Kurve dazwischen ist Betaflight-typisch
+   weich um die Mitte und steil an den Enden.
+   Gieren ist in ACRO deutlich schneller als in ANGLE/GPS, wie bei echten Reglern. */
+function ratesFor(d,axis,acro){
+  const c=CTRL.rc[axis]||CTRL.rc.rol;
+  if(CTRL.rc.custom) return {rate:c.rate,sup:c.sup,expo:c.expo};
+  const sup=c.sup;
+  const maxDeg=(axis==='yaw'? (acro? d.rates.max*0.6 : d.yawRate) : d.rates.max);
+  // Das Modell-Expo stammt aus der alten, einfachen Kurve; zusammen mit superRate
+  // wäre es doppelt gemoppelt und die Mitte fast tot. Deshalb anteilig.
+  return {rate:maxDeg/200*(1-Math.min(0.99,sup)), sup, expo:d.rates.expo*0.45};
+}
+// Höchste Drehrate dieser Achse bei vollem Ausschlag (für Anzeige)
+function maxRateOf(d,axis,acro){ const r=ratesFor(d,axis,acro); return Math.abs(bfRate(1,r.rate,r.sup,r.expo)); }
+
 /* ---------------- Tageszeit & Wetter ----------------
    Beleuchtung hängt im ganzen Renderer nur an SUN, ENV.fog und ENV.sky.
    sunC/ambC sind Multiplikatoren: bei „Mittag" alle 1, das Bild bleibt
@@ -3627,58 +3728,209 @@ function buildScene(mapId){
     envKey:APP.daytime+'|'+APP.weather};
   return SCENE;
 }
-
 /* ---------------- Eingabe: Tastatur, Gamepad, Touch ----------------
-   Stick-Konvention (Mode 2): thr,yaw = linker Stick · pit,rol = rechter Stick
-   Alle Werte -1..1. pit +1 = Stick nach vorn, rol +1 = Stick nach rechts. */
+   Alle Geräte liefern zuerst rohe Knüppelwerte LV/LH/RV/RH (-1..1).
+   Erst danach kommen Knüppelbelegung (Mode 1-4), Totzone, Trimmung,
+   Umkehr, Gaskurve und die Übertragungsverzögerung.
+   IN enthält am Ende thr,yaw,pit,rol wie bisher. */
 const IN={thr:-1,yaw:0,pit:0,rol:0,src:'keys'};
+const RAW={lv:-1,lh:0,rv:0,rh:0};        // rohe Knüppel, vor jeder Aufbereitung
 const KEYS={};
 const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 
 addEventListener('keydown',e=>{
   if(e.repeat)return;
   KEYS[e.code]=true;
-  if(/^(KeyW|KeyA|KeyS|KeyD|Arrow)/.test(e.code)&&IN.src!=='test'){IN.src='keys';padActive=false;}
+  if(/^(KeyW|KeyA|KeyS|KeyD|Arrow|ShiftLeft|ShiftRight)/.test(e.code)&&IN.src!=='test'){IN.src='keys';padActive=false;}
   handleKey(e.code); // Aktionen (in Teil "Steuerlogik" definiert)
 });
 addEventListener('keyup',e=>{KEYS[e.code]=false;});
 
+/* --- Aufbereitung: Totzone, Umkehr, Trimmung --- */
+function shapeAxis(v,axis){
+  const dz=CTRL.dead[axis]||0;
+  let x=v;
+  if(CTRL.invert[axis]) x=-x;
+  if(axis!=='thr'){
+    // Totzone um die Mitte, danach wieder auf den vollen Weg strecken
+    const a=Math.abs(x);
+    x = a<dz ? 0 : Math.sign(x)*(a-dz)/(1-dz);
+    x = clamp(x+(CTRL.trim[axis]||0),-1,1);
+  }else{
+    // Gas: Totzone nur am unteren Anschlag
+    const t=(x+1)/2;
+    const tt = t<dz ? 0 : (t-dz)/(1-dz);
+    x=tt*2-1;
+  }
+  return clamp(x,-1,1);
+}
+/* Gaskurve: um den Schwebepunkt flacher, an den Enden steiler.
+   thrExpo 0 = linear, 1 = sehr flach in der Mitte. */
+function thrCurve(t01){
+  const e=clamp(CTRL.thrExpo,0,1);
+  const x=t01*2-1;
+  const y=x*(x*x*e+(1-e));
+  return clamp((y+1)/2,0,1);
+}
+/* Knüppelbelegung anwenden und IN füllen */
+function applyStickMode(){
+  const m=STICK_MODES[CTRL.mode]||STICK_MODES[2];
+  const out={};
+  out[m.lv]=RAW.lv; out[m.lh]=RAW.lh; out[m.rv]=RAW.rv; out[m.rh]=RAW.rh;
+  for(const a of AXES){
+    let v=shapeAxis(out[a]!==undefined?out[a]:0,a);
+    if(a==='thr') v=thrCurve((v+1)/2)*2-1;
+    IN[a]=v;
+  }
+}
+/* --- Übertragungsverzögerung: Ringpuffer mit Zeitstempeln ---
+   Echte Funke plus Flugregler brauchen ein paar Dutzend Millisekunden.
+   Der Regler liest nicht IN, sondern den entsprechend alten Eintrag. */
+const LAG={buf:[],t:0};
+const LAG_MAX=240;
+function lagPush(dt){
+  LAG.t+=dt*1000;
+  LAG.buf.push({t:LAG.t,thr:IN.thr,yaw:IN.yaw,pit:IN.pit,rol:IN.rol});
+  const keep=LAG.t-LAG_MAX;
+  while(LAG.buf.length>2&&LAG.buf[0].t<keep) LAG.buf.shift();
+}
+function lagReset(){ LAG.buf=[]; LAG.t=0; }
+// Verzögerte Knüppelwerte für den Flugregler
+function inDelayed(){
+  if(IN.src==='test') return IN;          // Testhaken umgeht die Funkstrecke
+  const ms=clamp(CTRL.latency||0,0,LAG_MAX);
+  if(ms<=0||!LAG.buf.length) return IN;
+  const want=LAG.t-ms;
+  let lo=LAG.buf[0];
+  for(let i=LAG.buf.length-1;i>=0;i--){ if(LAG.buf[i].t<=want){ lo=LAG.buf[i]; break; } }
+  return lo;
+}
+
 // Sanfte Rampen, damit digitale Tasten wie analoge Sticks wirken
 function updateKeyInput(dt,springThr){
-  const ramp=(cur,target,up=4.5,down=6)=>{
+  const K=CTRL.key;
+  const fine=(KEYS.ShiftLeft||KEYS.ShiftRight)?K.fine:1;   // Feintaste: halber Weg
+  const ramp=(cur,target,up,down)=>{
     const r=(Math.abs(target)>Math.abs(cur)&&Math.sign(target)===Math.sign(cur||target))?up:down;
     const d=target-cur, m=r*dt;
     return Math.abs(d)<=m?target:cur+Math.sign(d)*m;
   };
-  const kv=(a,b)=>(KEYS[a]?1:0)-(KEYS[b]?1:0);
-  IN.yaw=ramp(IN.yaw,kv('KeyD','KeyA'));
-  IN.pit=ramp(IN.pit,kv('ArrowUp','ArrowDown'));
-  IN.rol=ramp(IN.rol,kv('ArrowRight','ArrowLeft'));
+  const kv=(a,b)=>((KEYS[a]?1:0)-(KEYS[b]?1:0))*fine;
+  // Tasten liegen fest auf den Knüppelrichtungen, die Belegung macht der Mode
+  const wantLH=kv('KeyD','KeyA');
+  const wantRV=kv('ArrowUp','ArrowDown');
+  const wantRH=kv('ArrowRight','ArrowLeft');
   const tk=kv('KeyW','KeyS');
-  if(springThr){ IN.thr=ramp(IN.thr,tk,3.5,4.5); }
-  else{ IN.thr=clamp(IN.thr+tk*dt*1.1,-1,1); } // manuelles Gas: Stick bleibt stehen
+  RAW.lh=ramp(RAW.lh,wantLH,K.up,K.down);
+  RAW.rv=ramp(RAW.rv,wantRV,K.up,K.down);
+  RAW.rh=ramp(RAW.rh,wantRH,K.up,K.down);
+  if(springThr) RAW.lv=ramp(RAW.lv,tk,K.up*0.78,K.down*0.75);
+  else RAW.lv=clamp(RAW.lv+tk*dt*K.thr,-1,1);   // manuelles Gas: Knüppel bleibt stehen
 }
 
-/* --- Gamepad --- */
+/* --- Gamepad ---
+   Ohne Kalibrierung gilt die übliche Belegung (Achsen 0-3). Mit Kalibrierung
+   werden Achsnummer, Umkehr, Mitte und Endausschläge pro Achse benutzt –
+   echte RC-Sender am USB-Adapter liegen fast immer anders. */
 let padActive=false;
+const PADCAL={on:false,step:0,axis:null,base:null,msg:''};
+const PAD_ORDER=['lv','lh','rv','rh'];
+const PAD_LABEL={lv:'linker Knüppel: hoch/runter',lh:'linker Knüppel: links/rechts',
+  rv:'rechter Knüppel: hoch/runter',rh:'rechter Knüppel: links/rechts'};
+function padRaw(p,slot){
+  const cal=CTRL.pad&&CTRL.pad.axes&&CTRL.pad.axes[slot];
+  if(cal){
+    const v=p.axes[cal.i];
+    if(v===undefined)return 0;
+    const mid=cal.mid, span=Math.max(0.15,(cal.max-cal.min)/2);
+    let x=clamp((v-mid)/span,-1,1);
+    if(cal.inv) x=-x;
+    return x;
+  }
+  const def={lv:1,lh:0,rv:3,rh:2}[slot];
+  const v=p.axes[def];
+  if(v===undefined)return 0;
+  return (slot==='lv'||slot==='rv')?-v:v;    // Y-Achsen zeigen nach unten
+}
 function pollGamepad(){
   const pads=navigator.getGamepads?navigator.getGamepads():[];
   for(const p of pads){
-    if(!p||p.axes.length<4)continue;
-    const db=v=>Math.abs(v)<0.07?0:(v-Math.sign(v)*0.07)/0.93;
-    const lx=db(p.axes[0]),ly=db(p.axes[1]),rx=db(p.axes[2]),ry=db(p.axes[3]);
-    if(Math.abs(lx)+Math.abs(ly)+Math.abs(rx)+Math.abs(ry)>0.02) padActive=true;
+    if(!p||p.axes.length<2)continue;
+    if(PADCAL.on){ padCalStep(p); return; }
+    const lv=padRaw(p,'lv'),lh=padRaw(p,'lh'),rv=padRaw(p,'rv'),rh=padRaw(p,'rh');
+    if(Math.abs(lh)+Math.abs(rv)+Math.abs(rh)>0.08||Math.abs(lv)>0.2) padActive=true;
     if(padActive){
-      IN.yaw=lx; IN.thr=-ly; IN.rol=rx; IN.pit=-ry; IN.src='pad';
-      if(p.buttons[0]&&p.buttons[0].pressed&&!pollGamepad._a){pollGamepad._a=true;handleKey('Space');}
-      if(p.buttons[0]&&!p.buttons[0].pressed)pollGamepad._a=false;
+      RAW.lv=lv; RAW.lh=lh; RAW.rv=rv; RAW.rh=rh;
+      IN.src='pad';
+      const armBtn=(CTRL.pad&&CTRL.pad.arm)||0;
+      const b=p.buttons[armBtn];
+      if(b&&b.pressed&&!pollGamepad._a){pollGamepad._a=true;handleKey('Space');}
+      if(b&&!b.pressed)pollGamepad._a=false;
     }
     break;
   }
 }
+/* Kalibrier-Assistent: für jeden Knüppel einmal in beide Endlagen,
+   danach loslassen. Achse und Richtung ergeben sich aus der Bewegung. */
+function padCalStart(){
+  const pads=navigator.getGamepads?navigator.getGamepads():[];
+  const p=[...pads].find(x=>x&&x.axes.length>=2);
+  if(!p){ PADCAL.msg='Kein Gamepad gefunden – anstecken und eine Taste drücken.'; return false; }
+  PADCAL.on=true; PADCAL.step=0; PADCAL.axis={};
+  PADCAL.base=[...p.axes];
+  PADCAL.msg='Bewege '+PAD_LABEL[PAD_ORDER[0]]+' einmal ganz in beide Richtungen.';
+  return true;
+}
+function padCalStep(p){
+  const slot=PAD_ORDER[PADCAL.step];
+  if(!slot){ padCalFinish(); return; }
+  let best=-1,bi=-1;
+  for(let i=0;i<p.axes.length;i++){
+    const d=Math.abs(p.axes[i]-(PADCAL.base[i]||0));
+    if(d>best){ best=d; bi=i; }
+  }
+  const a=PADCAL.axis[slot]||(PADCAL.axis[slot]={i:bi,min:1,max:-1,mid:PADCAL.base[bi]||0,seen:0});
+  if(best>0.35){
+    a.i=bi;
+    const v=p.axes[bi];
+    a.min=Math.min(a.min,v); a.max=Math.max(a.max,v);
+    a.seen=Math.max(a.seen,best);
+  }
+  if(a.seen>0.5&&(a.max-a.min)>0.6&&best<0.15){
+    // Knüppel wieder in der Mitte: diese Achse ist fertig
+    a.mid=(a.max+a.min)/2;
+    a.inv=(slot==='lv'||slot==='rv')?1:0;
+    PADCAL.step++;
+    const nx=PAD_ORDER[PADCAL.step];
+    PADCAL.msg=nx?('Bewege '+PAD_LABEL[nx]+' einmal ganz in beide Richtungen.')
+                 :'Fertig – Kalibrierung gespeichert.';
+    if(!nx) padCalFinish();
+    else PADCAL.base=[...p.axes];
+  }
+}
+function padCalFinish(){
+  PADCAL.on=false;
+  CTRL.pad=CTRL.pad||{};
+  CTRL.pad.axes={};
+  for(const slot of PAD_ORDER){
+    const a=PADCAL.axis[slot];
+    if(a) CTRL.pad.axes[slot]={i:a.i,min:a.min,max:a.max,mid:a.mid,inv:a.inv?1:0};
+  }
+  saveCtrl();
+  PADCAL.msg='Fertig – '+Object.keys(CTRL.pad.axes).length+' Achsen kalibriert.';
+  if(typeof buildCtrlUI==='function') buildCtrlUI();
+}
+function padCalCancel(){ PADCAL.on=false; PADCAL.msg='Abgebrochen.'; }
 
-/* --- Touch: zwei virtuelle Sticks (floating) + eigene Zeichnung im HUD --- */
-const TOUCH={l:null,r:null,rad:70}; // {id,cx,cy,x,y} je Stick
+/* --- Touch: zwei virtuelle Sticks + eigene Zeichnung im HUD ---
+   Wahlweise schwebend (Stick entsteht, wo der Finger aufsetzt) oder fest
+   an einer Ecke – feste Sticks treffen sich blind deutlich zuverlässiger. */
+const TOUCH={l:null,r:null,rad:70};
+function touchRad(){ return CTRL.touch.rad||70; }
+function fixedCenter(z){
+  const m=touchRad()+26;
+  return {cx: z==='l'? m : innerWidth-m, cy: innerHeight-m};
+}
 function stickZone(x){ return x<innerWidth/2?'l':'r'; }
 if(IS_TOUCH){
   const down=e=>{
@@ -3687,7 +3939,18 @@ if(IS_TOUCH){
       if(t.clientY<innerHeight*0.25)continue;         // oben: Buttons/HUD
       const z=stickZone(t.clientX);
       if(TOUCH[z])continue;
-      TOUCH[z]={id:t.identifier,cx:t.clientX,cy:t.clientY,x:0,y:0};
+      if(CTRL.touch.fixed){
+        const c=fixedCenter(z);
+        // nur greifen, wenn der Finger in der Nähe des festen Sticks aufsetzt
+        if(Math.hypot(t.clientX-c.cx,t.clientY-c.cy)>touchRad()*2.1)continue;
+        TOUCH[z]={id:t.identifier,cx:c.cx,cy:c.cy,x:0,y:0};
+      }else{
+        TOUCH[z]={id:t.identifier,cx:t.clientX,cy:t.clientY,x:0,y:0};
+      }
+      // sofort auf den Aufsetzpunkt reagieren
+      const s=TOUCH[z];
+      s.x=clamp((t.clientX-s.cx)/touchRad(),-1,1);
+      s.y=clamp((s.cy-t.clientY)/touchRad(),-1,1);
     }
     e.preventDefault();
   };
@@ -3696,8 +3959,8 @@ if(IS_TOUCH){
       for(const z of ['l','r']){
         const s=TOUCH[z];
         if(s&&s.id===t.identifier){
-          s.x=clamp((t.clientX-s.cx)/TOUCH.rad,-1,1);
-          s.y=clamp((s.cy-t.clientY)/TOUCH.rad,-1,1);
+          s.x=clamp((t.clientX-s.cx)/touchRad(),-1,1);
+          s.y=clamp((s.cy-t.clientY)/touchRad(),-1,1);
         }
       }
     }
@@ -3707,7 +3970,10 @@ if(IS_TOUCH){
     for(const t of e.changedTouches){
       for(const z of ['l','r']){
         if(TOUCH[z]&&TOUCH[z].id===t.identifier){
-          if(z==='l'&&!APP.springThr){ TOUCH.thrHold=IN.thr; } // Gas stehen lassen
+          // Gasknüppel ohne Rückstellfeder bleibt stehen, wo er war
+          const m=STICK_MODES[CTRL.mode]||STICK_MODES[2];
+          const vertIsThr=(z==='l'?m.lv:m.rv)==='thr';
+          if(vertIsThr&&!APP.springThr) TOUCH.thrHold=(z==='l'?RAW.lv:RAW.rv);
           TOUCH[z]=null;
         }
       }
@@ -3722,10 +3988,17 @@ if(IS_TOUCH){
 }
 function updateTouchInput(springThr){
   const l=TOUCH.l,r=TOUCH.r;
-  if(l){ IN.yaw=l.x; IN.thr=l.y; IN.src='touch'; }
-  else if(IS_TOUCH&&IN.src==='touch'){ IN.yaw=0; IN.thr=springThr?0:(TOUCH.thrHold??IN.thr); }
-  if(r){ IN.rol=r.x; IN.pit=r.y; IN.src='touch'; }
-  else if(IS_TOUCH&&IN.src==='touch'){ IN.rol=0; IN.pit=0; }
+  const m=STICK_MODES[CTRL.mode]||STICK_MODES[2];
+  if(l){ RAW.lh=l.x; RAW.lv=l.y; IN.src='touch'; }
+  else if(IS_TOUCH&&IN.src==='touch'){
+    RAW.lh=0;
+    RAW.lv=(m.lv==='thr'&&!springThr)?(TOUCH.thrHold??RAW.lv):(m.lv==='thr'?-1:0);
+  }
+  if(r){ RAW.rh=r.x; RAW.rv=r.y; IN.src='touch'; }
+  else if(IS_TOUCH&&IN.src==='touch'){
+    RAW.rh=0;
+    RAW.rv=(m.rv==='thr'&&!springThr)?(TOUCH.thrHold??RAW.rv):(m.rv==='thr'?-1:0);
+  }
 }
 
 /* ---------------- Audio: Motorsound ---------------- */
@@ -3813,6 +4086,13 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.birdHits=0;
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
   IN.thr=APP.springThr?0:-1; IN.yaw=IN.pit=IN.rol=0;
+  // Rohe Knüppel: alles in die Mitte, nur der Gasknüppel nach ganz unten
+  // (ausser bei Rückstellfeder, dann ist auch Gas mittig).
+  RAW.lv=RAW.lh=RAW.rv=RAW.rh=0;
+  { const sm=STICK_MODES[CTRL.mode]||STICK_MODES[2];
+    const slot=sm.lv==='thr'?'lv':sm.rv==='thr'?'rv':sm.lh==='thr'?'lh':'rh';
+    RAW[slot]=APP.springThr?0:-1; }
+  lagReset();
   TOUCH.thrHold=IN.thr;
   if(APP.mission) APP.mission.reset();
   updateButtons();
@@ -4100,22 +4380,26 @@ function flightController(dt){
   const m=d.mass+extraMass();
   const q=DR.q;
   const sf=APP.sensF;
-  const sYaw=IN.yaw*sf, sPit=IN.pit*sf, sRol=IN.rol*sf;
+  const S=inDelayed();                     // Knüppel wie sie am Flugregler ankommen
+  const sYaw=S.yaw*sf, sPit=S.pit*sf, sRol=S.rol*sf;
   const right=Q.rot(q,[1,0,0]), up=Q.rot(q,[0,1,0]), fwd=Q.rot(q,[0,0,-1]);
   let h=[fwd[0],0,fwd[2]], hl=Math.hypot(h[0],h[2]);
   if(hl<0.05){ h=[up[0],0,up[2]]; hl=Math.hypot(h[0],h[2])||1; }
   h=[h[0]/hl,0,h[2]/hl];
   const rh=[-h[2],0,h[0]];
 
-  const rates=d.rates, expo=rates.expo;
-  const curve=v=>Math.sign(v)*(Math.abs(v)**3*expo+Math.abs(v)*(1-expo));
   let rateT=[0,0,0], T=0;
-  const thr01=clamp((IN.thr+1)/2,0,1);
+  const thr01=clamp((S.thr+1)/2,0,1);
   const Ka=5.5+2.5*d.agility;
 
   if(mode==='ACRO'){
-    const mr=rates.max*deg*(0.55+0.45*sf);
-    rateT=[ -curve(sPit)*mr, -curve(sYaw)*mr*0.6, -curve(sRol)*mr ];
+    // Betaflight-Ratenkurve: rcRate legt den Weg um die Mitte fest,
+    // superRate zieht die Enden hoch, expo verflacht die Mitte.
+    const rr=ratesFor(d,'rol',1), rp=ratesFor(d,'pit',1), ry=ratesFor(d,'yaw',1);
+    const g=0.55+0.45*sf;
+    rateT=[ -bfRate(sPit,rp.rate,rp.sup,rp.expo)*deg*g,
+            -bfRate(sYaw,ry.rate,ry.sup,ry.expo)*deg*g,
+            -bfRate(sRol,rr.rate,rr.sup,rr.expo)*deg*g ];
     T=thr01*thr01*d.tmax;
   }else{
     let ud;
@@ -4127,7 +4411,7 @@ function flightController(dt){
       // Ein Stickausschlag bricht ab – die Kontrolle bleibt beim Piloten.
       let rthVy=null;
       if(RTH.on){
-        if(Math.abs(sPit)>0.25||Math.abs(sRol)>0.25||Math.abs(IN.thr)>0.45) stopRTH();
+        if(Math.abs(sPit)>0.25||Math.abs(sRol)>0.25||Math.abs(S.thr)>0.45) stopRTH();
         else { const c=rthCommand(d); vtx=c.vx; vtz=c.vz; rthVy=c.vy; }
       }
       const slop=1-d.gpsQ;
@@ -4156,7 +4440,7 @@ function flightController(dt){
       if(al>am){ ax*=am/al; az*=am/al; }
       const db=0.08;
       const vzT=rthVy!==null? rthVy
-        : IN.thr>db? (IN.thr-db)/(1-db)*d.climb*(0.5+0.5*sf) : IN.thr<-db? (IN.thr+db)/(1-db)*d.desc_*(0.5+0.5*sf) : 0;
+        : S.thr>db? (S.thr-db)/(1-db)*d.climb*(0.5+0.5*sf) : S.thr<-db? (S.thr+db)/(1-db)*d.desc_*(0.5+0.5*sf) : 0;
       const ay=clamp(3.2*(vzT-DR.vel[1]),-G*0.8,G*1.2);
       const F=[m*ax, m*(G+ay), m*az];
       const Fl=V3.len(F);
@@ -4171,7 +4455,7 @@ function flightController(dt){
       ud=V3.norm([tx,1,tz]);
       if(mode==='ATTI'){
         const db=0.08;
-        const vzT=IN.thr>db? (IN.thr-db)/(1-db)*d.climb : IN.thr<-db? (IN.thr+db)/(1-db)*d.desc_ : 0;
+        const vzT=S.thr>db? (S.thr-db)/(1-db)*d.climb : S.thr<-db? (S.thr+db)/(1-db)*d.desc_ : 0;
         const ay=clamp(3.2*(vzT-DR.vel[1]),-G*0.8,G*1.2);
         T=m*(G+ay)/clamp(up[1],0.35,1);
         if(DR.onGround&&vzT<=0.02){ T=0.03*d.tmax; rateT=[0,0,0]; ud=null; }
@@ -4185,7 +4469,8 @@ function flightController(dt){
       const mr=d.rates.max*deg*0.8;
       rateT[0]=clamp(rateT[0],-mr,mr); rateT[2]=clamp(rateT[2],-mr,mr);
     }
-    rateT[1]=-curve(sYaw)*d.yawRate*deg;
+    { const ry=ratesFor(d,'yaw');
+      rateT[1]=-bfRate(sYaw,ry.rate,ry.sup,ry.expo)*deg; }
   }
   // Instabilität: verrauschter Raten-Sollwert (Wind + nervöse, leichte Drohnen).
   // Wirkt VOR dem Rate-Regler, daher setzt eine agile Drohne das Zittern sichtbar um.
@@ -4231,10 +4516,13 @@ function physStep(dt){
   const d=APP.model;
   APP.time+=dt;
   const springThr=APP.springThr;
-  if(IN.src!=='test'){
+  // Eingabekette: Gerät -> rohe Knüppel (RAW) -> Belegung/Kurven (IN) -> Verzögerung
+  if(IN.src!=='test'&&IN.src!=='raw'){
     if(IN.src!=='pad'&&IN.src!=='touch') updateKeyInput(dt,springThr);
     if(IS_TOUCH) updateTouchInput(springThr);
   }
+  if(IN.src!=='test') applyStickMode();
+  lagPush(dt);
 
   flightController(dt);
 
@@ -6272,17 +6560,28 @@ function drawHUD(){
     hud.fillStyle=active?'rgba(120,210,255,0.9)':'rgba(255,255,255,0.55)';
     hud.beginPath();hud.arc(x+vx*r,y-vy*r,r*0.22,0,7);hud.fill();
   };
+  // Die Knüppel zeigen die rohe Stellung; was sie bewirken, sagt die Belegung.
+  const sm=STICK_MODES[CTRL.mode]||STICK_MODES[2];
+  const lbl=(x,y,r,v,h)=>{
+    hud.fillStyle='rgba(255,255,255,0.42)';hud.font=`${9.5*u}px sans-serif`;hud.textAlign='center';
+    hud.fillText(AXIS_NAMES[v],x,y-r-5*u);
+    hud.fillText(AXIS_NAMES[h],x,y+r+12*u);
+  };
   if(IS_TOUCH){
-    TOUCH.rad=Math.max(60,Math.min(w,hh)*0.085);
-    const r=TOUCH.rad, dpr=w/innerWidth;
-    const lx=TOUCH.l?TOUCH.l.cx*dpr:r*1.6+20, ly=TOUCH.l?TOUCH.l.cy*dpr:hh-r*1.4-20;
-    const rx=TOUCH.r?TOUCH.r.cx*dpr:w-r*1.6-20, ry=TOUCH.r?TOUCH.r.cy*dpr:hh-r*1.4-20;
-    stick(lx,ly,r,IN.yaw,IN.thr,!!TOUCH.l);
-    stick(rx,ry,r,IN.rol,IN.pit,!!TOUCH.r);
+    const dpr=w/innerWidth, r=touchRad()*dpr;
+    TOUCH.rad=r;
+    const fl=fixedCenter('l'), fr=fixedCenter('r');
+    const lx=TOUCH.l?TOUCH.l.cx*dpr:fl.cx*dpr, ly=TOUCH.l?TOUCH.l.cy*dpr:fl.cy*dpr;
+    const rx=TOUCH.r?TOUCH.r.cx*dpr:fr.cx*dpr, ry=TOUCH.r?TOUCH.r.cy*dpr:fr.cy*dpr;
+    stick(lx,ly,r,RAW.lh,RAW.lv,!!TOUCH.l);
+    stick(rx,ry,r,RAW.rh,RAW.rv,!!TOUCH.r);
+    lbl(lx,ly,r,sm.lv,sm.lh); lbl(rx,ry,r,sm.rv,sm.rh);
   }else{
     const r=34*u;
-    stick(pad+r+6*u,hh-r-14*u,r,IN.yaw,IN.thr,false);
-    stick(w-pad-r-6*u,hh-r-14*u,r,IN.rol,IN.pit,false);
+    const lx=pad+r+6*u, rx=w-pad-r-6*u, sy=hh-r-14*u;
+    stick(lx,sy,r,RAW.lh,RAW.lv,IN.src==='pad');
+    stick(rx,sy,r,RAW.rh,RAW.rv,IN.src==='pad');
+    lbl(lx,sy,r,sm.lv,sm.lh); lbl(rx,sy,r,sm.rv,sm.rh);
   }
 }
 
@@ -6373,9 +6672,10 @@ function buildMenu(){
     const b=document.createElement('button');
     b.textContent=s+(s==='Langsam'?' (Touch-Standard)':'');
     if(s===APP.sens)b.className='sel';
-    b.onclick=()=>{APP.sens=s;localStorage.setItem('ds_sens',s);buildMenu();};
+    b.onclick=()=>{APP.sens=s;localStorage.setItem('ds_sens',s);buildMenu();};   // buildMenu zeichnet die Ratenkurve neu
     sr.appendChild(b);
   }
+  buildCtrlUI();
   buildBadges();
   buildLogbook();
   const mr=$('mpRow');
@@ -6487,6 +6787,264 @@ function updateButtons(){
   kb.textContent='🐱';
   kb.classList.toggle('attn',!!DR.meowT);
 }
+/* --- Steuerung einstellen: Belegung, Raten, Totzone, Verzögerung, Geräte ---
+   Alles wirkt sofort und liegt in CTRL (localStorage ds_ctrl). */
+function ctrlSlider(box,name,val,min,max,step,fmt,on){
+  const row=document.createElement('div'); row.className='sl';
+  const nm=document.createElement('span'); nm.className='nm'; nm.textContent=name;
+  const inp=document.createElement('input'); inp.type='range';
+  inp.min=min; inp.max=max; inp.step=step; inp.value=val;
+  const vl=document.createElement('span'); vl.className='vl'; vl.textContent=fmt(val);
+  inp.oninput=()=>{ const v=parseFloat(inp.value); vl.textContent=fmt(v); on(v); };
+  row.appendChild(nm); row.appendChild(inp); row.appendChild(vl);
+  box.appendChild(row);
+  return inp;
+}
+function ctrlBtnRow(box,items,isSel,on){
+  const row=document.createElement('div'); row.className='crow';
+  for(const it of items){
+    const b=document.createElement('button');
+    b.className='cbtn'+(isSel(it.id)?' sel':'');
+    b.innerHTML=it.label+(it.sub?'<small>'+it.sub+'</small>':'');
+    b.onclick=()=>on(it.id);
+    row.appendChild(b);
+  }
+  box.appendChild(row);
+  return row;
+}
+/* Was in ACRO wirklich am Regler ankommt. Die Empfindlichkeit zählt zweimal mit:
+   einmal auf dem Knüppelweg und einmal auf der Hüllkurve – genauso wie in
+   flightController. Ohne das würde die Vorschau bei „Langsam" das Vierfache
+   der tatsächlichen Drehrate anzeigen. */
+function acroRateAt(d,ax,x){
+  const sf=APP.sensF, env=0.55+0.45*sf;
+  const r=ratesFor(d,ax,1);
+  return Math.abs(bfRate(x*sf,r.rate,r.sup,r.expo))*env;
+}
+/* Vorschau: Knüppelweg -> Drehrate (°/s) für die gewählte Drohne */
+function drawRateCurve(cv){
+  const d=APP.model, g=cv.getContext('2d');
+  const W=cv.width, H=cv.height;
+  g.clearRect(0,0,W,H);
+  g.fillStyle='#0d141c'; g.fillRect(0,0,W,H);
+  // Die Skala muss auch die gestrichelte Vergleichslinie fassen, sonst läuft sie oben raus
+  const top=Math.max(60,acroRateAt(d,'rol',1),acroRateAt(d,'pit',1),acroRateAt(d,'yaw',1),
+                     APP.sensF<0.999?maxRateOf(d,'rol',1):0);
+  g.strokeStyle='rgba(255,255,255,0.10)'; g.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=H*i/4; g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke();
+    const x=W*i/4; g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke();
+  }
+  // gestrichelt: was ohne die Empfindlichkeitsbremse möglich wäre
+  if(APP.sensF<0.999){
+    g.strokeStyle='rgba(255,255,255,0.22)'; g.lineWidth=1; g.setLineDash([4,4]);
+    const r=ratesFor(d,'rol',1);
+    g.beginPath();
+    for(let i=0;i<=120;i++){
+      const x=i/120, v=Math.abs(bfRate(x,r.rate,r.sup,r.expo));
+      const px=x*W, py=H-v/top*H*0.94-2;
+      i?g.lineTo(px,py):g.moveTo(px,py);
+    }
+    g.stroke(); g.setLineDash([]);
+  }
+  // Rollen und Nicken sind meist identisch – dann eine Linie statt zwei
+  // deckungsgleicher, sonst sucht man die verdeckte vergeblich.
+  const same=Math.abs(acroRateAt(d,'rol',1)-acroRateAt(d,'pit',1))<0.5;
+  const cols={rol:'#5fd4ff',pit:'#ffb020',yaw:'#7fe0a0'};
+  const curve=(ax,col)=>{
+    g.strokeStyle=col; g.lineWidth=2;
+    g.beginPath();
+    for(let i=0;i<=120;i++){
+      const x=i/120, v=acroRateAt(d,ax,x);
+      const px=x*W, py=H-v/top*H*0.94-2;
+      i?g.lineTo(px,py):g.moveTo(px,py);
+    }
+    g.stroke();
+  };
+  curve('yaw',cols.yaw);
+  if(same) curve('rol',cols.rol);
+  else { curve('pit',cols.pit); curve('rol',cols.rol); }
+  g.fillStyle='rgba(255,255,255,0.6)'; g.font='11px sans-serif'; g.textAlign='left';
+  g.fillText(Math.round(top)+' °/s',6,14);
+  g.textAlign='right'; g.fillText('voller Ausschlag',W-6,H-6);
+  g.textAlign='left'; g.fillText('Mitte',6,H-6);
+  let ly=30;
+  const legend=same
+    ? [['rol','Rollen & Nicken'],['yaw',AXIS_NAMES.yaw]]
+    : [['rol',AXIS_NAMES.rol],['pit',AXIS_NAMES.pit],['yaw',AXIS_NAMES.yaw]];
+  for(const [ax,label] of legend){
+    g.fillStyle=cols[ax];
+    g.fillText(label+'  '+Math.round(acroRateAt(d,ax,1))+' °/s',6,ly); ly+=14;
+  }
+  g.fillStyle='rgba(255,255,255,0.45)';
+  g.fillText('ACRO · Empfindlichkeit '+APP.sens,6,ly+2);
+}
+/* Vorschau: Gasknüppel -> Motorleistung */
+function drawThrCurve(cv){
+  const g=cv.getContext('2d'), W=cv.width, H=cv.height;
+  g.clearRect(0,0,W,H);
+  g.fillStyle='#0d141c'; g.fillRect(0,0,W,H);
+  g.strokeStyle='rgba(255,255,255,0.10)'; g.lineWidth=1;
+  for(let i=0;i<=4;i++){
+    const y=H*i/4; g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke();
+    const x=W*i/4; g.beginPath(); g.moveTo(x,0); g.lineTo(x,H); g.stroke();
+  }
+  g.strokeStyle='rgba(255,255,255,0.25)'; g.setLineDash([4,4]);
+  g.beginPath(); g.moveTo(0,H); g.lineTo(W,0); g.stroke(); g.setLineDash([]);
+  g.strokeStyle='#5fd4ff'; g.lineWidth=2; g.beginPath();
+  for(let i=0;i<=120;i++){
+    const x=i/120, y=thrCurve(x);
+    const px=x*W, py=H-y*H;
+    i?g.lineTo(px,py):g.moveTo(px,py);
+  }
+  g.stroke();
+  g.fillStyle='rgba(255,255,255,0.6)'; g.font='11px sans-serif';
+  g.textAlign='left'; g.fillText('Gaskurve',6,14);
+  g.fillText('Knüppel',6,H-6);
+  g.textAlign='right'; g.fillText('Leistung',W-6,14);
+}
+function ctrlPadMsg(){
+  const el=document.getElementById('padMsg');
+  if(!el)return;
+  if(PADCAL.on){ el.textContent=PADCAL.msg; el.className='note'; return; }
+  const pads=navigator.getGamepads?[...navigator.getGamepads()].filter(p=>p&&p.axes.length>=2):[];
+  const cal=CTRL.pad&&CTRL.pad.axes?Object.keys(CTRL.pad.axes).length:0;
+  el.className='note'+(pads.length?' ok':'');
+  el.textContent=(pads.length?'✔ '+pads.length+' Gerät(e) erkannt':'Kein Gamepad erkannt – anstecken und eine Taste drücken.')
+    +(cal?('  ·  eigene Kalibrierung aktiv ('+cal+' Achsen)'):'  ·  Standardbelegung (Achsen 0–3)')
+    +(PADCAL.msg&&!PADCAL.on?('  ·  '+PADCAL.msg):'');
+}
+function buildCtrlUI(){
+  const box=document.getElementById('ctrlBox');
+  if(!box)return;
+  box.innerHTML='';
+  const H=t=>{ const h=document.createElement('h4'); h.textContent=t; box.appendChild(h); };
+  const N=html=>{ const p=document.createElement('div'); p.className='note'; p.innerHTML=html; box.appendChild(p); return p; };
+  const d=APP.model;
+
+  /* 1 – Knüppelbelegung */
+  H('Knüppelbelegung');
+  ctrlBtnRow(box,[1,2,3,4].map(k=>{
+    const m=STICK_MODES[k];
+    return {id:k,label:m.name,
+      sub:'links '+AXIS_NAMES[m.lv]+'/'+AXIS_NAMES[m.lh]+' · rechts '+AXIS_NAMES[m.rv]+'/'+AXIS_NAMES[m.rh]};
+  }),id=>id===CTRL.mode,id=>{ CTRL.mode=id; saveCtrl(); resetDrone(true,false); buildCtrlUI(); });
+  N('Mode 2 ist im deutschsprachigen Raum am verbreitetsten, Mode 1 in Teilen Europas und Asiens. '+
+    'Die Belegung gilt für Gamepad, Touch und Tastatur gleichermassen.');
+
+  /* 2 – Ratenkurve */
+  H('Ratenkurve (Betaflight)');
+  ctrlBtnRow(box,[
+    {id:0,label:'Aus dem Modell',sub:'passend zur gewählten Drohne'},
+    {id:1,label:'Eigene Raten',sub:'rcRate · superRate · expo'}],
+    id=>id===(CTRL.rc.custom?1:0),
+    id=>{ CTRL.rc.custom=id; saveCtrl(); buildCtrlUI(); });
+  if(CTRL.rc.custom){
+    for(const ax of ['rol','pit','yaw']){
+      const c=CTRL.rc[ax];
+      const t=document.createElement('div'); t.className='note';
+      t.style.margin='11px 0 0'; t.innerHTML='<b>'+AXIS_NAMES[ax]+'</b>';
+      box.appendChild(t);
+      ctrlSlider(box,'rcRate',c.rate,0.1,3,0.01,v=>v.toFixed(2),v=>{c.rate=v;saveCtrl();drawRateCurve(cvR);});
+      ctrlSlider(box,'superRate',c.sup,0,0.95,0.01,v=>v.toFixed(2),v=>{c.sup=v;saveCtrl();drawRateCurve(cvR);});
+      ctrlSlider(box,'expo',c.expo,0,0.95,0.01,v=>v.toFixed(2),v=>{c.expo=v;saveCtrl();drawRateCurve(cvR);});
+    }
+  }else{
+    N('Bei Empfindlichkeit <b>Schnell</b> ergibt voller Ausschlag genau die Höchstrate des Modells ('+
+      Math.round(d.rates.max)+' °/s bei <b>'+d.name+'</b>). Die eingestellte Stufe <b>'+APP.sens+
+      '</b> bremst auf <b>'+Math.round(acroRateAt(d,'rol',1))+' °/s</b> – die gestrichelte Linie zeigt, '+
+      'was ohne diese Bremse ginge. Die Kurve dazwischen ist weich um die Mitte und steil an den Enden, '+
+      'wie bei einem echten Flugregler.');
+  }
+  const cvR=document.createElement('canvas'); cvR.width=cvR.height=330; box.appendChild(cvR);
+  drawRateCurve(cvR);
+
+  /* 3 – Gaskurve */
+  H('Gaskurve');
+  const cvT=document.createElement('canvas'); cvT.width=cvT.height=330; box.appendChild(cvT);
+  ctrlSlider(box,'Gas-Expo',CTRL.thrExpo,0,0.9,0.01,v=>v.toFixed(2),
+    v=>{CTRL.thrExpo=v;saveCtrl();drawThrCurve(cvT);});
+  drawThrCurve(cvT);
+  N('Mehr Expo heisst: um den Schwebepunkt reagiert das Gas feiner, an den Enden bleibt die volle Leistung.');
+
+  /* 4 – Totzone, Trimmung, Umkehr */
+  H('Totzone, Trimmung, Umkehr');
+  for(const ax of AXES){
+    ctrlSlider(box,'Totzone '+AXIS_NAMES[ax],CTRL.dead[ax],0,0.2,0.005,
+      v=>(v*100).toFixed(1)+' %',v=>{CTRL.dead[ax]=v;saveCtrl();});
+  }
+  for(const ax of ['yaw','pit','rol']){
+    ctrlSlider(box,'Trimmung '+AXIS_NAMES[ax],CTRL.trim[ax],-0.25,0.25,0.005,
+      v=>(v>0?'+':'')+(v*100).toFixed(1)+' %',v=>{CTRL.trim[ax]=v;saveCtrl();});
+  }
+  const chk=document.createElement('div'); chk.className='chk';
+  chk.appendChild(Object.assign(document.createElement('span'),{textContent:'Umkehren:'}));
+  for(const ax of AXES){
+    const l=document.createElement('label');
+    const c=document.createElement('input'); c.type='checkbox'; c.checked=!!CTRL.invert[ax];
+    c.onchange=()=>{ CTRL.invert[ax]=c.checked?1:0; saveCtrl(); };
+    l.appendChild(c); l.appendChild(document.createTextNode(AXIS_NAMES[ax]));
+    chk.appendChild(l);
+  }
+  box.appendChild(chk);
+
+  /* 5 – Übertragungsverzögerung */
+  H('Übertragung');
+  ctrlSlider(box,'Verzögerung',CTRL.latency,0,120,1,v=>v.toFixed(0)+' ms',
+    v=>{CTRL.latency=v;saveCtrl();});
+  N('Funke, Empfänger und Flugregler brauchen zusammen echte Zeit. '+
+    '<b>28 ms</b> entspricht einer guten Anlage, 60–90 ms einer trägen. '+
+    '0 ms ist unrealistisch, aber für den Einstieg leichter.');
+
+  /* 6 – Tastatur */
+  H('Tastatur');
+  ctrlSlider(box,'Knüppel-Anstieg',CTRL.key.up,1,12,0.1,v=>v.toFixed(1)+'/s',v=>{CTRL.key.up=v;saveCtrl();});
+  ctrlSlider(box,'Rückstellung',CTRL.key.down,1,14,0.1,v=>v.toFixed(1)+'/s',v=>{CTRL.key.down=v;saveCtrl();});
+  ctrlSlider(box,'Gas-Geschwindigkeit',CTRL.key.thr,0.3,3,0.05,v=>v.toFixed(2)+'/s',v=>{CTRL.key.thr=v;saveCtrl();});
+  ctrlSlider(box,'Feintaste (Shift)',CTRL.key.fine,0.1,1,0.05,v=>(v*100).toFixed(0)+' %',v=>{CTRL.key.fine=v;saveCtrl();});
+  N('Tasten kennen nur an und aus – die Rampen machen daraus einen Knüppelweg. '+
+    'Kleinere Werte fliegen ruhiger, grössere reagieren schneller.');
+
+  /* 7 – Touch */
+  H('Touch-Sticks');
+  ctrlBtnRow(box,[
+    {id:1,label:'Fest in den Ecken',sub:'blind zuverlässig zu treffen'},
+    {id:0,label:'Schwebend',sub:'entsteht unter dem Finger'}],
+    id=>id===(CTRL.touch.fixed?1:0),
+    id=>{ CTRL.touch.fixed=id; saveCtrl(); buildCtrlUI(); });
+  ctrlSlider(box,'Stick-Grösse',CTRL.touch.rad,45,120,1,v=>v.toFixed(0)+' px',
+    v=>{CTRL.touch.rad=v;saveCtrl();});
+
+  /* 8 – Gamepad / RC-Sender */
+  H('Gamepad / RC-Sender');
+  const pm=document.createElement('div'); pm.id='padMsg'; pm.className='note'; box.appendChild(pm);
+  const prow=document.createElement('div'); prow.className='crow';
+  const cal=document.createElement('button'); cal.className='cbtn';
+  cal.textContent='🎚️ Knüppel kalibrieren';
+  cal.onclick=()=>{ if(padCalStart()) cal.textContent='… läuft, Anweisung folgen'; ctrlPadMsg(); };
+  prow.appendChild(cal);
+  const stop=document.createElement('button'); stop.className='cbtn';
+  stop.textContent='Abbrechen';
+  stop.onclick=()=>{ padCalCancel(); buildCtrlUI(); };
+  prow.appendChild(stop);
+  const clr=document.createElement('button'); clr.className='cbtn';
+  clr.textContent='Kalibrierung löschen';
+  clr.onclick=()=>{ CTRL.pad=null; saveCtrl(); PADCAL.msg=''; buildCtrlUI(); };
+  prow.appendChild(clr);
+  box.appendChild(prow);
+  ctrlPadMsg();
+  N('Der Assistent fragt die vier Knüppel nacheinander ab: jeweils einmal ganz in beide Richtungen, '+
+    'dann loslassen. Achsnummer, Richtung, Mitte und Endausschläge ergeben sich daraus – '+
+    'nötig für RC-Sender am USB-Adapter, die selten der üblichen Belegung folgen.');
+
+  /* 9 – zurücksetzen */
+  const rrow=document.createElement('div'); rrow.className='crow'; rrow.style.marginTop='14px';
+  const rst=document.createElement('button'); rst.className='cbtn';
+  rst.textContent='↺ Alles auf Standard zurücksetzen';
+  rst.onclick=()=>{ resetCtrl(); buildCtrlUI(); toast('Steuerung zurückgesetzt'); };
+  rrow.appendChild(rst); box.appendChild(rrow);
+}
+
 /* --- Abzeichen-Raster: Gefundene farbig, Offene grau mit Hinweis --- */
 function buildBadges(){
   const g=$('badgeGrid');
@@ -6556,8 +7114,11 @@ function cycleMode(){
   const m=APP.mode;
   if(!APP.springThr&&IN.src!=='pad'&&!TOUCH.l){
     const hover=Math.sqrt((APP.model.mass*G)/(APP.model.tmax));
-    if(!DR.onGround)IN.thr=hover*2-1; else IN.thr=-1;
-    TOUCH.thrHold=IN.thr;
+    const t=(!DR.onGround)?hover*2-1:-1;
+    const sm2=STICK_MODES[CTRL.mode]||STICK_MODES[2];
+    const slot=sm2.lv==='thr'?'lv':sm2.rv==='thr'?'rv':sm2.lh==='thr'?'lh':'rh';
+    RAW[slot]=t; IN.thr=t;
+    TOUCH.thrHold=t;
   }
   const info={GPS:'GPS: hält Position & Höhe von selbst',ATTI:'ATTI: hält Höhe, driftet mit dem Wind',
     ANGLE:'ANGLE: selbstaufrichtend, Gas manuell',ACRO:'ACRO: volle manuelle Kontrolle!'}[m];
@@ -7506,6 +8067,7 @@ function frame(t){
   const dt=Math.min((t-lastT)/1000||0,0.1);lastT=t;
   FRAME_DT=dt||0.016;
   pollGamepad();
+  if(PADCAL.on) ctrlPadMsg();
   if(APP.state==='fly'&&!APP.paused){
     acc+=dt;let n=0;
     while(acc>=DT&&n++<60){physStep(DT);acc-=DT;}
@@ -7554,6 +8116,14 @@ window.T={
   },
   set(o){IN.src='test';Object.assign(IN,o,{src:'test'});},
   release(){IN.src='keys';},
+  // Eingabekette: rohe Knüppel setzen und die Aufbereitung mitlaufen lassen
+  RAW, KEYS, get CTRL(){return CTRL;}, CTRL_DEFAULT, STICK_MODES, AXES,
+  raw(o){IN.src='raw';Object.assign(RAW,o);},
+  saveCtrl,resetCtrl,bfRate,ratesFor,maxRateOf,thrCurve,shapeAxis,applyStickMode,
+  lagReset,inDelayed,padRaw,padCalStart,get PADCAL(){return PADCAL;},
+  fixedCenter,touchRad,buildCtrlUI,buildMenu,acroRateAt,
+  keydown(c){KEYS[c]=true;if(IN.src!=='test')IN.src='keys';},
+  keyup(c){KEYS[c]=false;},
   tick(sec){
     const steps=Math.round(sec/DT);
     for(let i=0;i<steps;i++){
