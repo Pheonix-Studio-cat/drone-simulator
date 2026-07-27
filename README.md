@@ -145,10 +145,28 @@ Baue im Menü über **„Eigene Drohne bauen"** deine eigene Drohne aus vorgegeb
 ### 🛠️ Map-Builder: eigene Karten bauen
 Über **„Eigene Karte bauen"** im Menü baust du dir deine eigene Landschaft: **Geländeform** (flach, hügelig, Berge, Wüste), Hügeligkeit, Baumdichte, Zufallszahl und ein **Wasserstand**, der Seen in die Senken legt – der Startplatz liegt immer auf einem trockenen Plateau darüber. In der Draufsicht (800 × 800 m) tippst du dann **Bäume, Häuser, Hochhäuser, Hallen, Mauern, Schornsteine, Felsen und Menschen** hin. Gespeicherte Karten stehen mit dem Abzeichen **EIGENE** im Kartenmenü und bleiben im Browser erhalten.
 
-### 👥 Mehrspieler (lokal)
-Im Menü einschalten, den Simulator in einem **zweiten Fenster oder Tab** desselben Browsers öffnen und dort ebenfalls einschalten – ihr seht euch dann gegenseitig live fliegen, mit dem jeweils gewählten Drohnenmodell. Sichtbar ist nur, wer auf derselben Karte unterwegs ist.
+### 👥 Mehrspieler – auch übers Internet
+Zwei Wege, dieselbe Spielhälfte:
 
-Für ein Spiel **über das Internet** bräuchte es einen Server, der die Positionen weiterreicht. Diese Seite liegt auf rein statischem Hosting (GitHub Pages) und hat keinen – deshalb der lokale Weg, der ohne Server auskommt und auch offline funktioniert.
+- **Gleiches Gerät:** Simulator in einem zweiten Fenster oder Tab öffnen, dort ebenfalls einschalten. Braucht nichts weiter, funktioniert offline.
+- **Übers Internet:** Gleicher **Raumcode** genügt (vier Zeichen, z. B. `K7QM`). Über „🔗 Link kopieren" bekommst du eine Adresse mit `?room=…` – wer sie öffnet, landet automatisch im selben Raum.
+
+Im Flug: **`Q`** öffnet den Chat, **`Z`** startet ein gemeinsames Rennen mit Countdown und Live-Rangliste im HUD. Sichtbar ist nur, wer auf derselben Karte unterwegs ist.
+
+**Ein Spielstand, ein Update.** Der Mehrspieler ist ein Schalter in derselben `index.html` auf derselben Adresse – keine zweite Version. Damit sind gespeicherte Drohnen, Abzeichen, Fotos und Bestzeiten automatisch dieselben, und ein Update erreicht beide Spielarten gleichzeitig.
+
+#### Der Server dazu
+Für den Internet-Weg gehört ein winziger **Cloudflare Worker** dazu (`server/`, rund 80 Zeilen). Einmal einrichten:
+
+```bash
+cd server && npx wrangler login && npx wrangler deploy
+```
+
+Danach die ausgegebene Adresse in `index.html` bei `MP_SERVER` eintragen – **eine Zeile**. Ohne diesen Schritt läuft alles wie bisher lokal weiter; fällt der Server später aus, schaltet das Spiel von selbst zurück und sagt es im Menü.
+
+**Kostenlos**, im Gratisrahmen von Cloudflare: 100 000 Anfragen pro Tag, eingehende WebSocket-Nachrichten zählen 20:1, ausgehende sind frei, und dank Hibernation kostet ein leerer Raum keine Rechenzeit. Gemessen sendet ein Spieler **145 Bytes pro Pose bei 20 Hz, also rund 2,8 kB/s**.
+
+**Was der Server nicht tut:** Er hat keine Spiellogik und keine Autorität – jeder rechnet seine eigene Physik, Torzeiten kommen von den Spielern selbst. Schummeln ist damit technisch möglich; das ist ein Spiel unter Freunden, kein Wettkampfsystem. Gespeichert wird nichts, ein Raum existiert nur, solange jemand drin ist, und wer den Code nicht kennt, kommt nicht hinein. Details in [`server/README.md`](server/README.md).
 
 ### 🌅 Tageszeit und Wetter
 Im Menü vor dem Start wählbar – beides steckt in den eingebackenen Schatten und im Nebel, deshalb wird die Szene beim Wechsel neu aufgebaut.
