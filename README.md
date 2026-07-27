@@ -116,6 +116,17 @@ Im Menü einschalten, den Simulator in einem **zweiten Fenster oder Tab** dessel
 
 Für ein Spiel **über das Internet** bräuchte es einen Server, der die Positionen weiterreicht. Diese Seite liegt auf rein statischem Hosting (GitHub Pages) und hat keinen – deshalb der lokale Weg, der ohne Server auskommt und auch offline funktioniert.
 
+### 🌅 Tageszeit und Wetter
+Im Menü vor dem Start wählbar – beides steckt in den eingebackenen Schatten und im Nebel, deshalb wird die Szene beim Wechsel neu aufgebaut.
+
+**Tageszeit:** 🌅 Morgen (tiefe Sonne von Osten, lange Schatten) · ☀️ Mittag · 🌇 Abendrot (rotes Gegenlicht von Westen) · 🌙 Nacht. Nachts steht der Mond am Himmel, es funkeln **Sterne**, und in den Häusern gehen **Fenster an** – in der Großstadt kommen dafür rund 87 000 Dreiecke dazu.
+
+**Wetter:** ☀️ Klar · 🌧️ Regen · ❄️ Schnee · 🌫️ Nebel. Regen und Schnee fallen als Partikel um die Kamera; Nebel drückt die Sicht auf gut 80 m.
+
+Regen und Schnee kosten **ehrlich, aber wenig**: gemessen an einem Race-5-Zöller bei voller Neigung im ANGLE-Modus fällt die Endgeschwindigkeit von 122,2 auf 119,4 km/h (−2,3 %), und der Akku ist nach 16 s bei 57,8 statt 53,9 % Verbrauch. **Im GPS-Modus merkst du davon nichts** – dort gleicht der Regler den Mehrwiderstand aus (54,3 statt 54,7 km/h), genau wie bei einer echten Drohne.
+
+Passend dazu gibt es den 🔦 **Scheinwerfer** als Zubehör (190 g, Taste `L`): ein Lichtkegel, der den Boden anleuchtet.
+
 ### Grafik-Umschalter
 Im Menü zwischen **✨ Realistisch** (glatte, produktnahe Rümpfe mit Glanzlicht) und **🧱 Blockig (Retro)** wählen. Die Auswahl wird gespeichert.
 
@@ -154,6 +165,7 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 | `K` | Mini-Andockdrohne ausklinken / zurückrufen |
 | `J` | Wespenschwarm loslassen (mit Wespennest) |
 | `Y` | Katze miauen lassen (mit Katze im Tragegurt) |
+| `L` | Scheinwerfer an/aus (mit Scheinwerfer) |
 | `R` | Zurücksetzen |
 | `1`–`4` | Windstärke |
 | `Esc` | Menü |

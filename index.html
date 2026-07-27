@@ -26,7 +26,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #btnbar button:active{background:var(--panel2)}
 #btnbar button.armed{background:#67251f;border-color:#c25047;color:#ffd9d5}
 #btnbar button.attn{background:#0f4a2d;border-color:#2fae6b;color:#c9ffe0}
-#bRescue,#bBomb,#bNuke,#bFw,#bCargo,#bCann,#bHorn,#bScout,#bWasp,#bCat{display:none}
+#bRescue,#bBomb,#bNuke,#bFw,#bCargo,#bCann,#bHorn,#bScout,#bWasp,#bCat,#bLight{display:none}
+#bLight.attn{background:#5a4a10;border-color:#e8d04a;color:#fff6c8}
 #bWasp.attn{background:#4a4406;border-color:#d8cf3c;color:#fbf7bb}
 #bCat.attn{background:#4a2d13;border-color:#d08c4a;color:#ffe2c4}
 #bCann.attn{background:#5c2410;border-color:#e08a3c;color:#ffdfc0}
@@ -189,6 +190,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <button id="bScout" title="Mini-Andockdrohne ausklinken (K)">🛰️</button>
   <button id="bWasp" title="Wespenschwarm loslassen (J)">🪰 0</button>
   <button id="bCat" title="Katze miauen lassen (Y)">🐱</button>
+  <button id="bLight" title="Scheinwerfer (L)">🔦</button>
   <button id="bArm">ARM</button>
   <button id="bMode">GPS</button>
   <button id="bCam">KAM</button>
@@ -223,6 +225,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <div class="grid" id="droneGrid"></div>
   <h2>Mission</h2>
   <div class="grid" id="missionGrid"></div>
+  <h2>Tageszeit</h2>
+  <div class="rowbtns" id="timeRow"></div>
+  <h2>Wetter</h2>
+  <div class="rowbtns" id="wxRow"></div>
+  <div class="help" id="wxHelp" style="margin-top:6px;font-size:12px"></div>
   <h2>Wind</h2>
   <div class="rowbtns" id="windRow"></div>
   <h2>Grafik</h2>
@@ -255,6 +262,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
     <span class="k">K</span> Mini-Andockdrohne ausklinken ·
     <span class="k">J</span> Wespenschwarm loslassen ·
     <span class="k">Y</span> Katze miauen lassen ·
+    <span class="k">L</span> Scheinwerfer an/aus ·
     <span class="k">R</span> Reset · <span class="k">1</span>–<span class="k">4</span> Wind · <span class="k">Esc</span> Menü<br>
     <b>Gamepad:</b> Linker Stick Gas/Yaw, rechter Stick Nick/Roll (Mode 2) – wird automatisch erkannt.<br>
     <b>Touch:</b> Virtuelle Sticks unten links (Gas/Yaw) und rechts (Nick/Roll), Buttons oben rechts.
@@ -448,6 +456,10 @@ const deg=Math.PI/180;
 const G=9.81, RHO=1.225;
 
 /* ---- Deterministisches 2D-Value-Noise (Terrain) ---- */
+// Achtung: der letzte Schritt nutzt >> (Vorzeichen-Shift), dadurch fällt das
+// oberste Bit immer weg – das Ergebnis liegt in [0, 0.5), nicht in [0, 1).
+// Alle Karten sind gegen dieses Verhalten gewachsen, deshalb bleibt es so;
+// Schwellenwerte müssen sich auf 0…0,5 beziehen.
 function hash2(x,z,seed){
   let h=(x*374761393+z*668265263+seed*1442695041)|0;
   h=(h^(h>>13))|0; h=Math.imul(h,1274126177); h=(h^(h>>16))|0;
@@ -647,6 +659,8 @@ const PARTS={
      desc:'Auf Knopfdruck rastet der Schwarm aus und holt fremde Drohnen im Umkreis von 300 m ★neu'},
     {id:'scout', name:'Mini-Andockdrohne', mass:0.05, scout:1,
      desc:'Klinkt sich aus, erkundet allein die Umgebung und schickt Fotos ★neu'},
+    {id:'spotlight', name:'Scheinwerfer', mass:0.19, light:1,
+     desc:'Leuchtet den Boden an – für Nachtflug und Nebel ★neu'},
     {id:'waspnest', name:'Wespennest', mass:0.28, wasps:3,
      desc:'Der Schwarm verscheucht alle Menschen im Umkreis von 150 m ★neu'},
     {id:'cargo', name:'Pakethaken mit Kiste', mass:0.09, cargo:1,
@@ -759,6 +773,7 @@ function buildDIYDrone(sel,name,id){
     ...(sum('hornets')?{hornets:sum('hornets')}:{}),
     ...(has('scout')?{scout:1}:{}),
     ...(sum('wasps')?{wasps:sum('wasps')}:{}),
+    ...(has('light')?{light:1}:{}),
     ...(has('cat')?{cat:1}:{}),
     ...(has('kamikaze')?{kamikaze:1}:{}),
     ...(cargo?{cargo:1, cargoMass:Ld.mass, cargoName:Ld.name}:{}),
@@ -791,6 +806,7 @@ function diySpecs(d){
   if(d.hornets) extra.push(['🐝 Hornissen',d.hornets+'× Schwarm · 300 m']);
   if(d.scout) extra.push(['🛰️ Mini-Drohne','erkundet und fotografiert']);
   if(d.wasps) extra.push(['🪰 Wespen',d.wasps+'× Schwarm · 150 m']);
+  if(d.light) extra.push(['🔦 Scheinwerfer','leuchtet den Boden an']);
   if(d.cat) extra.push(['🐱 Katze','1,6 kg an Bord, miaut auf Knopfdruck']);
   if(d.cargo) extra.push(['📦 Kiste',d.cargoName+' · '+(d.cargoMass*1000).toFixed(0)+' g']);
   if(d.kamikaze) extra.push(['💥 Kamikaze','Aufschlag zündet']);
@@ -1118,6 +1134,39 @@ function allMaps(){ return MAPS.concat(MY_MAPS); }
 function mapById(id){ return allMaps().find(m=>m.id===id); }
 
 /* ---------------- Missionen (Basisdaten, Höhen werden pro Karte gesetzt) ---------------- */
+/* ---------------- Tageszeit & Wetter ----------------
+   Beleuchtung hängt im ganzen Renderer nur an SUN, ENV.fog und ENV.sky.
+   sunC/ambC sind Multiplikatoren: bei „Mittag" alle 1, das Bild bleibt
+   damit exakt so wie bisher. */
+const DAYTIMES=[
+  {id:'morgen', name:'🌅 Morgen', desc:'Tiefe Sonne von Osten, lange Schatten',
+   sun:[0.62,0.30,0.72], sunC:[1.05,0.90,0.72], ambC:[0.95,0.95,1.02],
+   fogMul:[1.08,1.00,0.95], skyMul:[0.92,0.96,1.00], night:0},
+  {id:'mittag', name:'☀️ Mittag', desc:'Volles Licht, kurze Schatten',
+   sun:[0.45,0.80,0.32], sunC:[1,1,1], ambC:[1,1,1],
+   fogMul:[1,1,1], skyMul:[1,1,1], night:0},
+  {id:'abend', name:'🌇 Abendrot', desc:'Rotes Gegenlicht von Westen',
+   sun:[-0.72,0.22,-0.66], sunC:[1.18,0.62,0.34], ambC:[1.02,0.86,0.78],
+   fogMul:[1.22,0.82,0.66], skyMul:[1.05,0.62,0.50], night:0.2},
+  {id:'nacht', name:'🌙 Nacht', desc:'Mondlicht, Sterne und erleuchtete Fenster',
+   sun:[-0.30,0.55,-0.78], sunC:[0.20,0.26,0.42], ambC:[0.26,0.30,0.45],
+   fogMul:[0.17,0.20,0.32], skyMul:[0.07,0.10,0.22], night:1},
+];
+const WEATHER=[
+  {id:'klar', name:'☀️ Klar', desc:'Beste Sicht, nichts bremst',
+   fogD:1, kind:null, rate:0, drag:1, amp:1},
+  {id:'regen', name:'🌧️ Regen', desc:'Sicht deutlich schlechter, nasse Drohne zieht mehr Strom',
+   fogD:2.2, kind:'rain', rate:1500, drag:1.06, amp:1.09,
+   tint:[0.52,0.56,0.62], tintK:0.45},
+  {id:'schnee', name:'❄️ Schnee', desc:'Dichtes Flockengestöber, kalter Akku hält kürzer',
+   fogD:2.6, kind:'snow', rate:950, drag:1.04, amp:1.14,
+   tint:[0.84,0.87,0.92], tintK:0.55},
+  {id:'nebel', name:'🌫️ Nebel', desc:'Kaum 80 m Sicht – fliegen nach Instrumenten',
+   fogD:4.2, kind:null, rate:0, drag:1, amp:1,
+   tint:[0.70,0.73,0.77], tintK:0.6},
+];
+function daytimeById(id){ return DAYTIMES.find(t=>t.id===id)||DAYTIMES[1]; }
+function weatherById(id){ return WEATHER.find(w=>w.id===id)||WEATHER[0]; }
 const MISSIONS=[
  {id:'free', name:'Freiflug', icon:'∞',
   desc:'Kein Ziel, keine Zeit – einfach fliegen und üben.'},
@@ -1174,9 +1223,14 @@ function mkShader(vs,fs){
   for(let i=0;i<n;i++){const inf=gl.getActiveUniform(p,i);u[inf.name.replace('[0]','')]=gl.getUniformLocation(p,inf.name);}
   return {p,u,aP:gl.getAttribLocation(p,'aP'),aN:gl.getAttribLocation(p,'aN'),aC:gl.getAttribLocation(p,'aC')};
 }
-const SUN=V3.norm([0.45,0.8,0.32]);
-// Nebel/Himmel werden pro Karte gesetzt
-let ENV={fog:[0.62,0.74,0.86],fogD:0.0016,sky:[0.25,0.5,0.85]};
+// Sonnenstand: wird pro Tageszeit gesetzt, vor dem Backen der Schatten
+let SUN=V3.norm([0.45,0.8,0.32]);
+// Nebel/Himmel/Licht werden pro Karte und Tageszeit gesetzt
+// sunC/ambC sind Multiplikatoren (bei Mittag alle 1), night blendet Sterne ein
+let ENV={fog:[0.62,0.74,0.86],fogD:0.0016,sky:[0.25,0.5,0.85],
+  sunC:[1,1,1],ambC:[1,1,1],night:0,watMul:1};
+// Wetterwirkung auf Flug und Partikel
+let WX={drag:1,amp:1,kind:null,rate:0};
 
 const objSh=mkShader(`
 attribute vec3 aP; attribute vec3 aN; attribute vec3 aC;
@@ -1189,7 +1243,7 @@ void main(){
 }`,`
 precision mediump float;
 varying vec3 vN; varying vec3 vW; varying vec3 vC;
-uniform vec3 uColor,uSun,uCam,uFogCol,uZenC; uniform float uFogD,uAlpha,uSpec;
+uniform vec3 uColor,uSun,uCam,uFogCol,uZenC,uSunC; uniform float uFogD,uAlpha,uSpec;
 void main(){
   vec3 n=normalize(vN);
   vec3 V=normalize(uCam-vW);
@@ -1198,12 +1252,12 @@ void main(){
   vec3 skyA=mix(uFogCol,uZenC,0.5)*0.62;
   vec3 gndA=uFogCol*vec3(0.42,0.46,0.4);
   vec3 amb=mix(gndA,skyA,n.y*0.5+0.5);
-  vec3 c=uColor*vC*(amb+vec3(1.0,0.96,0.87)*dif*0.85);
+  vec3 c=uColor*vC*(amb+vec3(1.0,0.96,0.87)*uSunC*dif*0.85);
   // Fresnel-Umgebungsreflex an gewölbten Flächen
   float fr=pow(1.0-max(dot(n,V),0.0),3.0);
   c+=mix(uFogCol,uZenC,0.6)*fr*uSpec*1.5;
   vec3 h=normalize(uSun+V);
-  c+=vec3(1.0,0.98,0.92)*(pow(max(dot(n,h),0.0),60.0)*1.2+pow(max(dot(n,h),0.0),8.0)*0.15)*uSpec;
+  c+=vec3(1.0,0.98,0.92)*uSunC*(pow(max(dot(n,h),0.0),60.0)*1.2+pow(max(dot(n,h),0.0),8.0)*0.15)*uSpec;
   float d=length(vW-uCam);
   float f=1.0-exp(-uFogD*uFogD*d*d);
   gl_FragColor=vec4(mix(c,uFogCol,f),uAlpha);
@@ -1216,7 +1270,7 @@ varying vec3 vN; varying vec3 vW; varying vec3 vC;
 void main(){ vW=aP; vN=aN; vC=aC; gl_Position=uProj*uView*vec4(aP,1.0); }`,`
 precision mediump float;
 varying vec3 vN; varying vec3 vW; varying vec3 vC;
-uniform vec3 uSun,uCam,uFogCol; uniform float uFogD;
+uniform vec3 uSun,uCam,uFogCol,uSunC,uAmbC; uniform float uFogD;
 float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float noise(vec2 p){
   vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
@@ -1227,7 +1281,7 @@ void main(){
   float dif=max(dot(n,uSun),0.0);
   float amb=0.45+0.15*max(n.y,0.0);
   float det=0.92+0.16*(noise(vW.xz*0.8)*0.6+noise(vW.xz*3.1)*0.4);
-  vec3 c=vC*det*(amb+dif*0.7);
+  vec3 c=vC*det*(uAmbC*amb+uSunC*dif*0.7);
   float d=length(vW-uCam);
   float f=1.0-exp(-uFogD*uFogD*d*d);
   gl_FragColor=vec4(mix(c,uFogCol,f),1.0);
@@ -1255,13 +1309,24 @@ attribute vec2 aP; varying vec2 vUV;
 void main(){ vUV=aP; gl_Position=vec4(aP,0.9999,1.0); }`,`
 precision mediump float;
 varying vec2 vUV;
-uniform vec3 uR,uU,uF,uSun,uFogCol,uZen; uniform float uTan,uAsp;
+uniform vec3 uR,uU,uF,uSun,uFogCol,uZen; uniform float uTan,uAsp,uNight;
+float hs(vec3 p){ p=fract(p*0.3183099+vec3(0.71,0.113,0.419)); p*=17.0;
+  return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
 void main(){
   vec3 dir=normalize(uF+uR*vUV.x*uTan*uAsp+uU*vUV.y*uTan);
   float t=clamp(dir.y,0.0,1.0);
   vec3 sky=mix(uFogCol,uZen,pow(t,0.55));
   float s=max(dot(dir,uSun),0.0);
-  sky+=vec3(1.0,0.9,0.7)*pow(s,600.0)*3.0+vec3(1.0,0.85,0.6)*pow(s,8.0)*0.18;
+  // Nachts bleibt der scharfe Mond, der breite Hof verschwindet
+  sky+=vec3(1.0,0.9,0.7)*pow(s,600.0)*3.0
+      +vec3(1.0,0.85,0.6)*pow(s,8.0)*0.18*(1.0-uNight*0.92);
+  if(uNight>0.01&&dir.y>0.0){
+    // Sterne: pro Richtungszelle ein Zufallswert, nur die hellsten zünden
+    vec3 cell=floor(dir*150.0);
+    float r=hs(cell);
+    float star=step(0.9955,r)*(0.45+hs(cell+3.7)*0.75);
+    sky+=vec3(0.88,0.92,1.0)*star*uNight*smoothstep(0.02,0.30,dir.y);
+  }
   if(dir.y<0.0) sky=uFogCol*0.98;
   gl_FragColor=vec4(sky,1.0);
 }`);
@@ -1413,6 +1478,7 @@ function drawMesh(m,model,color=[1,1,1],alpha=1,spec=0.12){
   gl.uniform1f(objSh.u.uAlpha,alpha);
   gl.uniform1f(objSh.u.uSpec,spec);
   gl.uniform3fv(objSh.u.uZenC,ENV.sky);
+  gl.uniform3fv(objSh.u.uSunC,ENV.sunC);
   bindAttr(objSh.aP,m.vb,3);
   bindAttr(objSh.aN,m.nb,3);
   bindAttr(objSh.aC,m.cb,3);
@@ -1460,6 +1526,39 @@ const hornetMesh=mesh(b=>{
   b.box(0.052,0.006,0.019,[0,0.014,0.01],-0.5,[0.85,0.87,0.92]);
   b.ellipsoid(0.013,0.013,0.024,[0,0,0.066],6,4,k);
 });
+/* Wetterpartikel als gekachelter Batch:
+   Ein Mesh enthält alle Tropfen einer Kachel, die Kachel wird 2x2 um die
+   Kamera gelegt und vertikal durchgescrollt. Das sind vier Draw-Calls
+   statt einem pro Tropfen – bei tausend Tropfen macht das den Unterschied.
+   Die Partikel liegen doppelt übereinander, damit beim Scrollen von oben
+   immer schon der nächste Satz bereitsteht. */
+const RAIN_B=30, RAIN_T=18;
+function makeRainBatch(kind,n){
+  return mesh(b=>{
+    for(let i=0;i<n;i++){
+      const x=hash2(i,7,1)*2*RAIN_B, z=hash2(i,13,2)*2*RAIN_B, y=hash2(i,29,3)*2*RAIN_T;
+      const s=0.75+hash2(i,31,4)*1.2;
+      for(const dy of [0,2*RAIN_T]){
+        if(kind==='snow'){
+          const c=[1,1,1];
+          b.box(0.26*s,0.05,0.05,[x,y+dy,z],0,c);
+          b.box(0.05,0.05,0.26*s,[x,y+dy,z],0,c);
+          b.box(0.05,0.17*s,0.05,[x,y+dy,z],0,c);
+        }else{
+          b.box(0.022,0.85*s,0.022,[x,y+dy,z],0,[0.74,0.82,0.98]);
+        }
+      }
+    }
+  });
+}
+let rainBatch=null, snowBatch=null;
+function rainBatchFor(kind){
+  if(kind==='snow'){ if(!snowBatch)snowBatch=makeRainBatch('snow',240); return snowBatch; }
+  if(!rainBatch)rainBatch=makeRainBatch('rain',300);
+  return rainBatch;
+}
+// Lichtkegel des Scheinwerfers (Spitze oben, Öffnung unten)
+const lightConeMesh=mesh(b=>{ b.cyl(0.06,1,1,[0,-1,0],16,[1,0.96,0.82]); });
 // Einzelne Wespe: schlanker und blasser als die Hornisse, mit Wespentaille
 const waspMesh=mesh(b=>{
   const y=[0.98,0.9,0.25], k=[0.1,0.09,0.08];
@@ -1694,6 +1793,13 @@ function addAccessories(b,d,st,L,W,H,arm,bk){
         rod([sx,cy+K*0.14,cz+K*0.56],[sx+K*0.3,cy+K*0.58,cz+K*0.8],K*0.075,K*0.04,fur); // Schwanz
         for(const ls of [-1,1]) for(const lz of [cz-K*0.3,cz+K*0.3])     // Pfoten
           blob(K*0.1,K*0.1,K*0.13,[sx+ls*K*0.22,cy-K*0.28,lz],dk);
+        break;
+      }
+      case 'spotlight': {                  // Lampenkopf unter der Nase
+        const ly=uy-S*0.24, lz=Math.min(-L*0.12,-S*0.3);
+        b.box(S*0.24,S*0.3,S*0.24,[sx,uy-S*0.1,lz],0,dark);
+        rod([sx,ly,lz+S*0.16],[sx,ly,lz-S*0.16],S*0.2,S*0.24,[0.32,0.33,0.36]);
+        blob(S*0.22,S*0.22,S*0.05,[sx,ly,lz-S*0.19],[1,0.97,0.86]);
         break;
       }
       case 'scout': {                      // Mini-Andockdrohne auf dem Rücken
@@ -2800,6 +2906,33 @@ function addBuildingBox(B,obs,x,z,w,d,h,y,col,yaw=0){
   B.box(w,h,d,[x,y+h/2,z],yaw,col);
   // Rechteckige Hitbox (statt grobem Zylinder): präzise Wände & Ecken
   obs.push({x,z,r:Math.hypot(w,d)/2,h:y+h,box:{hw:w/2,hd:d/2,yaw}});
+  if(ENV.night>0.5) addWindows(B,x,z,w,d,h,y,yaw);
+}
+/* Nachts erleuchtete Fenster: flache helle Plättchen dicht vor den Wänden.
+   Nicht jedes Fenster brennt – das macht die Häuser lebendig. */
+function addWindows(B,x,z,w,d,h,y,yaw){
+  const cy=Math.cos(yaw), sy=Math.sin(yaw);
+  const wx=Math.max(0.7,Math.min(1.4,w*0.14)), wy=Math.max(0.7,Math.min(1.5,h*0.1));
+  const rows=Math.max(1,Math.min(9,Math.floor(h/3.4)));
+  const cols=(s)=>Math.max(1,Math.min(8,Math.floor(s/3.6)));
+  // Weit über 1: das Umgebungslicht ist nachts sehr dunkel, erst dadurch
+  // leuchten die Fenster wirklich (der Shader kennt keine Eigenleuchte)
+  const warm=[[20,17,10],[20,15,8],[15,17,20]];
+  for(const [side,span,nrm] of [[0,w,[0,0,-1]],[1,w,[0,0,1]],[2,d,[-1,0,0]],[3,d,[1,0,0]]]){
+    const n=cols(span);
+    for(let r=0;r<rows;r++) for(let c=0;c<n;c++){
+      // Achtung: hash2 liefert nur 0…0,5 (siehe Kommentar bei hash2) – Schwelle
+      // deshalb hier auf diesen Bereich bezogen, ~45 % der Fenster brennen
+      if(hash2(Math.round(x*3+c*17+side*7),Math.round(z*3+r*29),side)<0.275) continue;
+      const t=(c+0.5)/n-0.5, ly=y+(r+0.7)*(h/(rows+0.6));
+      // lokale Wandkoordinate -> Weltkoordinate (Gebäude ist um yaw gedreht)
+      const lx=side<2? t*span : nrm[0]*(d/2+0.06);
+      const lz=side<2? nrm[2]*(w/2+0.06) : t*span;
+      const px=x+lx*cy+lz*sy, pz=z-lx*sy+lz*cy;
+      const col=warm[(c+r+side)%3];
+      B.box(side<2?wx:0.05, wy, side<2?0.05:wx, [px,ly,pz], yaw, col);
+    }
+  }
 }
 
 /* --- Szenengeneratoren --- */
@@ -3084,7 +3217,8 @@ GEN.city=(map,B,obs,terH,rnd)=>{
       const ctr=Math.exp(-Math.hypot(x,z)/150);
       const h=7+hash2(bi*7+n,bj*3,8)*55*ctr+hash2(bi,bj,n)*8;
       const shade=0.32+hash2(bi,bj,n+20)*0.3;
-      const glass=hash2(bi,bj,n+30)>0.6;
+      // hash2 reicht nur bis 0,5 – mit >0.6 gab es nie ein Glashochhaus
+      const glass=hash2(bi,bj,n+30)>0.3;
       const col=glass?[shade*0.7,shade*0.85,shade*1.05]:[shade+0.15,shade+0.13,shade+0.1];
       addBuildingBox(B,obs,x,z,w,d,h,0,col);
       B.box(w*0.4,2,d*0.4,[x,h+1,z],0,[0.3,0.3,0.32]);       // Dachaufbau
@@ -3115,8 +3249,28 @@ GEN.city=(map,B,obs,terH,rnd)=>{
 };
 
 /* --- Szene bauen --- */
+/* Sonnenstand, Nebel und Himmelsfarbe aus Karte x Tageszeit x Wetter.
+   Muss VOR dem Backen der Schatten laufen, sonst passen die Schatten
+   nicht zum Sonnenstand. */
+function applyDaytime(map){
+  const T=daytimeById(APP.daytime), W=weatherById(APP.weather);
+  SUN=V3.norm(T.sun);
+  const mul=(c,m)=>[c[0]*m[0],c[1]*m[1],c[2]*m[2]];
+  let fog=mul(map.fog,T.fogMul);
+  // Wetter zieht den Nebel zu seiner eigenen Farbe hin
+  if(W.tint){ const k=W.tintK;
+    fog=[fog[0]+(W.tint[0]*(1-T.night*0.85)-fog[0])*k,
+         fog[1]+(W.tint[1]*(1-T.night*0.85)-fog[1])*k,
+         fog[2]+(W.tint[2]*(1-T.night*0.85)-fog[2])*k]; }
+  ENV={fog, fogD:map.fogD*W.fogD, sky:mul(map.sky,T.skyMul),
+    sunC:[...T.sunC], ambC:[...T.ambC], night:T.night,
+    // Wasser wird mitgedunkelt, sonst leuchtet der See nachts
+    watMul:(T.ambC[0]+T.ambC[1]+T.ambC[2])/3};
+  WX={drag:W.drag, amp:W.amp, kind:W.kind, rate:W.rate};
+}
 function buildScene(mapId){
   const map=mapById(mapId)||MAPS[0];
+  applyDaytime(map);
   const terH=makeTerFn(map);
   let s=map.ter.seed*7919+13;
   const rnd=()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; };
@@ -3220,8 +3374,8 @@ function buildScene(mapId){
       x:o.x,z:o.z,yaw:0,phase:rnd()*7});
   }
   SCENE={map,terH,stat,terMesh,shadow,obstacles:obs,race,photo,plats,people,
-    water:map.water?{...map.water}:null};
-  ENV={fog:map.fog,fogD:map.fogD,sky:map.sky};
+    water:map.water?{...map.water}:null,
+    envKey:APP.daytime+'|'+APP.weather};
   return SCENE;
 }
 
@@ -3362,6 +3516,8 @@ const APP={
   model:DRONES[1], modeIdx:0, camera:0, windLevel:1,
   mapId:'standard', missionId:'free', mission:null,
   sens:(localStorage.getItem('ds_sens'))||(('ontouchstart' in window)||navigator.maxTouchPoints>0?'Langsam':'Normal'),
+  daytime:localStorage.getItem('ds_time')||'mittag',
+  weather:localStorage.getItem('ds_wx')||'klar',
   time:0,
   get mode(){ return this.model.modes[this.modeIdx]; },
   get springThr(){ const m=this.mode; return m==='GPS'||m==='ATTI'; },
@@ -3398,6 +3554,7 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.cargoOn=!!d.cargo; CRATE=null;
   DR.cannon=d.cannon||0; DR.hornets=d.hornets||0; DR.wasps=d.wasps||0;
   SWARMS=[]; SCOUT=null; DR.scoutOut=false; DR.meowT=0;
+  DR.lightOn=!!d.light; wxReset();
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST; }
   if(fullBatt) DR.soc=(APP.missionId==='landing')?0.22:1;
@@ -3466,10 +3623,11 @@ function flightController(dt){
       // (Neigung folgt aus der nötigen Beschleunigung), sonst bleibt sie deutlich
       // unter ihrer Sollgeschwindigkeit.
       const vt=Math.hypot(vtx,vtz);
-      let aff=d.dragH*vt*vt/m;
+      const wd=WX.drag;                    // Wetter zählt in der Vorsteuerung mit
+      let aff=d.dragH*wd*vt*vt/m;
       for(let k=0;k<2&&vt>0.01;k++){
         const th=Math.atan2(aff,G), sT=Math.sin(th), cT=Math.cos(th);
-        aff=((d.dragV*vt*vt*sT*sT+d.dragL*vt*sT)*sT
+        aff=wd*((d.dragV*vt*vt*sT*sT+d.dragL*vt*sT)*sT
             +(d.dragH*vt*vt*cT*cT+d.dragL*vt*cT)*cT)/m;
       }
       const ffk=vt>0.01?aff/vt:0;
@@ -3589,7 +3747,8 @@ function physStep(dt){
   const wind=windAt(APP.time,DR.pos[1]);
   const vAir=V3.sub(DR.vel,wind);
   const vb=Q.rotInv(DR.q,vAir);
-  const pkgD=extraMass()>0?1.25:1;
+  // Nässe bzw. Anhaftung bremst zusätzlich
+  const pkgD=(extraMass()>0?1.25:1)*WX.drag;
   const Fdb=[
     -(d.dragH*vb[0]*Math.abs(vb[0])+d.dragL*vb[0])*pkgD,
     -(d.dragV*vb[1]*Math.abs(vb[1])+d.dragL*vb[1])*pkgD,
@@ -3613,7 +3772,8 @@ function batteryStep(dt,Tsum,m){
   const d=APP.model, b=d.batt;
   const hoverT=m*G;
   const load=Math.max(Tsum/hoverT,0.02);
-  DR.amps=DR.armed? d.hoverAmp*Math.pow(load,1.5)+0.25 : 0.05;
+  // Regen und Kälte kosten zusätzlich Strom
+  DR.amps=(DR.armed? d.hoverAmp*Math.pow(load,1.5)+0.25 : 0.05)*WX.amp;
   DR.soc=Math.max(0,DR.soc - DR.amps*dt/3600/(b.mah/1000));
   const ocv=3.35+0.85*DR.soc;
   const sag=Math.min(0.4,0.055*Math.pow(DR.amps/d.hoverAmp,0.8));
@@ -4038,6 +4198,32 @@ function stepHornets(dt){
     // nach dem Angriff lösen sie sich auf
     if(sw.t>22||(!alive&&sw.t>3.5)) SWARMS.splice(i,1);
   }
+}
+
+/* ---------------- Wetter: Regen und Schnee ----------------
+   Kein Partikel-Array: die Kachel-Meshes aus p3.js werden nur verschoben.
+   WXS hält den Scroll-Zustand (Fallhöhe und Winddrift). */
+const WXS={fall:0, dx:0, dz:0};
+function wxReset(){ WXS.fall=0; WXS.dx=0; WXS.dz=0; }
+function stepWeather(dt){
+  if(!WX.kind)return;
+  const snow=WX.kind==='snow';
+  const c=(VIEW&&VIEW.cam)||DR.pos;
+  const wind=windAt(APP.time,c[1]);
+  const wf=snow?0.9:0.35;
+  WXS.fall=(WXS.fall+(snow?1.7:19)*dt)%(2*RAIN_T);
+  WXS.dx+=wind[0]*wf*dt;
+  WXS.dz+=wind[2]*wf*dt;
+}
+
+/* ---------------- Scheinwerfer ---------------- */
+function toggleLight(){
+  const d=APP.model;
+  if(!d.light||APP.state!=='fly')return false;
+  DR.lightOn=!DR.lightOn;
+  toast(DR.lightOn?'🔦 Scheinwerfer an':'🔦 Scheinwerfer aus',1200);
+  updateButtons();
+  return true;
 }
 
 /* ---------------- Wespennest ----------------
@@ -4475,7 +4661,7 @@ function stepBombs(dt){
     if(p.pos[1]<gy+p.r*0.5){ p.pos[1]=gy+p.r*0.5; p.vel=[p.vel[0]*0.4,-p.vel[1]*0.25,p.vel[2]*0.4]; p.spin*=0.5; }
   }
   stepCrate(dt);
-  stepAI(dt); stepHornets(dt); stepScout(dt);
+  stepAI(dt); stepHornets(dt); stepScout(dt); stepWeather(dt);
   if(APP.shake) APP.shake=Math.max(0,APP.shake-dt*1.6);
   if(DR.meowT) DR.meowT=Math.max(0,DR.meowT-dt);
   if(APP.flashT) APP.flashT=Math.max(0,APP.flashT-dt*1.1);
@@ -4742,6 +4928,7 @@ function render(){
   gl.useProgram(skySh.p);
   gl.uniform3fv(skySh.u.uR,VIEW.right);gl.uniform3fv(skySh.u.uU,VIEW.up);gl.uniform3fv(skySh.u.uF,VIEW.fwd);
   gl.uniform3fv(skySh.u.uSun,SUN);gl.uniform3fv(skySh.u.uFogCol,ENV.fog);gl.uniform3fv(skySh.u.uZen,ENV.sky);
+  gl.uniform1f(skySh.u.uNight,ENV.night||0);
   gl.uniform1f(skySh.u.uTan,Math.tan(cam.fov/2));gl.uniform1f(skySh.u.uAsp,glc.width/glc.height);
   bindAttr(skySh.aP,skyBuf,2);
   gl.drawArrays(gl.TRIANGLES,0,3);
@@ -4751,6 +4938,7 @@ function render(){
   gl.uniformMatrix4fv(terSh.u.uProj,false,VIEW.proj);
   gl.uniformMatrix4fv(terSh.u.uView,false,VIEW.view);
   gl.uniform3fv(terSh.u.uSun,SUN);gl.uniform3fv(terSh.u.uCam,cam.eye);
+  gl.uniform3fv(terSh.u.uSunC,ENV.sunC);gl.uniform3fv(terSh.u.uAmbC,ENV.ambC);
   gl.uniform3fv(terSh.u.uFogCol,ENV.fog);gl.uniform1f(terSh.u.uFogD,ENV.fogD);
   bindAttr(terSh.aP,SCENE.terMesh.vb,3);
   bindAttr(terSh.aN,SCENE.terMesh.nb,3);
@@ -4885,6 +5073,34 @@ function render(){
       gl.depthMask(true);
     }
   }
+  // Scheinwerferkegel: als durchscheinender Kegel nach unten-vorn
+  if(DR.lightOn&&d.light&&!DR.crashed&&cam.name!=='FPV'){
+    const gy=SCENE.terH(DR.pos[0],DR.pos[2]);
+    const len=Math.max(3,Math.min(70,DR.pos[1]-gy+2));
+    const bm=M4.fromQuatPos(DR.q,DR.pos);
+    gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);
+    drawMesh(lightConeMesh,M4.mul(bm,M4.mul(M4.translate(0,-d.style.bodyH,-d.style.bodyL*0.4),
+      M4.scale(len*0.34,len,len*0.34))),[1,0.95,0.78],0.09);
+    gl.depthMask(true);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  }
+  // Regen und Schnee: 2x2 Kacheln um die Kamera, vertikal durchgescrollt
+  if(WX.kind){
+    const snow=WX.kind==='snow';
+    const bm=rainBatchFor(WX.kind);
+    const S=2*RAIN_B;
+    // Winddrift herausrechnen, damit das Raster trotz Drift lückenlos bleibt
+    const cx=cam.eye[0]-WXS.dx, cz=cam.eye[2]-WXS.dz;
+    const bx=Math.floor((cx-RAIN_B)/S)*S+WXS.dx;
+    const bz=Math.floor((cz-RAIN_B)/S)*S+WXS.dz;
+    const by=cam.eye[1]+RAIN_T-2*RAIN_T-WXS.fall;
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+    gl.depthMask(false);
+    const col=snow?[1,1,1.05]:[0.7,0.8,0.98];
+    for(let i=0;i<2;i++)for(let k=0;k<2;k++)
+      drawMesh(bm,M4.translate(bx+i*S,by,bz+k*S),col,snow?0.95:0.6);
+    gl.depthMask(true);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+  }
   // Abgeworfene Kiste liegt in der Landschaft
   if(CRATE){
     const cs=CRATE.s||1;
@@ -4991,7 +5207,8 @@ function render(){
     gl.uniform1f(watSh.u.uLvl,SCENE.water.level);
     gl.uniform3fv(watSh.u.uCam,cam.eye);
     gl.uniform3fv(watSh.u.uFogCol,ENV.fog);
-    gl.uniform3fv(watSh.u.uWCol,SCENE.water.col);
+    const wm=ENV.watMul===undefined?1:ENV.watMul;
+    gl.uniform3fv(watSh.u.uWCol,[SCENE.water.col[0]*wm,SCENE.water.col[1]*wm,SCENE.water.col[2]*wm]);
     gl.uniform1f(watSh.u.uFogD,ENV.fogD);
     gl.uniform1f(watSh.u.uT,APP.time);
     gl.depthMask(false);
@@ -5219,6 +5436,29 @@ function buildMenu(){
     c.onclick=()=>{APP.missionId=m.id;buildMenu();};
     mg.appendChild(c);
   }
+  const tr=$('timeRow');
+  tr.innerHTML='';
+  for(const t of DAYTIMES){
+    const b=document.createElement('button');
+    b.textContent=t.name; b.title=t.desc;
+    if(t.id===APP.daytime)b.className='sel';
+    b.onclick=()=>{APP.daytime=t.id;localStorage.setItem('ds_time',t.id);buildMenu();};
+    tr.appendChild(b);
+  }
+  const xr=$('wxRow');
+  xr.innerHTML='';
+  for(const w of WEATHER){
+    const b=document.createElement('button');
+    b.textContent=w.name; b.title=w.desc;
+    if(w.id===APP.weather)b.className='sel';
+    b.onclick=()=>{APP.weather=w.id;localStorage.setItem('ds_wx',w.id);buildMenu();};
+    xr.appendChild(b);
+  }
+  { const T=daytimeById(APP.daytime), W=weatherById(APP.weather);
+    const eff=W.drag>1||W.amp>1
+      ? ` Kostet spürbar: +${Math.round((W.drag-1)*100)} % Luftwiderstand, +${Math.round((W.amp-1)*100)} % Strom.`
+      : '';
+    $('wxHelp').textContent=T.desc+' · '+W.desc+'.'+eff; }
   const wr=$('windRow');
   wr.innerHTML='';
   WIND_NAMES.forEach((n,i)=>{
@@ -5271,7 +5511,9 @@ function buildMenu(){
   $('startBtn').textContent=(APP.state==='fly'&&!configChanged())?'WEITERFLIEGEN':'ABHEBEN';
 }
 let flownConfig='';
-function configKey(){ return APP.mapId+'|'+APP.model.id+'|'+APP.missionId; }
+// Tageszeit und Wetter stecken in den gebackenen Schatten bzw. im Nebel,
+// deshalb gehören sie in den Schlüssel: bei Änderung wird neu aufgebaut.
+function configKey(){ return APP.mapId+'|'+APP.model.id+'|'+APP.missionId+'|'+APP.daytime+'|'+APP.weather; }
 function configChanged(){ return flownConfig!==configKey(); }
 function openMenu(){ APP.paused=true;$('menu').style.display='block';buildMenu(); }
 function closeMenuAndStart(){
@@ -5279,7 +5521,8 @@ function closeMenuAndStart(){
   $('menu').style.display='none';
   $('pview').style.display='none';
   if(APP.state!=='fly'||configChanged()){
-    if(!SCENE||SCENE.map.id!==APP.mapId) buildScene(APP.mapId);
+    if(!SCENE||SCENE.map.id!==APP.mapId||SCENE.envKey!==APP.daytime+'|'+APP.weather)
+      buildScene(APP.mapId);
     APP.mission=makeMission(APP.missionId);
     APP.state='fly';
     APP.camera=APP.model.cls==='fpv'?0:1;
@@ -5330,6 +5573,10 @@ function updateButtons(){
   wb.textContent='🪰 '+(DR.wasps||0);
   wb.classList.toggle('attn',!!(DR.wasps>0&&SCENE&&SCENE.people.some(p=>
     Math.hypot(p.x-DR.pos[0],p.z-DR.pos[2])<WASP_R)));
+  const lb=$('bLight');
+  lb.style.display=APP.model.light?'block':'none';
+  lb.textContent=DR.lightOn?'🔦 an':'🔦 aus';
+  lb.classList.toggle('attn',!!DR.lightOn);
   const kb=$('bCat');
   kb.style.display=APP.model.cat?'block':'none';
   kb.textContent='🐱';
@@ -5384,6 +5631,7 @@ function handleKey(code){
   else if(code==='KeyK'){toggleScout();}
   else if(code==='KeyJ'){releaseWasps();}
   else if(code==='KeyY'){catMeow();}
+  else if(code==='KeyL'){toggleLight();}
   else if(code==='KeyR'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}
   else if(/^Digit[1-4]$/.test(code)){APP.windLevel=+code.slice(5)-1;toast('💨 '+WIND_NAMES[APP.windLevel]);}
 }
@@ -5401,6 +5649,7 @@ $('bHorn').onclick=()=>releaseHornets();
 $('bScout').onclick=()=>toggleScout();
 $('bWasp').onclick=()=>releaseWasps();
 $('bCat').onclick=()=>catMeow();
+$('bLight').onclick=()=>toggleLight();
 $('bReset').onclick=()=>{if(APP.state==='fly'){resetDrone(true);toast('Zurückgesetzt');updateButtons();}};
 $('bMenu').onclick=()=>{if(APP.paused)closeMenuAndStart();else openMenu();};
 $('startBtn').onclick=closeMenuAndStart;
@@ -6248,6 +6497,7 @@ function renderEditorPreview(){
   gl.useProgram(skySh.p);
   gl.uniform3fv(skySh.u.uR,VIEW.right);gl.uniform3fv(skySh.u.uU,VIEW.up);gl.uniform3fv(skySh.u.uF,VIEW.fwd);
   gl.uniform3fv(skySh.u.uSun,SUN);gl.uniform3fv(skySh.u.uFogCol,ENV.fog);gl.uniform3fv(skySh.u.uZen,ENV.sky);
+  gl.uniform1f(skySh.u.uNight,ENV.night||0);
   gl.uniform1f(skySh.u.uTan,Math.tan(38*deg/2));gl.uniform1f(skySh.u.uAsp,glc.width/glc.height);
   bindAttr(skySh.aP,skyBuf,2); gl.drawArrays(gl.TRIANGLES,0,3);
   gl.enable(gl.DEPTH_TEST);
