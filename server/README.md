@@ -8,31 +8,44 @@ Ohne diesen Server funktioniert der Simulator vollständig weiter; der
 Mehrspieler fällt dann auf **„gleiches Gerät"** zurück (zwei Fenster
 desselben Browsers).
 
-## Einmal einrichten
+## Einmal einrichten – ohne Terminal, geht auch am Tablet
 
-Du brauchst ein kostenloses Cloudflare-Konto. Sonst nichts.
+Du brauchst ein kostenloses Cloudflare-Konto. Sonst nichts. Cloudflare
+holt sich den Code selbst aus GitHub, du klickst nur:
+
+1. **dash.cloudflare.com** öffnen und anmelden
+2. Links **Workers und Pages** → oben rechts **Anwendung erstellen**
+3. **Repository importieren** wählen und dieses Repository verbinden
+4. **Projektname**: `drone-sim-rooms` (muss zum `name` in `wrangler.toml` passen)
+5. **Build-Befehl**: leer lassen · **Bereitstellungsbefehl**: `npx wrangler deploy`
+6. Unter **Erweiterte Einstellungen** den **Pfad** auf `server` setzen –
+   sonst sucht Cloudflare im Hauptverzeichnis und findet die Konfiguration nicht
+7. **Bereitstellen**
+
+Von da an deployt jeder Push auf `main`, der `server/` berührt, von selbst.
+
+Gegenprobe: `https://drone-sim-rooms.DEIN-NAME.workers.dev/health` muss
+`ok` antworten.
+
+Die Adresse trägst du in `index.html` in **eine einzige Zeile** ein –
+suche nach `MP_SERVER`:
+
+```js
+let MP_SERVER='https://drone-sim-rooms.DEIN-NAME.workers.dev';
+```
+
+Fertig. Wer die Seite aufruft, tippt auf **🌐 Online** und ist bei allen,
+die gerade dieselbe Karte fliegen – ohne Code, ohne Absprache.
+
+### Falls du an einem Rechner sitzt
+
+Dann geht es auch direkt:
 
 ```bash
 cd server
 npx wrangler login      # öffnet den Browser, einmal bestätigen
 npx wrangler deploy
 ```
-
-Am Ende steht eine Adresse in der Form
-
-```
-https://drone-sim-rooms.DEIN-NAME.workers.dev
-```
-
-Die trägst du in `index.html` in **eine einzige Zeile** ein – suche nach
-`MP_SERVER`:
-
-```js
-const MP_SERVER='';   // <- hier die workers.dev-Adresse hinein
-```
-
-Fertig. Wer die Seite aufruft, kann ab dann einen Raumcode eingeben und
-mit anderen zusammen fliegen.
 
 ## Kostet das etwas?
 
@@ -66,5 +79,12 @@ Dann in `index.html` `MP_SERVER='http://127.0.0.1:8787'` setzen.
   von Spielinhalten. Ein Raum existiert, solange jemand drin ist.
 - **Nicht mitlesen.** Nachrichten werden unverändert weitergereicht.
 
-Ein Raum ist nur über seinen Code erreichbar. Wer den Code nicht kennt,
-kommt nicht hinein.
+Ein Raum ist nur über seinen Namen erreichbar. Die **öffentlichen** Räume
+heissen absichtlich berechenbar (`P` + Hash der Karte + Ausweichraum) –
+dort sollen sich ja Fremde treffen. Der **private** Code ist acht Zeichen
+aus 32, also 40 Bit; wer ihn nicht hat, kommt nicht hinein.
+
+Ist ein Raum voll (16 Piloten), weist der Server nicht ab, sondern nimmt
+die Verbindung an, schickt `{"t":"full"}` und schliesst mit Code `4001`.
+Daran erkennt das Spiel, dass es den nächsten von acht Ausweichräumen
+derselben Karte nehmen soll – macht 128 Piloten pro Karte.
