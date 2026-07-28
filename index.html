@@ -26,7 +26,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #btnbar button:active{background:var(--panel2)}
 #btnbar button.armed{background:#67251f;border-color:#c25047;color:#ffd9d5}
 #btnbar button.attn{background:#0f4a2d;border-color:#2fae6b;color:#c9ffe0}
-#bRescue,#bBomb,#bNuke,#bFw,#bCargo,#bCann,#bHorn,#bScout,#bWasp,#bCat,#bLight,#bGim,#bRTH{display:none}
+#bRescue,#bBomb,#bNuke,#bFw,#bCargo,#bCann,#bHorn,#bScout,#bWasp,#bCat,#bLight,#bGim,#bRTH,#bChat{display:none}
+#bChat.attn{background:#0d3a52;border-color:#3fb6e6;color:#cceeff}
 #bRTH.attn{background:#0d3a52;border-color:#3fb6e6;color:#cceeff}
 #bLight.attn{background:#5a4a10;border-color:#e8d04a;color:#fff6c8}
 #bWasp.attn{background:#4a4406;border-color:#d8cf3c;color:#fbf7bb}
@@ -99,8 +100,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .ctrl .ok{color:#7fe0a0}
 #chatbar{position:absolute;left:0;right:0;bottom:calc(74px + env(safe-area-inset-bottom));z-index:30;
   display:none;justify-content:center;pointer-events:none}
-#chatbar input{pointer-events:auto;width:min(560px,86vw);background:rgba(10,16,24,.92);
+#chatwrap{display:flex;flex-direction:column;gap:7px;align-items:center;width:min(560px,90vw)}
+#chatbar input{pointer-events:auto;width:100%;background:rgba(10,16,24,.92);
   border:1px solid var(--acc);color:#fff;border-radius:11px;padding:11px 14px;font-size:14px}
+/* Schnellnachrichten: im Flug tippt sich schlecht, mit dem Daumen gar nicht */
+#chatquick{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:100%}
+#chatquick button{pointer-events:auto;background:rgba(10,16,24,.92);border:1px solid var(--line);
+  color:var(--txt);border-radius:999px;padding:8px 13px;font-size:13.5px;cursor:pointer}
+#chatquick button:active{background:var(--acc);color:#04121c;border-color:var(--acc)}
 .card.unfit{opacity:.5}
 .card.unfit .warn{color:#ffb020;font-size:11.5px;line-height:1.35;margin:4px 0 2px}
 .card.unfit.sel{opacity:.75;border-color:#ffb020;box-shadow:0 0 0 1px #ffb020}
@@ -237,13 +244,17 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <button id="bLight" title="Scheinwerfer (L)">🔦</button>
   <button id="bGim" title="Kamera neigen (, und .)">🎥 0°</button>
   <button id="bRTH" title="Return-to-Home (T)">🏠</button>
+  <button id="bChat" title="Chat (Q)">💬</button>
   <button id="bArm">ARM</button>
   <button id="bMode">GPS</button>
   <button id="bCam">KAM</button>
   <button id="bReset">RESET</button>
   <button id="bMenu">MENÜ</button>
 </div>
-<div id="chatbar"><input id="chatInp" maxlength="120" placeholder="Nachricht … (Enter senden, Esc abbrechen)"></div>
+<div id="chatbar"><div id="chatwrap">
+  <div id="chatquick"></div>
+  <input id="chatInp" maxlength="120" placeholder="Nachricht … (Enter senden, Esc abbrechen)">
+</div></div>
 <div id="menu"><div class="wrap">
   <h1>DROHNEN-<span>SIMULATOR</span></h1>
   <div class="sub">Realistische Flugphysik · 11 Modelle · 6 Karten · Missionen · Tastatur, Gamepad &amp; Touch</div>
@@ -4245,15 +4256,21 @@ if(IS_TOUCH){
 function updateTouchInput(springThr){
   const l=TOUCH.l,r=TOUCH.r;
   const m=STICK_MODES[CTRL.mode]||STICK_MODES[2];
+  // Finger weg vom Knüppel. Was dann gilt, hängt an der Rückstellfeder:
+  // Mit Feder (GPS und ATTI) federt der Gasknüppel in die MITTE, und Mitte
+  // heisst dort „Höhe halten". Auf -1 zu springen hiesse „Motoren aus" – die
+  // Drohne fiele beim Loslassen sofort. Ohne Feder (ANGLE, ACRO) bleibt der
+  // Knüppel stehen, wo er war, wie an einem echten Sender.
+  const rel=(axis)=>axis==='thr' ? (springThr?0:(TOUCH.thrHold??null)) : 0;
   if(l){ RAW.lh=l.x; RAW.lv=l.y; IN.src='touch'; }
   else if(IS_TOUCH&&IN.src==='touch'){
     RAW.lh=0;
-    RAW.lv=(m.lv==='thr'&&!springThr)?(TOUCH.thrHold??RAW.lv):(m.lv==='thr'?-1:0);
+    const v=rel(m.lv); if(v!==null) RAW.lv=v;
   }
   if(r){ RAW.rh=r.x; RAW.rv=r.y; IN.src='touch'; }
   else if(IS_TOUCH&&IN.src==='touch'){
     RAW.rh=0;
-    RAW.rv=(m.rv==='thr'&&!springThr)?(TOUCH.thrHold??RAW.rv):(m.rv==='thr'?-1:0);
+    const v=rel(m.rv); if(v!==null) RAW.rv=v;
   }
 }
 
@@ -4312,7 +4329,7 @@ const DR={
   pos:[0,0,0], vel:[0,0,0], q:Q.ident(), w:[0,0,0],
   motors:[0,0,0,0], propAng:[0,0,0,0],
   armed:false, onGround:true, crashed:false, groundTimer:0,
-  soc:1, volts:0, amps:0, battF:1,
+  soc:1, volts:0, amps:0, battF:1, dead:0,
   pkg:false, iTerm:[0,0,0], flightTime:0,
   driftV:[0,0], wob:[0,0],
   dbg:{rateT:[0,0,0],T:0},
@@ -4336,7 +4353,7 @@ function resetDrone(fullBatt=true,clearWreck=true){
   SWARMS=[]; SCOUT=null; DR.scoutOut=false; DR.meowT=0;
   DR.lightOn=!!d.light; wxReset();
   RTH.on=false; RTH.phase=''; HOME.set=false; LINK.q=1;
-  DR.warn25=0; DR.warnT=0; DR.warnManual=0; GIM.user=0;
+  DR.warn25=0; DR.warnT=0; DR.warnManual=0; DR.warnDead=0; DR.dead=0; GIM.user=0;
   resetFacts(); STATS.flights++; saveStats(); ghostStart();
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST;
@@ -4509,12 +4526,16 @@ loadStats();
    Kein zweiter Regler: RTH setzt nur den Sollwert, den der GPS-Zweig
    des Flight Controllers ohnehin schon verarbeitet. */
 const HOME={x:0,y:0,z:0,set:false};
-const RTH={on:false, phase:'', reason:''};
+const RTH={on:false, phase:'', reason:'', land:0, ease:0};
 const RTH_ALT=35;              // Sicherheitshöhe über dem Startpunkt
 const RTH_SOC=0.15;            // darunter kommt sie von allein zurück
 function setHome(){
   HOME.x=DR.pos[0]; HOME.z=DR.pos[2];
-  HOME.y=SCENE?SCENE.terH(HOME.x,HOME.z):DR.pos[1];
+  // groundHeightAt statt terH: der Startpunkt kann eine Plattform, ein Dach
+  // oder mit Schwimmern die Wasseroberfläche sein. terH kennt davon nichts
+  // und liefert den Erdboden darunter – dann sinkt Return-to-Home beim
+  // Landen durch das, worauf sie gestartet ist.
+  HOME.y=SCENE?groundHeightAt(HOME.x,HOME.z):DR.pos[1];
   HOME.set=true;
 }
 function homeDist(){ return HOME.set?Math.hypot(DR.pos[0]-HOME.x,DR.pos[2]-HOME.z):0; }
@@ -4528,7 +4549,7 @@ function startRTH(reason){
   if(APP.state!=='fly'||DR.crashed)return false;
   if(!HOME.set) setHome();
   if(RTH.on)return true;
-  RTH.on=true; RTH.phase='climb'; RTH.reason=reason||'';
+  RTH.on=true; RTH.phase='climb'; RTH.reason=reason||''; RTH.land=0; RTH.ease=0;
   if(APP.mode!=='GPS') APP.modeIdx=APP.modes.indexOf('GPS');
   beep(880,0.18); setTimeout(()=>beep(1320,0.22),160);
   toast('🏠 Return-to-Home'+(reason?' – '+reason:'')+' · '+homeDist().toFixed(0)+' m',3000);
@@ -4537,7 +4558,7 @@ function startRTH(reason){
 }
 function stopRTH(silent){
   if(!RTH.on)return false;
-  RTH.on=false; RTH.phase=''; RTH.reason='';
+  RTH.on=false; RTH.phase=''; RTH.reason=''; RTH.land=0; RTH.ease=0;
   if(!silent) toast('🏠 Return-to-Home abgebrochen',1500);
   updateButtons();
   return true;
@@ -4556,10 +4577,19 @@ function rthCommand(d){
     return {vx:(HOME.x-DR.pos[0])/dist*sp, vz:(HOME.z-DR.pos[2])/dist*sp,
       vy:clamp((HOME.y+RTH_ALT-DR.pos[1])*0.5,-d.desc_*0.5,d.climb*0.7)};
   }
-  // landen: langsam sinken, über dem Boden abbremsen
-  const h=DR.pos[1]-HOME.y;
-  return {vx:(HOME.x-DR.pos[0])*0.6, vz:(HOME.z-DR.pos[2])*0.6,
-    vy:-Math.min(d.desc_*0.5, 0.8+h*0.35)};
+  // Landen: nie schneller sinken, als die Drohne einen Aufschlag verträgt.
+  // crashSpeed ist die Geschwindigkeit, ab der sie zerbricht; 60 % davon
+  // lassen Luft für Böen und Regelfehler. In den letzten zwei Metern wird
+  // daraus ein sanftes Aufsetzen statt eines kontrollierten Sturzes.
+  const h=Math.max(0,DR.pos[1]-HOME.y);
+  // Drei Abschnitte: oben zügig, damit man nicht minutenlang zuschaut; ab
+  // acht Metern höchstens 60 % der Bruchgeschwindigkeit, damit ein Regelfehler
+  // sie nicht zerlegt; die letzten zwei Meter im Schritttempo.
+  const soft=crashSpeed(d)*0.6;
+  const v = h>8 ? Math.min(d.desc_*0.5, 0.8+h*0.35)
+          : h>2 ? Math.min(soft, 0.8+h*0.35)
+                : Math.min(0.5, soft);
+  return {vx:(HOME.x-DR.pos[0])*0.6, vz:(HOME.z-DR.pos[2])*0.6, vy:-v};
 }
 /* Failsafe: leerer Akku oder Reichweitengrenze holen sie von allein zurück.
    Nur aus dem GPS-Modus heraus – wer bewusst in ANGLE oder ACRO fliegt,
@@ -4567,6 +4597,21 @@ function rthCommand(d){
    trotzdem. */
 function rthWatch(dt){
   if(APP.state!=='fly'||DR.crashed||!canRTH())return;
+  // Letzte Handbreit: Eine Drohne mit starkem Bodeneffekt – Ducts vor allem –
+  // sinkt dort immer langsamer und setzt nie auf; ohne Gegenmassnahme hängt
+  // sie für immer über dem Boden und saugt den Akku leer.
+  //
+  // Abschalten wäre falsch: Aus 40 cm freiem Fall werden 2,8 m/s, und eine
+  // 4-kg-Drohne zerbricht schon bei 1,9. Ein Pilot nimmt in dieser Lage das
+  // Gas weg, und genau das tut RTH.ease – der Schub sinkt langsam, bis der
+  // Bodeneffekt sie nicht mehr trägt. Abgeschaltet wird erst bei Bodenkontakt,
+  // von der Stelle, die das ohnehin schon tut.
+  if(RTH.on&&RTH.phase==='land'&&DR.armed){
+    const h=DR.pos[1]-groundHeightAt(DR.pos[0],DR.pos[2]);
+    if(h<1.2&&Math.abs(DR.vel[1])<0.2) RTH.land=(RTH.land||0)+dt;
+    else if(h>2) RTH.land=0;
+    RTH.ease=RTH.land>0.8? Math.min(1,(RTH.ease||0)+dt/2) : 0;
+  }else RTH.ease=0;
   if(!DR.armed||DR.onGround)return;
   if(RTH.on)return;
   if(APP.mode!=='GPS'){
@@ -4708,7 +4753,9 @@ function flightController(dt){
       const F=[m*ax, m*(G+ay), m*az];
       const Fl=V3.len(F);
       ud=V3.scale(F,1/(Fl||1));
-      T=Fl;
+      // RTH nimmt beim Aufsetzen das Gas weg (siehe rthWatch), sonst trägt
+      // der Bodeneffekt sie endlos eine Handbreit über dem Boden.
+      T=Fl*(1-0.3*(RTH.ease||0));
       if(DR.onGround&&vzT<=0.02){ T=0.03*d.tmax; rateT=[0,0,0]; ud=null;
         if(RTH.on&&RTH.phase==='land'){ RTH.on=false; RTH.phase=''; DR.armed=false;
           fact('rthLanded');
@@ -4875,7 +4922,17 @@ function batteryStep(dt,Tsum,m){
   const sag=Math.min(0.55,DR.amps*b.Ri*(1.6-0.6*DR.soc));
   const vc=Math.max(2.9,ocv-sag);
   DR.volts=vc*b.cells;
-  DR.battF=DR.soc<=0? 0.55 : 0.75+0.35*clamp((vc-3.3)/0.9,0,1);
+  // Leerer Akku heisst leer. Unter Last fällt die Zellspannung dann unter
+  // 3 V, die Regler gehen in die Unterspannungsabschaltung, und innerhalb
+  // von gut zwei Sekunden ist kein Schub mehr da – ab da kommt sie herunter,
+  // ob der Pilot will oder nicht. Kein harter Schnitt: ein Pack stirbt über
+  // ein paar Sekunden, nicht in einem Bild.
+  if(DR.soc<=0&&DR.armed){
+    if(!DR.dead&&!DR.warnDead){ DR.warnDead=1; beep(220,0.5);
+      toast('🪫 <b>Akku leer</b> – die Motoren geben auf',4000); }
+    DR.dead=Math.min(1,(DR.dead||0)+dt/2.5);
+  }else if(DR.soc>0) DR.dead=0;
+  DR.battF=(0.75+0.35*clamp((vc-3.3)/0.9,0,1))*(1-(DR.dead||0));
 }
 
 /* --- Boden, Wasser, Plattformen, Hindernisse, Menschen --- */
@@ -6828,7 +6885,9 @@ function drawMpHud(w,hh,u){
     hud.textAlign='left';
     hud.font=`${12*u}px sans-serif`;
     const now=performance.now();
-    let y=hh-96*u;
+    // Auf dem Touchgerät liegen unten links die Knüppel – dort gelesen wird
+    // nichts. Die Zeilen wandern deshalb über den Stick.
+    let y=IS_TOUCH? hh*0.70 : hh-96*u;
     for(let i=MP.chat.length-1;i>=0;i--){
       const c=MP.chat[i];
       const age=(now-c.t)/1000;
@@ -6842,12 +6901,14 @@ function drawMpHud(w,hh,u){
       y-=16*u;
     }
   }
-  // Verbindungszustand oben links, nur wenn etwas nicht rund läuft
-  if(MP.net&&MP.state!=='online'){
+  // Verbindungszustand oben links, nur wenn etwas nicht rund läuft.
+  // Hing früher an MP.net, das es seit dem Umbau auf Online/Privat nicht mehr
+  // gibt – die Anzeige war damit tot, gerade wenn man sie gebraucht hätte.
+  if(MP.on&&MP.state!=='online'){
     hud.textAlign='left';
     hud.fillStyle=MP.state==='verbinde'?'rgba(255,200,90,0.9)':'rgba(255,160,150,0.9)';
     hud.font=`${11*u}px sans-serif`;
-    hud.fillText(MP.state==='verbinde'?'👥 verbinde …':'👥 gleiches Gerät',pad,hh*0.24);
+    hud.fillText(MP.state==='verbinde'?'👥 verbinde …':'👥 nur dieses Gerät',pad,hh*0.24);
   }
 }
 function drawHUD(){
@@ -7278,6 +7339,11 @@ function updateButtons(){
   kb.style.display=APP.model.cat?'block':'none';
   kb.textContent='🐱';
   kb.classList.toggle('attn',!!DR.meowT);
+  // Ohne diesen Knopf ist der Chat auf einem Touchgerät nicht erreichbar –
+  // Q gibt es dort nicht.
+  const chb=$('bChat');
+  chb.style.display=MP.on?'block':'none';
+  chb.classList.toggle('attn',chatIsOpen());
 }
 /* --- Steuerung einstellen: Belegung, Raten, Totzone, Verzögerung, Geräte ---
    Alles wirkt sofort und liegt in CTRL (localStorage ds_ctrl). */
@@ -7619,10 +7685,27 @@ function cycleMode(){
   updateButtons();
 }
 /* --- Chat-Eingabe im Flug --- */
+// Sechs Sätze, die im Flug reichen. Getippt wird nur, wer will – mit dem
+// Daumen an den Knüppeln kommt man sonst zu nichts.
+const CHAT_QUICK=['Los!','Warte','Achtung!','Abgestürzt','Gut geflogen','Bin gleich zurück'];
+function buildChatQuick(){
+  const q=$('chatquick');
+  if(!q||q.childElementCount)return;
+  for(const t of CHAT_QUICK){
+    const b=document.createElement('button');
+    b.textContent=t;
+    b.onclick=(e)=>{ e.preventDefault(); mpChatSend(t); chatClose(); };
+    q.appendChild(b);
+  }
+}
 function chatOpen(){
   if(!MP.on||APP.state!=='fly')return false;
   const bar=$('chatbar'), inp=$('chatInp');
-  bar.style.display='flex'; inp.value=''; inp.focus();
+  buildChatQuick();
+  bar.style.display='flex'; inp.value='';
+  // Auf dem Touchgerät nicht automatisch die Bildschirmtastatur hochreissen –
+  // meistens will man nur eine der Schnellnachrichten antippen.
+  if(!IS_TOUCH) inp.focus();
   return true;
 }
 function chatClose(){ $('chatbar').style.display='none'; $('chatInp').blur(); }
@@ -7681,6 +7764,7 @@ $('bScout').onclick=()=>toggleScout();
 $('bWasp').onclick=()=>releaseWasps();
 $('bCat').onclick=()=>catMeow();
 $('bLight').onclick=()=>toggleLight();
+$('bChat').onclick=()=>{ if(chatIsOpen())chatClose(); else if(!chatOpen())toast('Chat gibt es nur im Mehrspieler'); updateButtons(); };
 // Ein Knopf für Touch: schaltet durch die üblichen Kamerawinkel
 $('bGim').onclick=()=>{
   const steps=[0,-30,-60,-90];
@@ -8294,6 +8378,10 @@ function mpSetOn(v){
   MP.on=v; mpSave();
   if(v) mpStart(); else mpStop();
   buildMenu();
+  // Der Chat-Knopf im HUD hängt daran – ohne das taucht er erst auf, wenn
+  // zufällig etwas anderes die Knopfleiste neu zeichnet.
+  if(APP.state==='fly') updateButtons();
+  if(!v) chatClose();
 }
 function mpSetMode(m){
   const v=(m==='privat')?'privat':'online';
@@ -8829,7 +8917,7 @@ requestAnimationFrame(frame);
 
 /* --- Test-API (für automatisierte Prüfung) --- */
 window.T={
-  APP,DR,IN,MAPS,
+  APP,DR,IN,MAPS,DRONES,allDrones,allMaps,
   key:handleKey,
   get WRECK(){return WRECK;},
   get RESCUE(){return RESCUE;},
@@ -8863,7 +8951,7 @@ window.T={
   MP,get MP_SERVER(){return MP_SERVER;},mpSetServer(u){MP_SERVER=u||'';},
   mpSetOn,mpSetMode,mpSetRoom,mpRandomRoom,mpLink,mpOnMessage,mpSend,mpChatSend,
   mpPublicRoom,mpWantRoom,mpSyncRoom,mpStop,mpStart,MP_SHARD_MAX,
-  mpRaceStart,mpRanking,mpCountdown,mpReportGate,mpVisible,mpNetFailed,chatOpen,chatClose,chatIsOpen,
+  mpRaceStart,mpRanking,mpCountdown,mpReportGate,mpVisible,mpNetFailed,chatOpen,chatClose,chatIsOpen,CHAT_QUICK,buildChatQuick,
   keydown(c){KEYS[c]=true;if(IN.src!=='test')IN.src='keys';},
   keyup(c){KEYS[c]=false;},
   tick(sec){
@@ -8874,8 +8962,28 @@ window.T={
       stepDebris(DT);rescueStep(DT);stepBombs(DT);
     }
   },
+  // Touch-Eingabeweg: TOUCH.l/r sind die Finger auf den Knüppeln. Die Tests
+  // fassen damit denselben Weg an wie ein Daumen auf dem Glas.
+  get TOUCH(){return TOUCH;}, get IS_TOUCH(){return IS_TOUCH;},
+  touchStick(zone,x,y){ TOUCH[zone]={id:zone==='l'?-1:-2,x,y,cx:0,cy:0}; IN.src='touch'; },
+  touchRelease(zone){
+    const m=STICK_MODES[CTRL.mode]||STICK_MODES[2];
+    const vertIsThr=(zone==='l'?m.lv:m.rv)==='thr';
+    if(vertIsThr&&!APP.springThr) TOUCH.thrHold=(zone==='l'?RAW.lv:RAW.rv);
+    TOUCH[zone]=null;
+  },
+  updateTouchInput,
+  // Nur für Messreihen: die Szene füllt sich über viele Starts hinweg mit
+  // KI-Drohnen, Vögeln und Trümmern. Wer eine Landung nach der anderen misst,
+  // will keinen zufälligen Vogelschlag mitten drin.
+  clearTraffic(){ AIDRONES.length=0; BIRDS.length=0; DEBRIS.length=0; SWARMS.length=0;
+    WRECK=null; RESCUE=null; DR.birdHits=0; },
+  // Return-to-Home und Startpunkt
+  HOME,RTH,setHome,startRTH,stopRTH,groundHeightAt,rthCommand,
+  drawHUD,
   st(){return {pos:[...DR.pos],vel:[...DR.vel],mode:APP.mode,armed:DR.armed,
     onGround:DR.onGround,crashed:DR.crashed,soc:DR.soc,volts:DR.volts,
+    battF:DR.battF,dead:DR.dead,
     motors:[...DR.motors],tilt:tiltAngle()/deg,map:SCENE.map.id,
     debris:DEBRIS.length,wreck:!!WRECK,carrying:!!(RESCUE&&RESCUE.carrying),photos:PHOTOS.length};},
 };
