@@ -75,6 +75,8 @@ Gemessen im Simulator: ein Fall aus 10 m dauert auf der Erde **1,46 s**, auf dem
 
 **Eine normale Drohne hebt dort nicht ab.** Sie bekommt in 1,6 % Luftdichte auch nur 1,6 % ihres Schubs – gemessen **0,30 N gegen 3,3 N Eigengewicht**. Dafür gibt es zwei marstaugliche Fluggeräte mit riesigen Rotoren (1,2 m und 2,4 m Durchmesser), die genau dort schweben, wo alles andere liegen bleibt. Umgekehrt tut sich der Marshubschrauber auf der Erde schwer: dreimal so viel Gewicht, und mehr Luft bringt ihm nichts, weil sein Motordrehmoment begrenzt.
 
+**Du kannst dich dabei nicht verrennen:** Wählst du die Marskarte, stellt der Simulator die Drohne gleich auf eine um, die dort fliegt – und umgekehrt. Ungeeignete Modelle stehen ausgegraut in der Liste, mit Angabe, wie viel Schub ihnen fehlt. Startest du trotzdem eine, die es nicht schafft, sagt das HUD dauerhaft warum.
+
 **Kein GPS**: Auf dem Mars gibt es keine Navigationssatelliten. Der GPS-Modus verschwindet aus der Liste, Return-to-Home sagt klar, warum es nicht geht – geflogen wird in ATTI und ANGLE.
 
 Dazu ein **Staubsturm** als neue Wetterlage: nimmt vor allem die Sicht. Marswind ist schnell, aber kraftlos – die Kraft geht mit der Luftdichte, und die ist fast nicht da.
