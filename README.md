@@ -153,7 +153,9 @@ Zwei Knöpfe, sonst nichts:
 - **🌐 Online:** Antippen und drin sein. Du landest automatisch bei allen, die gerade **dieselbe Karte** fliegen – wechselst du die Karte, wechselst du mit. Es gibt nichts einzugeben und nichts abzusprechen.
 - **🔒 Privat:** Ein eigener Raum, den nur erreicht, wem du den Link schickst („🔗 Link kopieren"). Der Code steckt im Link und wird nirgends angezeigt.
 
-Im Flug: **`Q`** öffnet den Chat, **`Z`** startet ein gemeinsames Rennen mit Countdown und Live-Rangliste im HUD.
+Im Flug: **`Q`** oder der **💬**-Knopf öffnet den Chat, **`Z`** startet ein gemeinsames Rennen mit Countdown und Live-Rangliste im HUD. Weil sich im Flug schlecht tippt, gibt es sechs Kurzmeldungen zum Antippen.
+
+**Du siehst, was die anderen fliegen.** Über jedem Mitspieler steht sein Name und sein Drohnenmodell, und gezeichnet wird wirklich sein Modell – auch versteckte Bauten, die du selbst noch nicht gefunden hast (freigeschaltet wird dadurch nichts, dein Menü bleibt unverändert). Fliegt jemand eine **selbstgebaute** Drohne, schickt er alle vier Sekunden seinen Bauplan mit, und dein Gerät baut daraus dasselbe Modell – rund 150 Bytes, gespeichert wird nichts.
 
 **Wie das ohne Absprache funktioniert:** Der Raumname wird aus der Karten-Kennung gerechnet (`P` + fünf Zeichen aus einem FNV-1a-Hash + ein Zeichen für den Ausweichraum). Zwei Browser kommen bei derselben Karte zwangsläufig auf denselben Namen – dafür braucht es keinen Lobby-Server und keine Anmeldung. Wird ein Raum voll (16 Piloten), schickt der Server mit dem Schliesscode `4001` in den nächsten von acht Ausweichräumen weiter; **bis zu 128 Piloten pro Karte**, und der Spieler merkt davon nichts.
 
@@ -274,6 +276,16 @@ FPV (bei Kameradrohnen gimbal-stabilisiert), Verfolgerkamera und Bodenansicht (S
 ### Steuerung einstellen
 
 Im Menü unter **🎮 Steuerung einstellen**; alles wirkt sofort und wird unter `ds_ctrl` gespeichert.
+
+**Drei Knöpfe reichen.** Ganz oben stehen **Einfach · Normal · Voll realistisch**, und damit ist man fertig – der Rest liegt zugeklappt hinter *Mehr einstellen*. Was die Voreinstellungen unterscheiden, sind genau die vier Dinge, die den Unterschied ausmachen:
+
+| | Verzögerung | Gas-Expo | Totzone | Tastatur-Anstieg |
+|---|---|---|---|---|
+| **Einfach** | 0 ms | 0,50 | 6 % | langsam |
+| **Normal** | 28 ms | 0,35 | 4 % | mittel |
+| **Voll realistisch** | 60 ms | 0,15 | 0 % | schnell |
+
+Gemessen: drei Sekunden Vollgas aus dem Stand ergeben **21 m** mit *Einfach*, **84 m** mit *Normal* und **149 m** mit *Voll realistisch*. Wer von Hand etwas verstellt, sieht das oben ausdrücklich – dann ist keine Voreinstellung mehr aktiv.
 
 | Einstellung | Was sie tut |
 |---|---|
