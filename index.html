@@ -101,6 +101,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   display:none;justify-content:center;pointer-events:none}
 #chatbar input{pointer-events:auto;width:min(560px,86vw);background:rgba(10,16,24,.92);
   border:1px solid var(--acc);color:#fff;border-radius:11px;padding:11px 14px;font-size:14px}
+.card.unfit{opacity:.5}
+.card.unfit .warn{color:#ffb020;font-size:11.5px;line-height:1.35;margin:4px 0 2px}
+.card.unfit.sel{opacity:.75;border-color:#ffb020;box-shadow:0 0 0 1px #ffb020}
 .rowbtns{display:flex;gap:8px;flex-wrap:wrap}
 .rowbtns button{background:var(--panel);border:1px solid var(--line);color:var(--txt);border-radius:9px;
   padding:9px 16px;font-size:13px;cursor:pointer}
@@ -713,6 +716,28 @@ function finalizeDrone(d){
   // rund 2,4 mOhm bei einem 6S-Rennakku, rund 7 mOhm bei einem 2S-2250er.
   d.batt.Ri = 12/d.batt.mah * clamp(6/Math.max(d.hoverAmp,0.5), 0.3, 1.6);
   return d;
+}
+/* Kann diese Drohne auf dieser Karte überhaupt abheben?
+   Gerechnet wird wie in physStep: Schub mal Dichteverhältnis gegen das
+   Gewicht in der dortigen Schwerkraft. Ohne diese Prüfung landet man auf
+   dem Mars in einer Drohne, die sich keinen Zentimeter bewegt – und nichts
+   sagt einem warum. */
+function liftRatio(d,map){
+  const W=worldOf(map);
+  const design=WORLDS[d.world||'earth'];
+  const rho=Math.min(1.6, W.rho/design.rho);
+  return (d.tmax*rho)/(d.mass*W.g);
+}
+function canFlyOn(d,map){ return liftRatio(d,map)>1.05; }
+/* Eine Drohne, die auf dieser Karte fliegt – für den Vorschlag im Menü. */
+function suggestDroneFor(map,list){
+  const all=list||DRONES;
+  return all.find(d=>!d.egg&&canFlyOn(d,map))||all.find(d=>canFlyOn(d,map))||null;
+}
+/* Eine Karte, auf der diese Drohne fliegt. */
+function suggestMapFor(d,list){
+  const all=list||MAPS;
+  return all.find(m=>canFlyOn(d,m))||null;
 }
 /* Ab welchem Tempo ein Anstoss die Drohne zerlegt.
    Propellerschutz steckt viel weg, und ein leichtes Modell bringt bei gleichem
@@ -6831,6 +6856,20 @@ function drawHUD(){
   if(APP.state!=='fly')return;
   if(HOME.set&&!DR.crashed) drawLinkNoise(w,hh,clamp(Math.min(w,hh)/760,0.7,2.1));
   drawMpHud(w,hh,clamp(Math.min(w,hh)/760,0.7,2.1));
+  // Unfliegbare Kombination: dauerhaft sichtbar, sonst sucht man ewig den Fehler
+  if(SCENE&&!canFlyOn(APP.model,SCENE.map)){
+    const u=clamp(Math.min(w,hh)/760,0.7,2.1);
+    const pct=(liftRatio(APP.model,SCENE.map)*100).toFixed(0);
+    hud.textAlign='center';
+    hud.fillStyle='rgba(40,20,10,0.78)';
+    // Tiefer als der Toast-Bereich, sonst überdecken sich die beiden
+    const wy=hh*0.31;
+    hud.fillRect(w/2-190*u,wy-17*u,380*u,42*u);
+    hud.fillStyle='#ffb020'; hud.font=`bold ${13*u}px sans-serif`;
+    hud.fillText('⚠ Diese Drohne kann hier nicht fliegen',w/2,wy);
+    hud.fillStyle='rgba(255,255,255,0.75)'; hud.font=`${11*u}px sans-serif`;
+    hud.fillText('Nur '+pct+' % des nötigen Schubs – im Menü eine passende wählen',w/2,wy+16*u);
+  }
   const u=clamp(Math.min(w,hh)/760,0.7,2.1);
   const d=APP.model;
   hud.textBaseline='middle';
@@ -6982,14 +7021,26 @@ function buildMenu(){
     const c=document.createElement('div');c.className='card mcard'+(m.id===APP.mapId?' sel':'');
     c.innerHTML=`<div class="nm">${m.icon} ${m.name}${m.custom?'<span class="chip fpv">EIGENE</span>':''}</div>
       <div class="ds">${m.desc}</div>`;
-    c.onclick=()=>{APP.mapId=m.id;buildMenu();};
+    c.onclick=()=>{
+      APP.mapId=m.id;
+      // Sonst landet man auf dem Mars in einer Drohne, die sich nicht rührt.
+      if(!canFlyOn(APP.model,m)){
+        const alt=suggestDroneFor(m,allDrones());
+        if(alt){ APP.model=alt; APP.modeIdx=0;
+          toast('Auf „'+m.name+'" hebt diese Drohne nicht ab – umgestellt auf <b>'+alt.name+'</b>',3600); }
+      }
+      buildMenu();
+    };
     mg0.appendChild(c);
   }
   const dg=$('droneGrid');
   dg.innerHTML='';
+  const curMap=mapById(APP.mapId)||MAPS[0];
   for(const d of allDrones()){
-    const c=document.createElement('div');c.className='card'+(d.id===APP.model.id?' sel':'');
+    const fits=canFlyOn(d,curMap);
+    const c=document.createElement('div');c.className='card'+(d.id===APP.model.id?' sel':'')+(fits?'':' unfit');
     c.innerHTML=`<div class="nm">${d.name}<span class="chip ${d.cls}">${d.egg?d.badge:(d.diy?'DIY':(d.cls==='cam'?'KAMERA':'FPV'))}</span></div>
+      ${fits?'':`<div class="warn">⚠ Hebt auf „${curMap.name}" nicht ab (${(liftRatio(d,curMap)*100).toFixed(0)} % des nötigen Schubs) – Klick wechselt die Karte</div>`}
       <div class="ds">${d.diy?'Selbstgebaut · '+partBy('frame',d.sel.frame).name:d.desc}</div>
       <div class="sp"><span>⚖ <b>${(d.mass*1000).toFixed(0)} g</b></span>
       <span>🚀 <b>${(d.maxSpeed*3.6).toFixed(0)}${d.cls==='fpv'?'+':''} km/h</b></span>
@@ -6998,7 +7049,15 @@ function buildMenu(){
       <span>🪶 <b>${stabLabel(d.stab)}</b></span>
       ${d.range?`<span>📡 <b>nur ${d.range} m</b></span>`:''}
       ${d.bombs?`<span>💣 <b>${d.bombs} Bomben</b></span>`:''}</div>`;
-    c.onclick=()=>{APP.model=d;APP.modeIdx=0;buildMenu();};
+    c.onclick=()=>{
+      APP.model=d; APP.modeIdx=0;
+      if(!canFlyOn(d,mapById(APP.mapId)||MAPS[0])){
+        const m2=suggestMapFor(d,allMaps());
+        if(m2){ APP.mapId=m2.id;
+          toast(d.name+' fliegt hier nicht – Karte auf <b>'+m2.icon+' '+m2.name+'</b> gewechselt',3600); }
+      }
+      buildMenu();
+    };
     dg.appendChild(c);
   }
   const mg=$('missionGrid');
@@ -7135,6 +7194,15 @@ function closeMenuAndStart(){
     chasePos=null;
     flownConfig=configKey();
     resetDrone(true);
+    // Letztes Geländer: wer trotzdem in einer Kombination startet, die nicht
+    // fliegen kann, soll wenigstens erfahren warum.
+    if(!canFlyOn(APP.model,SCENE.map)){
+      const pct=(liftRatio(APP.model,SCENE.map)*100).toFixed(0);
+      const alt=suggestDroneFor(SCENE.map,allDrones());
+      toast('⚠ <b>'+APP.model.name+'</b> hebt auf „'+SCENE.map.name+'" nicht ab – '+
+        'sie erreicht nur '+pct+' % des nötigen Schubs.'+
+        (alt?'<br><small>Im Menü '+alt.name+' wählen – die fliegt hier.</small>':''),7000);
+    }else
     toast(SCENE.map.name+' · '+APP.model.name+' bereit – '+(IS_TOUCH?'ARM drücken und Gas geben!':'Leertaste zum Armen, dann W für Gas'),3600);
   }
   else if(APP.mission&&(APP.mission.done||APP.mission.failed)){
@@ -8709,7 +8777,7 @@ window.T={
   saveCtrl,resetCtrl,bfRate,ratesFor,maxRateOf,thrCurve,shapeAxis,applyStickMode,
   lagReset,inDelayed,padRaw,padCalStart,get PADCAL(){return PADCAL;},
   fixedCenter,touchRad,buildCtrlUI,buildMenu,acroRateAt,
-  hitPeopleAt,revivePeople,crashSpeed,touchLimits,get STATS(){return STATS;},get FACT(){return FACT;},
+  hitPeopleAt,revivePeople,crashSpeed,touchLimits,canFlyOn,liftRatio,suggestDroneFor,suggestMapFor,get STATS(){return STATS;},get FACT(){return FACT;},
   MP,get MP_SERVER(){return MP_SERVER;},mpSetServer(u){MP_SERVER=u||'';},
   mpSetOn,mpSetNet,mpSetRoom,mpRandomRoom,mpLink,mpOnMessage,mpSend,mpChatSend,
   mpRaceStart,mpRanking,mpCountdown,mpReportGate,mpVisible,mpNetFailed,chatOpen,chatClose,chatIsOpen,
