@@ -147,24 +147,24 @@ Baue im Menü über **„Eigene Drohne bauen"** deine eigene Drohne aus vorgegeb
 ### 🛠️ Map-Builder: eigene Karten bauen
 Über **„Eigene Karte bauen"** im Menü baust du dir deine eigene Landschaft: **Geländeform** (flach, hügelig, Berge, Wüste), Hügeligkeit, Baumdichte, Zufallszahl und ein **Wasserstand**, der Seen in die Senken legt – der Startplatz liegt immer auf einem trockenen Plateau darüber. In der Draufsicht (800 × 800 m) tippst du dann **Bäume, Häuser, Hochhäuser, Hallen, Mauern, Schornsteine, Felsen und Menschen** hin. Gespeicherte Karten stehen mit dem Abzeichen **EIGENE** im Kartenmenü und bleiben im Browser erhalten.
 
-### 👥 Mehrspieler – auch übers Internet
-Zwei Wege, dieselbe Spielhälfte:
+### 👥 Mehrspieler – ohne Raumcode
+Zwei Knöpfe, sonst nichts:
 
-- **Gleiches Gerät:** Simulator in einem zweiten Fenster oder Tab öffnen, dort ebenfalls einschalten. Braucht nichts weiter, funktioniert offline.
-- **Übers Internet:** Gleicher **Raumcode** genügt (vier Zeichen, z. B. `K7QM`). Über „🔗 Link kopieren" bekommst du eine Adresse mit `?room=…` – wer sie öffnet, landet automatisch im selben Raum.
+- **🌐 Online:** Antippen und drin sein. Du landest automatisch bei allen, die gerade **dieselbe Karte** fliegen – wechselst du die Karte, wechselst du mit. Es gibt nichts einzugeben und nichts abzusprechen.
+- **🔒 Privat:** Ein eigener Raum, den nur erreicht, wem du den Link schickst („🔗 Link kopieren"). Der Code steckt im Link und wird nirgends angezeigt.
 
-Im Flug: **`Q`** öffnet den Chat, **`Z`** startet ein gemeinsames Rennen mit Countdown und Live-Rangliste im HUD. Sichtbar ist nur, wer auf derselben Karte unterwegs ist.
+Im Flug: **`Q`** öffnet den Chat, **`Z`** startet ein gemeinsames Rennen mit Countdown und Live-Rangliste im HUD.
+
+**Wie das ohne Absprache funktioniert:** Der Raumname wird aus der Karten-Kennung gerechnet (`P` + fünf Zeichen aus einem FNV-1a-Hash + ein Zeichen für den Ausweichraum). Zwei Browser kommen bei derselben Karte zwangsläufig auf denselben Namen – dafür braucht es keinen Lobby-Server und keine Anmeldung. Wird ein Raum voll (16 Piloten), schickt der Server mit dem Schliesscode `4001` in den nächsten von acht Ausweichräumen weiter; **bis zu 128 Piloten pro Karte**, und der Spieler merkt davon nichts.
+
+Der private Code ist acht Zeichen aus einem Alphabet von 32, also **40 Bit** – zum Durchprobieren von aussen zu viel.
 
 **Ein Spielstand, ein Update.** Der Mehrspieler ist ein Schalter in derselben `index.html` auf derselben Adresse – keine zweite Version. Damit sind gespeicherte Drohnen, Abzeichen, Fotos und Bestzeiten automatisch dieselben, und ein Update erreicht beide Spielarten gleichzeitig.
 
 #### Der Server dazu
-Für den Internet-Weg gehört ein winziger **Cloudflare Worker** dazu (`server/`, rund 80 Zeilen). Einmal einrichten:
+Dahinter steht ein winziger **Cloudflare Worker** (`server/`, rund 90 Zeilen), der bereits läuft. Er ist über *Workers Builds* mit diesem Repository verbunden: Jeder Push auf `main`, der `server/` berührt, deployt ihn neu – ohne Terminal, das geht auch vom Tablet aus. Wie man ihn von Grund auf einrichtet, steht in [`server/README.md`](server/README.md).
 
-```bash
-cd server && npx wrangler login && npx wrangler deploy
-```
-
-Danach die ausgegebene Adresse in `index.html` bei `MP_SERVER` eintragen – **eine Zeile**. Ohne diesen Schritt läuft alles wie bisher lokal weiter; fällt der Server später aus, schaltet das Spiel von selbst zurück und sagt es im Menü.
+Ist der Server einmal nicht erreichbar, fällt der Mehrspieler von selbst auf **zwei Fenster desselben Browsers** zurück und sagt es im Menü – kaputt geht dabei nichts.
 
 **Kostenlos**, im Gratisrahmen von Cloudflare: 100 000 Anfragen pro Tag, eingehende WebSocket-Nachrichten zählen 20:1, ausgehende sind frei, und dank Hibernation kostet ein leerer Raum keine Rechenzeit. Gemessen sendet ein Spieler **145 Bytes pro Pose bei 20 Hz, also rund 2,8 kB/s**.
 

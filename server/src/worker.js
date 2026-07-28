@@ -22,13 +22,26 @@ export class Room {
     if (request.headers.get('Upgrade') !== 'websocket')
       return new Response('Erwartet einen WebSocket', { status: 426 });
 
-    // Hibernation-API: die Sockets überleben, auch wenn das Objekt schläft
-    if (this.state.getWebSockets().length >= MAX_PER_ROOM)
-      return new Response('Raum voll', { status: 503 });
-
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
+
+    // Voll: den Socket trotzdem annehmen und sofort mit 4001 schliessen. Ein
+    // 503 auf den Upgrade käme im Browser nur als "Verbindung fehlgeschlagen"
+    // an – der Spieler wüsste nicht, dass er einfach den nächsten Ausweichraum
+    // derselben Karte nehmen soll. Mit dem eigenen Code weiss er es.
+    if (this.state.getWebSockets().length >= MAX_PER_ROOM) {
+      server.accept();
+      try { server.send('{"t":"full"}'); } catch (e) {}
+      try { server.close(4001, 'Raum voll'); } catch (e) {}
+      return new Response(null, { status: 101, webSocket: client });
+    }
+
+    // Hibernation-API: die Sockets überleben, auch wenn das Objekt schläft
     this.state.acceptWebSocket(server);
+    // Den Herzschlag beantwortet die Laufzeit selbst. Ohne das würde jeder
+    // Ping das Objekt wecken und Rechenzeit kosten, obwohl nichts passiert.
+    this.state.setWebSocketAutoResponse(
+      new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}'));
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -41,8 +54,11 @@ export class Room {
     }
   }
 
-  webSocketClose(ws) {
-    try { ws.close(); } catch (e) {}
+  webSocketClose(ws, code, reason) {
+    // Code und Grund durchreichen statt blind zu schliessen – 1005/1006 sind
+    // reservierte Codes, die nicht zurückgeschickt werden dürfen.
+    try { ws.close(code >= 1000 && code !== 1005 && code !== 1006 ? code : 1000, reason); }
+    catch (e) {}
   }
 
   webSocketError(ws) {
