@@ -82,6 +82,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .ctrl h4{font-size:11.5px;color:var(--acc);text-transform:uppercase;letter-spacing:1.2px;
   margin:16px 0 7px;font-weight:700}
 .ctrl h4:first-child{margin-top:0}
+.ctrl .morebox{margin-top:14px;border-top:1px solid var(--line);padding-top:4px}
+.ctrl .morebox>summary{cursor:pointer;list-style:none;padding:9px 2px;font-size:13px;
+  color:var(--acc);font-weight:700;user-select:none}
+.ctrl .morebox>summary::-webkit-details-marker{display:none}
+.ctrl .morebox>summary::before{content:'▸ ';display:inline-block;transition:transform .15s}
+.ctrl .morebox[open]>summary::before{content:'▾ '}
 .ctrl .crow{display:flex;gap:7px;flex-wrap:wrap}
 .ctrl .cbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:9px;
   padding:9px 13px;font-size:12.5px;cursor:pointer;line-height:1.25;text-align:left}
@@ -1125,6 +1131,15 @@ function parsePrompt(text){
 
 function allDrones(){ return DRONES.concat(eggDrones(),DIY_DRONES); }
 function droneById(id){ return allDrones().find(d=>d.id===id); }
+/* Was ein Mitspieler fliegen kann, ist mehr als das, was du selbst wählen
+   darfst: versteckte Bauten, die du noch nicht gefunden hast, und fremde
+   Eigenbauten. Damit du seine Drohne siehst und nicht deine eigene als
+   Platzhalter, gibt es diese zweite, weitere Liste – rein zum Zeichnen.
+   Freigeschaltet wird dadurch nichts: EGGS_FOUND bleibt unberührt, dein
+   Menü zeigt weiterhin nur deine eigenen. */
+const MP_SHAPES={};              // fremde Eigenbauten, nur für diese Sitzung
+function allDroneShapes(){ return DRONES.concat(EGG_SPECS,DIY_DRONES,Object.values(MP_SHAPES)); }
+function droneShapeById(id){ return allDroneShapes().find(d=>d.id===id); }
 loadDIY();
 
 /* ---------------- Karten ----------------
@@ -1342,6 +1357,42 @@ const CTRL_DEFAULT={
   pad:null,              // {axes:{thr:{i,inv,min,max,mid}, …}, arm:0}
 };
 let CTRL=JSON.parse(JSON.stringify(CTRL_DEFAULT));
+/* Drei Voreinstellungen statt zwanzig Regler. Wer mag, klappt darunter
+   „Mehr einstellen" auf und dreht weiter alles einzeln – nichts ist
+   verschwunden, es steht nur nicht mehr im Weg.
+
+   Unterschieden werden genau die Dinge, die den Unterschied ausmachen:
+   wie träge die Funkstrecke ist, wie fein das Gas um den Schwebepunkt
+   reagiert, wie gross die Totzone ist und wie schnell die Tastatur den
+   Knüppel bewegt. */
+const CTRL_PRESETS={
+  einfach:{ name:'Einfach', sub:'verzeiht viel, reagiert sofort',
+    latency:0, thrExpo:0.5, dead:0.06, key:{up:3.4,down:5.0,thr:0.9,fine:0.35} },
+  normal:{ name:'Normal', sub:'wie eine gute Anlage',
+    latency:28, thrExpo:0.35, dead:0.04, key:{up:4.5,down:6.0,thr:1.1,fine:0.4} },
+  echt:{ name:'Voll realistisch', sub:'träge Funke, keine Totzone',
+    latency:60, thrExpo:0.15, dead:0.0, key:{up:6.5,down:8.0,thr:1.4,fine:0.5} },
+};
+function ctrlPresetName(){
+  // Welche Voreinstellung passt zu dem, was gerade eingestellt ist?
+  for(const id in CTRL_PRESETS){
+    const p=CTRL_PRESETS[id];
+    if(Math.abs(CTRL.latency-p.latency)<0.6 && Math.abs(CTRL.thrExpo-p.thrExpo)<0.01 &&
+       Math.abs(CTRL.dead.rol-p.dead)<0.001 && Math.abs(CTRL.key.up-p.key.up)<0.05) return id;
+  }
+  return '';                       // von Hand verändert
+}
+function applyCtrlPreset(id){
+  const p=CTRL_PRESETS[id];
+  if(!p)return false;
+  CTRL.latency=p.latency;
+  CTRL.thrExpo=p.thrExpo;
+  for(const ax of AXES) CTRL.dead[ax]=(ax==='thr')? Math.min(p.dead,0.03) : p.dead;
+  CTRL.key={...CTRL.key,...p.key};
+  CTRL.rc.custom=0;                // eigene Raten gehören nicht zu einer Voreinstellung
+  saveCtrl();
+  return true;
+}
 function loadCtrl(){
   try{
     const o=JSON.parse(localStorage.getItem('ds_ctrl')||'null');
@@ -3121,7 +3172,10 @@ function rebuildDroneMeshes(){
   }
   DRONE_MESH={};
   const fn = GFX==='blocky' ? buildDroneMeshBlocky : buildDroneMesh;
-  for(const d of allDrones()) DRONE_MESH[d.id]=fn(d);
+  // allDroneShapes statt allDrones: auch die Modelle, die nur ein Mitspieler
+  // fliegt. Ein paar Meshes mehr kosten nichts, ein falsch gezeichneter
+  // Mitspieler dagegen schon.
+  for(const d of allDroneShapes()){ try{ DRONE_MESH[d.id]=fn(d); }catch(e){} }
 }
 // Mesh einer einzelnen (z.B. neu gebauten DIY-)Drohne ergänzen/aktualisieren
 function ensureDroneMesh(d){
@@ -6706,8 +6760,10 @@ function render(){
   }
   // Mitspieler aus anderen Fenstern
   for(const p of mpVisible()){
-    const pd=droneById(p.model)||APP.model;
-    const dm=DRONE_MESH[pd.id]||DRONE_MESH[APP.model.id];
+    // Seine Drohne, nicht deine. Notfalls die kleinste aus dem Katalog –
+    // aber nie das eigene Modell, sonst hält man den anderen für sich selbst.
+    const pd=droneShapeById(p.model)||DRONES[0];
+    const dm=DRONE_MESH[pd.id]||DRONE_MESH[DRONES[0].id];
     if(!dm)continue;
     const pm=M4.fromQuatPos(p.q,p.pos);
     drawMesh(dm.body,pm,[1,1,1],p.crashed?0.5:1);
@@ -6718,9 +6774,8 @@ function render(){
         drawMesh(spin?dm.disc:dm.prop,local,[1,1,1],spin?0.42:1);
       }
     }
-    // Namensschild als kleine Tafel über der Drohne
-    drawMesh(padWpMesh,M4.mul(M4.translate(p.pos[0],p.pos[1]+0.55,p.pos[2]),M4.scale(0.3,1,0.3)),
-      [0.25,0.85,1],0.75);
+    // Das Schild darüber zeichnet drawMpHud mit echtem Text – eine blaue
+    // Tafel im Raum wäre daneben nur doppelt.
   }
   // Drohnenschatten (Richtung Sonne versetzt)
   if(!DR.crashed){
@@ -6847,9 +6902,48 @@ function drawLinkNoise(w,hh,u){
 }
 /* Mehrspieler im HUD: Countdown, Live-Rangliste und die letzten Chatzeilen.
    Alles auf dem 2D-Canvas, kostet den Renderer nichts. */
+// Weltpunkt auf den Bildschirm rechnen – für die Schilder über den
+// Mitspielern. null, wenn der Punkt hinter der Kamera liegt.
+function mulV4(m,a){
+  return [m[0]*a[0]+m[4]*a[1]+m[8]*a[2]+m[12]*a[3],
+          m[1]*a[0]+m[5]*a[1]+m[9]*a[2]+m[13]*a[3],
+          m[2]*a[0]+m[6]*a[1]+m[10]*a[2]+m[14]*a[3],
+          m[3]*a[0]+m[7]*a[1]+m[11]*a[2]+m[15]*a[3]];
+}
+function worldToScreen(p,w,hh){
+  if(!VIEW||!VIEW.view||!VIEW.proj)return null;
+  const c=mulV4(VIEW.proj,mulV4(VIEW.view,[p[0],p[1],p[2],1]));
+  if(c[3]<=0.05)return null;
+  return [(c[0]/c[3]*0.5+0.5)*w, (1-(c[1]/c[3]*0.5+0.5))*hh, c[3]];
+}
 function drawMpHud(w,hh,u){
   if(!MP.on)return;
   const pad=14*u;
+  // Schild über jedem Mitspieler: wer es ist und was er fliegt. Ohne das
+  // sieht man zwar fremde Drohnen, weiss aber nicht, wessen sie sind.
+  for(const p of mpVisible()){
+    const s=worldToScreen([p.pos[0],p.pos[1]+0.9,p.pos[2]],w,hh);
+    if(!s||s[2]>260)continue;                    // zu weit weg: unlesbar
+    const nm=String(p.name||'Pilot').slice(0,14);
+    // Nicht auf die 3D-Ansicht warten: selbst nachschlagen, sonst hängt das
+    // Schild an der Reihenfolge, in der gezeichnet wird.
+    const pd=droneShapeById(p.model);
+    const md=String(pd?pd.name:'').slice(0,20);
+    const fade=Math.max(0.25,1-s[2]/260);
+    hud.textAlign='center';
+    hud.font=`bold ${11*u}px sans-serif`;
+    const tw=Math.max(hud.measureText(nm).width,md?hud.measureText(md).width:0)+14*u;
+    hud.fillStyle='rgba(10,16,24,'+(0.5*fade)+')';
+    hud.fillRect(s[0]-tw/2,s[1]-(md?26:15)*u,tw,(md?28:17)*u);
+    hud.fillStyle='rgba(124,214,255,'+fade+')';
+    hud.fillText(nm,s[0],s[1]-(md?15:4)*u);
+    if(md){
+      hud.font=`${9.5*u}px sans-serif`;
+      hud.fillStyle='rgba(255,255,255,'+(0.75*fade)+')';
+      hud.fillText(md,s[0],s[1]-4*u);
+    }
+  }
+  hud.textAlign='left';
   // Countdown vor dem Rennstart
   const cd=mpCountdown();
   if(cd>0){
@@ -7358,6 +7452,9 @@ function ctrlSlider(box,name,val,min,max,step,fmt,on){
   box.appendChild(row);
   return inp;
 }
+// Bleibt „Mehr einstellen" offen, wenn die Oberfläche neu gebaut wird?
+// Sonst klappt es bei jedem Klick auf einen Regler wieder zu.
+let CTRL_MORE_OPEN=false;
 function ctrlBtnRow(box,items,isSel,on){
   const row=document.createElement('div'); row.className='crow';
   for(const it of items){
@@ -7473,12 +7570,25 @@ function ctrlPadMsg(){
     +(PADCAL.msg&&!PADCAL.on?('  ·  '+PADCAL.msg):'');
 }
 function buildCtrlUI(){
-  const box=document.getElementById('ctrlBox');
-  if(!box)return;
-  box.innerHTML='';
+  const root=document.getElementById('ctrlBox');
+  if(!root)return;
+  root.innerHTML='';
+  // box zeigt erst auf den sichtbaren Teil und ab „Mehr einstellen" auf den
+  // ausklappbaren – H, N und die Regler hängen alle daran.
+  let box=root;
   const H=t=>{ const h=document.createElement('h4'); h.textContent=t; box.appendChild(h); };
   const N=html=>{ const p=document.createElement('div'); p.className='note'; p.innerHTML=html; box.appendChild(p); return p; };
   const d=APP.model;
+
+  /* 0 – Voreinstellung: drei Knöpfe statt zwanzig Regler */
+  H('Voreinstellung');
+  const cur=ctrlPresetName();
+  ctrlBtnRow(box,Object.keys(CTRL_PRESETS).map(id=>({
+    id, label:CTRL_PRESETS[id].name, sub:CTRL_PRESETS[id].sub })),
+    id=>id===cur,
+    id=>{ applyCtrlPreset(id); lagReset(); buildCtrlUI(); });
+  N(cur? 'Alles Weitere lässt sich unten einzeln einstellen – nichts davon musst du anfassen.'
+       : '<b>Von Hand eingestellt.</b> Ein Knopf oben setzt alles wieder auf eine der drei Voreinstellungen.');
 
   /* 1 – Knüppelbelegung */
   H('Knüppelbelegung');
@@ -7489,6 +7599,18 @@ function buildCtrlUI(){
   }),id=>id===CTRL.mode,id=>{ CTRL.mode=id; saveCtrl(); resetDrone(true,false); buildCtrlUI(); });
   N('Mode 2 ist im deutschsprachigen Raum am verbreitetsten, Mode 1 in Teilen Europas und Asiens. '+
     'Die Belegung gilt für Gamepad, Touch und Tastatur gleichermassen.');
+
+  /* Ab hier: alles Weitere, zugeklappt. Wer es braucht, findet es; wer nicht,
+     sieht drei Knöpfe und die Knüppelbelegung und ist fertig. */
+  const more=document.createElement('details');
+  more.className='morebox';
+  more.open=!!CTRL_MORE_OPEN;
+  more.ontoggle=()=>{ CTRL_MORE_OPEN=more.open; };
+  const sum=document.createElement('summary');
+  sum.textContent='Mehr einstellen';
+  more.appendChild(sum);
+  root.appendChild(more);
+  box=more;                       // ab jetzt hängt alles hier drin
 
   /* 2 – Ratenkurve */
   H('Ratenkurve');
@@ -8300,6 +8422,7 @@ function mpOnMessage(m){
   if(!m.id||m.id===MP.id)return;
   if(m.bye){ MP.peers.delete(m.id); return; }
   if(m.t==='chat'){ mpAddChat(m.name||'?', String(m.msg||'').slice(0,120)); return; }
+  if(m.t==='diy'){ mpAddShape(m); return; }
   if(m.t==='go'){ mpRaceGo(m.at, m.name); return; }
   if(m.t==='gate'){ mpGate(m.id, m.name, m.i, m.ms, m.done); return; }
   MP.peers.set(m.id,{...m,seen:performance.now()});
@@ -8465,6 +8588,11 @@ function mpStep(){
     MP.lastPing=now;
     try{ MP.ws.send('{"t":"ping"}'); }catch(e){}
   }
+  // Eigenbau-Bauplan alle paar Sekunden anbieten, damit auch Nachzügler
+  // sehen, was man fliegt. Kostet 1 Nachricht alle 4 s.
+  if(now-(MP.lastShape||0)>4000&&APP.state==='fly'){
+    MP.lastShape=now; mpSendShape();
+  }
   // eigene Lage senden (etwa 20-mal pro Sekunde)
   if(now-MP.lastSend>50&&APP.state==='fly'&&SCENE){
     MP.lastSend=now;
@@ -8476,6 +8604,32 @@ function mpStep(){
   }
   // alte Einträge vergessen
   for(const [id,p] of MP.peers) if(now-p.seen>2500) MP.peers.delete(id);
+}
+/* Fremde Eigenbauten: Der Bauplan (`sel`) ist ein paar Zeilen gross, also
+   schickt ihn jeder alle paar Sekunden mit. Wer dazukommt, bekommt ihn beim
+   nächsten Mal – dafür braucht es keine Rückfrage beim Server, der ohnehin
+   nichts speichert. Gebaut wird daraus dasselbe Modell, das der andere
+   fliegt; gespeichert wird nichts, es überlebt das Schliessen der Seite
+   nicht und taucht in deinem Menü nicht auf. */
+const MP_SHAPES_MAX=32;
+function mpAddShape(m){
+  if(!m||!m.id||!m.sel||MP_SHAPES[m.id])return false;
+  if(Object.keys(MP_SHAPES).length>=MP_SHAPES_MAX)return false;
+  // Der Bauplan kommt von einem Fremden. buildDIYDrone schlägt nur Teile
+  // nach – ausgeführt wird daraus nichts –, aber unbekannte Teilenummern
+  // können werfen, deshalb der Fangbügel.
+  try{
+    const d=buildDIYDrone(m.sel,String(m.name||'Eigenbau').slice(0,24),m.id);
+    if(!d)return false;
+    MP_SHAPES[m.id]=d;
+    if(typeof ensureDroneMesh==='function') ensureDroneMesh(d);
+    return true;
+  }catch(e){ return false; }
+}
+function mpSendShape(){
+  const d=APP.model;
+  if(!d||!d.sel)return false;          // nur Eigenbauten haben einen Bauplan
+  return mpSend({t:'diy',id:d.id,name:d.name,sel:d.sel});
 }
 function mpVisible(){
   if(!MP.on||!SCENE)return [];
@@ -8945,12 +9099,14 @@ window.T={
   RAW, KEYS, get CTRL(){return CTRL;}, CTRL_DEFAULT, STICK_MODES, AXES,
   raw(o){IN.src='raw';Object.assign(RAW,o);},
   saveCtrl,resetCtrl,bfRate,ratesFor,maxRateOf,thrCurve,shapeAxis,applyStickMode,
+  CTRL_PRESETS,ctrlPresetName,applyCtrlPreset,
   lagReset,inDelayed,padRaw,padCalStart,get PADCAL(){return PADCAL;},
   fixedCenter,touchRad,buildCtrlUI,buildMenu,acroRateAt,
   hitPeopleAt,revivePeople,crashSpeed,touchLimits,canFlyOn,liftRatio,suggestDroneFor,suggestMapFor,get STATS(){return STATS;},get FACT(){return FACT;},
   MP,get MP_SERVER(){return MP_SERVER;},mpSetServer(u){MP_SERVER=u||'';},
   mpSetOn,mpSetMode,mpSetRoom,mpRandomRoom,mpLink,mpOnMessage,mpSend,mpChatSend,
   mpPublicRoom,mpWantRoom,mpSyncRoom,mpStop,mpStart,MP_SHARD_MAX,
+  mpAddShape,mpSendShape,MP_SHAPES,droneShapeById,allDroneShapes,worldToScreen,
   mpRaceStart,mpRanking,mpCountdown,mpReportGate,mpVisible,mpNetFailed,chatOpen,chatClose,chatIsOpen,CHAT_QUICK,buildChatQuick,
   keydown(c){KEYS[c]=true;if(IN.src!=='test')IN.src='keys';},
   keyup(c){KEYS[c]=false;},
@@ -8976,8 +9132,11 @@ window.T={
   // Nur für Messreihen: die Szene füllt sich über viele Starts hinweg mit
   // KI-Drohnen, Vögeln und Trümmern. Wer eine Landung nach der anderen misst,
   // will keinen zufälligen Vogelschlag mitten drin.
-  clearTraffic(){ AIDRONES.length=0; BIRDS.length=0; DEBRIS.length=0; SWARMS.length=0;
-    WRECK=null; RESCUE=null; DR.birdHits=0; },
+  // Einmal leeren reicht nicht: Während einer Messung von einer Minute
+  // spawnen neue nach. Die Uhren werden deshalb weit nach hinten gestellt.
+  clearTraffic(quietFor){ AIDRONES.length=0; BIRDS.length=0; DEBRIS.length=0; SWARMS.length=0;
+    WRECK=null; RESCUE=null; DR.birdHits=0;
+    const q=quietFor||600; aiTimer=q; birdTimer=q; },
   // Return-to-Home und Startpunkt
   HOME,RTH,setHome,startRTH,stopRTH,groundHeightAt,rthCommand,
   drawHUD,
