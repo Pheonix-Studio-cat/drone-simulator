@@ -114,6 +114,12 @@ Bei einem Absturz zerlegt sich die Drohne in Einzelteile (Propeller, Arme, Akku,
 Foto-Button 📷 (Taste `F`): Schnappschüsse landen in einer **Galerie** im Menü (mit Download). Die Foto-Mission speichert ihre Bilder ebenfalls dort.
 
 ### 🔧 DIY-Drohnen-Editor
+
+**🚀 Mars-Rotoren, vier Größen.** Im Teilekatalog stehen unter Propeller vier Rotoren für dünne Luft: **0,6 m · 1,2 m · 1,8 m · 2,4 m** Durchmesser. Wer einen davon einbaut, baut ein Marsfluggerät – die Ausleger wachsen mit (Rotorkreise dürfen sich nicht überlappen), GPS fällt weg, und gerechnet wird nach Rotorfläche statt nach Motorleistung. In 1,6 % Luftdichte hilft kein stärkerer Motor, nur Fläche.
+
+Die Zellenmasse hängt am Rotor und ersetzt Rahmen, Motoren und Propeller: ein 1,8-m-Rotor an einem 18-Gramm-Whoop-Rahmen ist kein leichtes Marsfluggerät, sondern gar keins. Geeicht an den beiden eingebauten Marsfluggeräten (1,2 m → 1,8 kg, 2,4 m → 20 kg).
+
+Gemessen über **alle 1600 Kombinationen** aus Rahmen, Motor, Rotor und Akku: Jede einzelne hebt auf dem Mars ab, die schwächste mit **1,08-fachem** Schub – es gibt also keine Sackgasse. Auf der Erde bleibt so ein Aufbau weit zäher als normale Props (**1,1× gegen 2,6×**). Dass die grossen Rotoren auf der Erde überhaupt fliegen, ist kein Fehler: 3,4 kg an 1,8-m-Rotoren heben hier tatsächlich ab.
 **💬 Einfach hinschreiben, was sie können soll:** Ganz oben im Editor gibt es ein Feld für deinen Wunsch – „schnell und wendig", „lange Flugzeit", „zum Filmen in Rot", „klein für drinnen", „schwere Lasten tragen", „Freestyle". Der Baukasten stellt Rahmen, Motoren, Propeller, Akku, Kamera und Farbe passend ein. *Manche Wünsche schalten etwas frei, das sonst nirgends im Menü steht …*
 
 Es gibt auch **Zubehör** zu finden, das an *jede* selbstgebaute Drohne passt: einen **Kamikaze-Sprengsatz** (der Aufschlag ist die Zündung), ein **unsichtbares Atombomben-Magazin** mit 20 Sprengköpfen und eine **Katze im Tragegurt** 🐱, die unter dem Rumpf hängt und auf Knopfdruck (Taste `Y`) maunzt – der Ton wird im Spiel erzeugt, nachzuladen ist nichts. Ihre 1,6 kg wollen allerdings erst mal gehoben werden. Beide tauchen nach dem Fund im Editor unter **Zubehör** auf. Und eine schlanke **Langstreckendrohne** mit Satellitenkuppel, V-Leitwerk und Waffenpylonen – 200 km/h, 10 Bomben und eine Atombombe.
