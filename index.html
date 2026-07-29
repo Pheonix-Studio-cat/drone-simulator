@@ -869,6 +869,18 @@ const PARTS={
     {id:'m', name:'Mittlere Props', propR:0.075, mass:0.006, desc:'Guter Kompromiss'},
     {id:'l', name:'Große Props', propR:0.11, mass:0.012, desc:'Viel Schub, träger'},
     {id:'xl', name:'Riesen-Props', propR:0.16, mass:0.022, desc:'Hebt schwere Lasten'},
+    /* Mars-Rotoren. In 1,6 % Luftdichte hilft kein stärkerer Motor, sondern
+       nur Fläche – deshalb diese Grössen und deshalb rechnen sie unten nach
+       einer eigenen Formel. Wer sie einbaut, baut ein Marsfluggerät: auf dem
+       Mars hebt es ab, auf der Erde ist es zu schwer für seine eigene Fläche. */
+    {id:'mars_s', name:'Mars-Rotor 0,6 m', propR:0.30, mass:0.04, world:'mars', discN:4.2, zelle:0.55,
+     desc:'Kleinster sinnvoller Marsrotor – nur für sehr leichte Aufbauten'},
+    {id:'mars_m', name:'Mars-Rotor 1,2 m', propR:0.60, mass:0.15, world:'mars', discN:2.3, zelle:1.30,
+     desc:'Grösse des ersten Marshubschraubers'},
+    {id:'mars_l', name:'Mars-Rotor 1,8 m', propR:0.90, mass:0.40, world:'mars', discN:2.0, zelle:2.80,
+     desc:'Trägt Kamera und Instrumente'},
+    {id:'mars_xl', name:'Mars-Rotor 2,4 m', propR:1.20, mass:0.85, world:'mars', discN:1.8, zelle:4.60,
+     desc:'Für schwere Forschungsflieger'},
   ],
   batt:[
     {id:'2smini', name:'2S 300 mAh', cells:2, mah:300, mass:0.018, min:4.5, desc:'Whoop-Pack: federleicht, sackt unter Last'},
@@ -930,9 +942,32 @@ function buildDIYDrone(sel,name,id){
   if(sel.c1 && sel.c2 && sel.color==='custom'){ c1=hexToRgb(sel.c1)||[.7,.7,.7]; c2=hexToRgb(sel.c2)||[.15,.15,.15]; }
   else { const COL=partBy('color',sel.color); c1=COL.c1; c2=COL.c2; }
   const fpv=F.cls==='fpv';
-  const mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0) + accMass);
-  // Schub/Gewicht sinkt leicht mit schwerem Akku, steigt mit großen Props
-  const twrDry=Math.max(1.6, M.twr*(0.85+P.propR*1.6)*(fpv?1.05:1.0)*(F.twrF||1));
+  const mars=P.world==='mars';
+  const marsArm = mars ? Math.max(F.arm, P.propR*1.08) : F.arm;
+  const marsArea = mars ? 4*Math.PI*P.propR*P.propR : 0;
+  let mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0) + accMass);
+  /* Ein Marsfluggerät wiegt, was seine Rotoren verlangen: Ausleger, Naben,
+     Getriebe, Streben. Ein 1,8-m-Rotor an einem 18-Gramm-Whoop-Rahmen ist
+     kein leichtes Marsfluggerät, sondern gar keins. Die Zellenmasse steht
+     deshalb am Rotor und ersetzt Rahmen, Motoren und Propeller – was du
+     darunter hängst (Akku, Kamera, Fahrwerk, Zubehör), zählt weiter dazu.
+     Geeicht an den beiden echten Marsfluggeräten: der 1,2-m-Hubschrauber
+     wiegt 1,8 kg, der 2,4-m-Frachter 20 kg. */
+  if(mars) mass = P.zelle + B.mass + (C.mass||0) + (Gr.mass||0) + accMass;
+  /* Schub/Gewicht. Auf der Erde skaliert er mit dem Motor; auf dem Mars nicht.
+     Dort trägt allein die Rotorfläche: Schub ≈ Fläche · Flächenbelastung, und
+     der Motor verschiebt das nur wenig. Käme ein Marsaufbau aus der Erdformel,
+     hätte er auf dem Mars absurde Reserven und auf der Erde erst recht – beides
+     falsch. Die Flächenbelastung (discN) steht am Rotor und ist an den beiden
+     eingebauten Marsfluggeräten geeicht. */
+  let twrDry;
+  if(mars){
+    const area=4*Math.PI*P.propR*P.propR;                 // vier Rotorkreise
+    const thrust=area*P.discN*(0.75+0.25*(M.twr/2.2));    // Newton auf dem Mars
+    twrDry=clamp(thrust/(mass*WORLDS.mars.g), 0.35, 3.0);
+  }else{
+    twrDry=Math.max(1.6, M.twr*(0.85+P.propR*1.6)*(fpv?1.05:1.0)*(F.twrF||1));
+  }
   // Zubehör hängt am selben Antrieb: der Schub bleibt gleich, das Gewicht steigt.
   // (finalizeDrone rechnet tmax = twr·mass·g, also entspricht das genau dem
   //  Schub des nackten Aufbaus – sonst wären angebaute Teile schwerelos.)
@@ -942,7 +977,11 @@ function buildDIYDrone(sel,name,id){
   const d={
     id:id||('diy_'+Date.now().toString(36)), name:name||'Meine Drohne', cls:F.cls, diy:true,
     meshKind:F.kind, sel:{...sel},
-    mass, arm:F.arm, twr, tauUp:M.tau, tauDn:M.tau*1.45, propR:P.propR,
+    // Ein 1,2-m-Rotor passt an keinen 9-cm-Arm: die Ausleger wachsen mit,
+    // sonst überlappen sich die Kreise – im Bild wie in Wirklichkeit.
+    mass, arm:marsArm,
+    twr, tauUp:M.tau*(mars?3:1), tauDn:M.tau*1.45*(mars?3:1), propR:P.propR,
+    ...(mars?{world:'mars'}:{}),
     maxTilt: F.maxTilt||(fpv?55:35), maxSpeed, dragF:F.dragF,
     ...((F.bombs||sum('bombs'))?{bombs:(F.bombs||0)+sum('bombs')}:{}),
     ...(F.range?{range:F.range}:{}),
@@ -960,7 +999,10 @@ function buildDIYDrone(sel,name,id){
     climb: (fpv?3.5:2.6)*(twr-1)+2, desc_:(fpv?3:2)*(twr-1)+2,
     yawRate: fpv?200+agility*40:100+agility*30,
     batt:{cells:B.cells, mah:B.mah, min:B.min},
-    modes: fpv?['GPS','ANGLE','ACRO']:['GPS','ATTI'], gpsQ:C.gimbal?1.0:0.9, agility,
+    // Auf dem Mars gibt es keine Navigationssatelliten – modesFor blendet GPS
+    // ohnehin aus, aber ein Marsaufbau soll es gar nicht erst führen.
+    modes: mars?['ATTI','ANGLE']:(fpv?['GPS','ANGLE','ACRO']:['GPS','ATTI']),
+    gpsQ:mars?0:(C.gimbal?1.0:0.9), agility,
     rates:{max: fpv?560+agility*120:340, expo:fpv?.68:.6},
     // Action-Cam zählt wie eine feste Frontkamera, wiegt aber fast nichts
     camAngle: (C.fpvcam||has('actionCam'))?(fpv?22:8):0, fovFpv: fpv?112:74,
