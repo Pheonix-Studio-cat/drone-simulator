@@ -70,14 +70,59 @@ npx wrangler dev
 
 Dann in `index.html` `MP_SERVER='http://127.0.0.1:8787'` setzen.
 
-## Was der Server absichtlich nicht tut
+## Was der Server jetzt doch entscheidet
 
-- **Keine Spiellogik, keine Autorität.** Torzeiten kommen von den Spielern
+Lange stand hier „keine Spiellogik, keine Autorität". Das gilt für den Flug
+weiterhin – nicht mehr für drei Dinge, die sich anders nicht durchsetzen
+lassen, solange der Quelltext öffentlich ist und jeder eine eigene Fassung
+bauen kann:
+
+1. **Wer bist du.** Ein Konto ist eine Kennung plus eine Unterschrift des
+   Servers (HMAC-SHA256). Gespeichert wird dafür nichts; die Unterschrift
+   trägt sich selbst, jeder Raum prüft sie allein. Ohne gültige Unterschrift
+   ist man Gast: fliegen ja, chatten nein.
+2. **Wer darf dir schreiben.** Chatnachrichten gehen nur an Leute, die deinen
+   Vertrauenscode eingetragen haben. Gefiltert wird hier im Worker – eine
+   nachgebaute Oberfläche ändert daran nichts.
+3. **Wer bestimmt im Raum.** Karte, Wetter, Tageszeit, Sperre und Rauswurf
+   darf nur der Admin.
+
+### Admin-Code hinterlegen
+
+Im Dashboard: *Workers und Pages → drone-sim-rooms → Einstellungen →
+Variablen → Verschlüsselte Variable hinzufügen*, Name `ADMIN_CODE`. Damit
+steht er in keiner Datei und in keinem Repository. Einlösen lässt er sich
+**genau einmal**; danach ist er verbraucht, auch in einem anderen Raum.
+
+Optional `ACCOUNT_SECRET` als zweites Geheimnis für die Konto-Unterschriften.
+Ohne das wird `ADMIN_CODE` dafür mitbenutzt – ändert man den, werden alle
+bestehenden Konten ungültig und müssen neu angelegt werden.
+
+### Selbst testen
+
+```bash
+bash serve.sh          # frischer Worker, Zustand gelöscht
+node test_acct.js      # 23 Prüfungen gegen den echten Server
+```
+
+Der Einmal-Code ist absichtlich einmalig: Beim zweiten Lauf ohne frischen
+Worker überspringt die Suite den Admin-Teil und sagt das auch.
+
+## Was der Server weiterhin nicht tut
+
+- **Keine Autorität über den Flug.** Torzeiten kommen von den Spielern
   selbst. Wer schummeln will, kann das – das ist ein Spiel unter Freunden,
   kein Wettkampfsystem.
-- **Nichts speichern.** Es gibt keine Datenbank, keine Konten, keine Logs
-  von Spielinhalten. Ein Raum existiert, solange jemand drin ist.
-- **Nicht mitlesen.** Nachrichten werden unverändert weitergereicht.
+- **Fast nichts speichern.** Gespeichert wird nur, was eine Regel braucht:
+  pro Raum die eingestellte Welt, wer Admin ist und wer für zehn Minuten
+  draussen bleibt – plus die eine Zeile, dass der Einmal-Code verbraucht ist.
+  **Keine Konten** (die Unterschrift trägt sich selbst), keine Namenslisten,
+  keine Vertrauenslisten über die Verbindung hinaus, keine Chatverläufe,
+  keine Flugdaten.
+- **Chat nur weiterreichen, nicht auswerten.** Der Server schaut sich von
+  einer Chatnachricht genau eines an: an wen sie gehen darf. Inhalt wird
+  nicht gelesen, nicht gespeichert und nicht durchsucht. Posen, Torzeiten
+  und Baupläne gehen weiterhin völlig unverändert durch.
 
 Ein Raum ist nur über seinen Namen erreichbar. Die **öffentlichen** Räume
 heissen absichtlich berechenbar (`P` + Hash der Karte + Ausweichraum) –

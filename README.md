@@ -163,6 +163,22 @@ Der private Code ist acht Zeichen aus einem Alphabet von 32, also **40 Bit** –
 
 **Ein Spielstand, ein Update.** Der Mehrspieler ist ein Schalter in derselben `index.html` auf derselben Adresse – keine zweite Version. Damit sind gespeicherte Drohnen, Abzeichen, Fotos und Bestzeiten automatisch dieselben, und ein Update erreicht beide Spielarten gleichzeitig.
 
+### 👤 Konto, Vertrauenscodes, Admin
+
+**Ein Konto ist hier nur ein Name.** Anzeigename und Benutzername, sonst nichts – kein Alter, keine E-Mail, kein Passwort. Der Server erzeugt dazu eine Kennung und unterschreibt sie (HMAC-SHA256); gespeichert wird dafür **nichts**, die Unterschrift trägt sich selbst und jeder Raum kann sie allein prüfen.
+
+**Ehrlich dazugesagt:** Das ist kein Login. Wer dein Gerät benutzt, ist du. Für ein Spiel unter Freunden reicht es, mehr wird nicht versprochen. Es gibt einen Knopf, der das Konto vom Gerät löscht.
+
+**Deine Kennung ist dein Vertrauenscode.** Im Online-Modus siehst du alle fliegen und kannst mit allen Rennen fahren – **schreiben kann dir nur, wessen Code du eingetragen hast.** Das gilt in die Richtung, in die du das Vertrauen gegeben hast, und Zurücknehmen wirkt sofort.
+
+Entscheidend: **Diese Regel liegt im Server, nicht im Browser.** Eine Nachricht von jemandem, dem du nicht vertraust, wird gar nicht erst weitergereicht – sie wird nicht etwa angezeigt und dann versteckt. Wer eine eigene Fassung des Spiels baut (der Quelltext ist öffentlich), ändert daran nichts, denn er redet weiterhin mit diesem Server. Was er tun kann: einen eigenen Server aufsetzen – dann ist das seine Welt, nicht diese.
+
+**Admin.** Wer den Admin-Code einlöst, darf für alle im Raum die **Karte, das Wetter und die Tageszeit** setzen, den **Raum sperren** und **Spieler rauswerfen**. Der Code ist ein Cloudflare-Geheimnis, steht also in keiner Datei und in keinem Repository, und er lässt sich **genau einmal** einlösen – danach ist er verbraucht, auch in einem anderen Raum.
+
+Einrichten (im Cloudflare-Dashboard, geht auch am Tablet): *Workers und Pages → drone-sim-rooms → Einstellungen → Variablen → Verschlüsselte Variable hinzufügen*, Name `ADMIN_CODE`.
+
+Damit bekommt der Server zum ersten Mal Spiellogik – bewusst, denn ohne das gäbe es keine durchsetzbaren Rechte. Über den **Flug** hat er weiterhin keine Autorität: Physik und Torzeiten kommen von den Spielern.
+
 #### Der Server dazu
 Dahinter steht ein winziger **Cloudflare Worker** (`server/`, rund 90 Zeilen), der bereits läuft. Er ist über *Workers Builds* mit diesem Repository verbunden: Jeder Push auf `main`, der `server/` berührt, deployt ihn neu – ohne Terminal, das geht auch vom Tablet aus. Wie man ihn von Grund auf einrichtet, steht in [`server/README.md`](server/README.md).
 
