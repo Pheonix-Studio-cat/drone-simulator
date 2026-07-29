@@ -7408,9 +7408,41 @@ function buildMenu(){
         ac.type='password'; ac.style.cssText='flex:1 1 170px;'+inpStyle;
         const ab=document.createElement('button');
         ab.id='accAdminBtn'; ab.textContent='🔑 Einlösen';
-        ab.onclick=()=>{ if(!MP.on||MP.state!=='online'){ toast('Dafür musst du erst verbunden sein'); return; }
-          mpAdminClaim(ac.value); ac.value=''; };
+        ab.onclick=()=>{
+          if(!MP.on||MP.state!=='online'){
+            accNote('Dafür musst du erst verbunden sein – der Mehrspieler muss auf An und Online stehen.',false);
+            return;
+          }
+          if(!ac.value.trim()){ accNote('Erst den Code eintippen, dann einlösen.',false); return; }
+          accNote('Frage den Server …',false);
+          mpAdminClaim(ac.value); ac.value='';
+        };
         line([ac,ab]);
+        // Die Antwort des Servers bleibt stehen – zusammen mit dem, was sie
+        // für den nächsten Schritt bedeutet.
+        const note=document.createElement('div');
+        note.id='accMsg';
+        note.style.cssText='font-size:12px;line-height:1.5;width:100%;margin:2px 0 4px;'+
+          'color:'+(ACC.msg?(ACC.msgOk?'#7fe0a0':'#ffb020'):'var(--dim)');
+        if(!ACC.msg){
+          note.innerHTML='Einen Admin-Code hat nur, wer ihn selbst im Cloudflare-Dashboard '+
+            'als <b>Geheimnis</b> namens <code>ADMIN_CODE</code> hinterlegt hat.';
+        }else{
+          const tip=
+            /kein Admin-Code/i.test(ACC.msg)
+              ? 'Das Geheimnis ist noch nicht aktiv. Im Dashboard reicht „Variable hinzufügen" nicht – '+
+                'unten rechts muss <b>Bereitstellen</b> angetippt werden.'
+            : /stimmt nicht/i.test(ACC.msg)
+              ? 'Gross- und Kleinschreibung zählen. Prüf auch, ob der Wert im Dashboard genau derselbe ist.'
+            : /schon eingelöst/i.test(ACC.msg)
+              ? 'Der Code gilt nur einmal. Für einen neuen Versuch im Dashboard einen anderen '+
+                '<code>ADMIN_CODE</code> setzen und wieder bereitstellen.'
+            : /Konto/i.test(ACC.msg)
+              ? 'Oben erst ein Konto anlegen.'
+            : '';
+          note.innerHTML='<b>'+ACC.msg+'</b>'+(tip?'<br><span style="color:var(--dim)">'+tip+'</span>':'');
+        }
+        acct.appendChild(note);
       }else{
         const w=document.createElement('button');
         w.id='admWorld'; w.textContent='🌍 Meine Welt für alle';
@@ -8493,7 +8525,15 @@ function mpPublicRoom(mapId,shard){
    sich ein und kann dir dann schreiben. Wer ihn nicht hat, kann es nicht –
    und zwar weil der Server die Nachricht gar nicht erst weiterreicht, nicht
    weil der Browser sie versteckt. */
-const ACC={id:'',name:'',user:'',token:'',admin:false,trust:[]};
+const ACC={id:'',name:'',user:'',token:'',admin:false,trust:[],msg:'',msgOk:false};
+/* Was der Server antwortet, blitzt sonst nur kurz oben am Bildschirm auf –
+   und wer im Menü ganz unten beim Admin-Feld sitzt, sieht davon nichts.
+   Deshalb bleibt die letzte Antwort dort stehen, bis eine neue kommt. */
+function accNote(msg,ok){
+  ACC.msg=String(msg||'').slice(0,160);
+  ACC.msgOk=!!ok;
+  if(typeof buildMenu==='function'&&APP.state!=='fly') buildMenu();
+}
 function accLoad(){
   try{
     const a=JSON.parse(localStorage.getItem('ds_acct')||'null');
@@ -8605,15 +8645,19 @@ function mpOnMessage(m){
      Spieler-Kennung, gehören also VOR die Prüfung weiter unten. Stand das
      einmal falsch herum, verschwanden Adminrechte und Weltwechsel spurlos. */
   if(m.t==='hello'){
+    // Erst hier ist man wirklich drin (siehe ws.onopen).
+    if(MP.ws){ MP.state='online'; MP.tries=0; }
     ACC.admin=!!m.admin;
     if(m.state) mpApplyState(m.state,true);
     if(typeof buildMenu==='function')buildMenu();
     return;
   }
   if(m.t==='state'){ mpApplyState(m,false); return; }
-  if(m.t==='sys'){ toast(String(m.msg||'').slice(0,120),3600); return; }
+  if(m.t==='sys'){ const s=String(m.msg||'').slice(0,160);
+    toast(s,3600); accNote(s,false); return; }
   if(m.t==='admin'){ ACC.admin=!!m.ok;
-    toast(m.ok?'🔑 Du bist jetzt Admin dieses Raums':'Admin-Code stimmt nicht',3600);
+    const s=m.ok?'🔑 Du bist jetzt Admin dieses Raums':'Admin-Code stimmt nicht';
+    toast(s,3600); accNote(s,!!m.ok);
     if(typeof buildMenu==='function')buildMenu(); return; }
   if(m.t==='kicked'){ MP.kicked=performance.now();
     toast('Du wurdest aus dem Raum entfernt',4000); mpSetOn(false); return; }
@@ -8661,8 +8705,12 @@ function mpStartNet(){
   let ws;
   try{ ws=new WebSocket(url.toString()); }catch(e){ mpNetFailed(); return; }
   MP.ws=ws;
+  // Offener Socket heisst noch nicht angenommen: Ein voller, gesperrter oder
+  // für dich verbotener Raum nimmt die Verbindung an und schliesst sie sofort
+  // wieder. „Online" gilt deshalb erst, wenn der Server begrüsst hat – das
+  // tut er nur bei Sockets, die wirklich im Raum sind.
   ws.onopen=()=>{ if(MP.ws!==ws)return;
-    MP.state='online'; MP.tries=0; MP.lastPing=performance.now();
+    MP.lastPing=performance.now();
     mpSendTrust();                       // wen ich hören will
     if(typeof buildMenu==='function')buildMenu(); };
   ws.onmessage=(ev)=>{ try{ mpOnMessage(JSON.parse(ev.data)); }catch(e){} };
@@ -9341,7 +9389,7 @@ window.T={
   mpSetOn,mpSetMode,mpSetRoom,mpRandomRoom,mpLink,mpOnMessage,mpSend,mpChatSend,
   mpPublicRoom,mpWantRoom,mpSyncRoom,mpStop,mpStart,MP_SHARD_MAX,
   mpAddShape,mpSendShape,MP_SHAPES,droneShapeById,allDroneShapes,worldToScreen,
-  ACC,accLoad,accSave,accForget,accCreate,accTrustAdd,accTrustDel,mpSendTrust,
+  ACC,accLoad,accSave,accForget,accCreate,accTrustAdd,accTrustDel,mpSendTrust,accNote,
   MP_ROOM,mpApplyState,mpAdminSet,mpAdminKick,mpAdminClaim,mpAdminPushWorld,
   mpRaceStart,mpRanking,mpCountdown,mpReportGate,mpVisible,mpNetFailed,chatOpen,chatClose,chatIsOpen,CHAT_QUICK,buildChatQuick,
   keydown(c){KEYS[c]=true;if(IN.src!=='test')IN.src='keys';},
