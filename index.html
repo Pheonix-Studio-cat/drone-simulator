@@ -1213,37 +1213,37 @@ loadDIY();
 /* ---------------- Karten ----------------
    ter: Höhenfeld-Parameter · water: Wasserlinie · gen: Szenen-Generator */
 const MAPS=[
- {id:'standard', name:'Standard', icon:'🌳',
+ {id:'standard', name:'Standard', tempC:16, icon:'🌳',
   desc:'Wiesen, Wälder, sanfte Hügel – der Klassiker zum Üben.',
   ter:{amp:14, freq:0.006, ramp:150, seed:11},
   pal:{low:[0.26,0.45,0.19], high:[0.4,0.52,0.26], rock:[0.48,0.45,0.4], snow:0},
   water:null, fog:[0.62,0.74,0.86], fogD:0.0016, sky:[0.25,0.5,0.85],
   trees:120, people:8, gen:'standard', range:760, grass:{n:2600,col:[0.24,0.46,0.16]}},
- {id:'lost', name:'Lostplace', icon:'🏚️',
+ {id:'lost', name:'Lostplace', tempC:14, icon:'🏚️',
   desc:'Verlassenes Industriegelände: 60-m-Schornstein, Hallen und Ruinen – perfekt für FPV-Dives.',
   ter:{amp:3, freq:0.01, ramp:80, seed:23},
   pal:{low:[0.42,0.4,0.33], high:[0.36,0.38,0.3], rock:[0.45,0.43,0.4], snow:0},
   water:null, fog:[0.66,0.66,0.62], fogD:0.0022, sky:[0.45,0.5,0.58],
   trees:45, people:3, gen:'lost', range:760, grass:{n:900,col:[0.5,0.45,0.22]}},
- {id:'arctic', name:'Antarktis', icon:'🧊',
+ {id:'arctic', name:'Antarktis', tempC:-25, icon:'🧊',
   desc:'Endloses Eis, eine Forschungsstation und beißender Wind. Gut sichtbar: nichts.',
   ter:{amp:10, freq:0.005, ramp:100, seed:37},
   pal:{low:[0.88,0.91,0.95], high:[0.92,0.95,0.99], rock:[0.55,0.6,0.68], snow:1},
   water:null, fog:[0.83,0.87,0.92], fogD:0.0026, sky:[0.55,0.7,0.88],
   trees:0, people:4, gen:'arctic', range:760},
- {id:'mount', name:'Berge & Seen', icon:'🏔️',
+ {id:'mount', name:'Berge & Seen', tempC:8, icon:'🏔️',
   desc:'Alpines Panorama mit Gipfeln, Bergseen und Nadelwald. Vorsicht: Wasser ist endgültig.',
   ter:{amp:120, freq:0.0062, ramp:160, seed:52},
   pal:{low:[0.28,0.46,0.2], high:[0.42,0.4,0.36], rock:[0.5,0.47,0.44], snow:0, snowLine:48},
   water:{level:1.1, col:[0.1,0.3,0.42]}, fog:[0.66,0.76,0.88], fogD:0.0014, sky:[0.28,0.52,0.86],
   trees:170, people:6, gen:'mount', range:760, grass:{n:2200,col:[0.24,0.46,0.16],maxAlt:36}},
- {id:'flat', name:'Flachland', icon:'🌾',
+ {id:'flat', name:'Flachland', tempC:17, icon:'🌾',
   desc:'Felder bis zum Horizont, Windräder und ein Bauernhof. Ideal für Geschwindigkeit.',
   ter:{amp:2.5, freq:0.004, ramp:60, seed:71},
   pal:{low:[0.45,0.42,0.2], high:[0.35,0.5,0.22], rock:[0.5,0.47,0.42], snow:0, fields:1},
   water:null, fog:[0.68,0.77,0.87], fogD:0.0013, sky:[0.3,0.55,0.87],
   trees:35, people:5, gen:'flat', range:760, grass:{n:2600,col:[0.35,0.5,0.2]}},
- {id:'city', name:'Großstadt', icon:'🏙️',
+ {id:'city', name:'Großstadt', tempC:22, icon:'🏙️',
   desc:'Hochhaus-Schluchten, Straßen, Fußgänger und ein Park. Fliege verantwortungsvoll.',
   ter:{amp:0, freq:0.01, ramp:60, seed:99},
   pal:{low:[0.36,0.37,0.38], high:[0.38,0.39,0.4], rock:[0.4,0.4,0.42], snow:0, city:1},
@@ -1252,7 +1252,7 @@ const MAPS=[
  // Der Jezero-Krater ist der Landeplatz von Perseverance und Ingenuity.
  // Die Geländeform ist nachempfunden, nicht aus Messdaten gebacken – dafür
  // ist die Physik echt (siehe README).
- {id:'mars', name:'Mars · Jezero', icon:'🔴', world:'mars',
+ {id:'mars', name:'Mars · Jezero', tempC:-58, icon:'🔴', world:'mars',
   desc:'Deltafront im Jezero-Krater. 3,721 m/s², 1,6 % Luftdichte, kein GPS – hier hebt nur ein Marsfluggerät ab.',
   ter:{amp:26, freq:0.0042, ramp:120, seed:301},
   // Boden deutlich dunkler als der Himmel, sonst verschwindet der Horizont
@@ -1328,7 +1328,7 @@ loadMyMaps();
    Geländeprofil aus offenen Terrain-Daten (SRTM u.a.), Gebäudegrundrisse aus
    Overture Maps / OpenStreetMap-Mitwirkenden (ODbL). Alles vorab eingebacken. */
 const REAL_MAPS=[
- {id:'r_zurich', name:'Zürich', icon:'🇨🇭', real:true, key:'zurich',
+ {id:'r_zurich', name:'Zürich', tempC:18, icon:'🇨🇭', real:true, key:'zurich',
   desc:'Echte Zürcher Innenstadt: 2600 reale Gebäudegrundrisse mit echten Höhen, Limmat und Seebecken.',
   ter:{seed:101}, gen:'real', range:820, trees:40,
   water:{level:406.0, col:[0.10,0.26,0.34]},
@@ -1336,40 +1336,40 @@ const REAL_MAPS=[
         scree:[0.5,0.49,0.46], treeLine:9000, urban:900, water:[0.10,0.26,0.34]},
   fog:[0.70,0.76,0.84], fogD:0.00085, sky:[0.30,0.52,0.84],
   grass:{n:1200,col:[0.28,0.44,0.2]}},
- {id:'r_matter', name:'Matterhorn', icon:'🏔️', real:true, key:'matter',
+ {id:'r_matter', name:'Matterhorn', tempC:1, icon:'🏔️', real:true, key:'matter',
   desc:'Das echte Matterhorn-Massiv über Zermatt – 9 km Panorama, über 2500 Höhenmeter Wandfluchten.',
   ter:{seed:102}, gen:'real', range:4200, trees:60,
   land:{grass:[0.34,0.42,0.24], forest:[0.16,0.31,0.16], rock:[0.40,0.38,0.36],
         scree:[0.55,0.53,0.5], treeLine:2200, snowLine:2850},
   fog:[0.72,0.79,0.88], fogD:0.00012, sky:[0.20,0.44,0.82],
   grass:{n:900,col:[0.32,0.42,0.22],maxAlt:2200}},
- {id:'r_lauter', name:'Lauterbrunnental', icon:'🪂', real:true, key:'lauter',
+ {id:'r_lauter', name:'Lauterbrunnental', tempC:11, icon:'🪂', real:true, key:'lauter',
   desc:'Echtes Trogtal mit fast senkrechten Felswänden – der legendäre Spot für Wingsuit und Proximity.',
   ter:{seed:103}, gen:'real', range:2300, trees:90,
   land:{grass:[0.31,0.46,0.22], forest:[0.15,0.32,0.15], rock:[0.44,0.42,0.40],
         scree:[0.54,0.52,0.49], treeLine:1900, snowLine:2500},
   fog:[0.70,0.78,0.87], fogD:0.00024, sky:[0.24,0.48,0.84],
   grass:{n:1400,col:[0.30,0.46,0.2],maxAlt:1900}},
- {id:'r_everest', name:'Mount Everest', icon:'🗻', real:true, key:'everest',
+ {id:'r_everest', name:'Mount Everest', tempC:-22, icon:'🗻', real:true, key:'everest',
   desc:'Das echte Everest-Massiv: gebackene Höhen bis 8748 m, 13 km Sichtfeld. Dünne Luft inklusive.',
   ter:{seed:104}, gen:'real', range:6000, trees:0,
   land:{grass:[0.42,0.42,0.36], forest:[0.3,0.34,0.26], rock:[0.38,0.36,0.35],
         scree:[0.52,0.50,0.48], treeLine:4200, snowLine:5600},
   fog:[0.78,0.84,0.92], fogD:0.0001, sky:[0.10,0.30,0.72]},
- {id:'r_canyon', name:'Grand Canyon', icon:'🏜️', real:true, key:'canyon',
+ {id:'r_canyon', name:'Grand Canyon', tempC:28, icon:'🏜️', real:true, key:'canyon',
   desc:'Echte Schlucht am South Rim – rund 1400 Höhenmeter senkrecht hinunter zum Colorado.',
   ter:{seed:105}, gen:'real', range:4200, trees:50,
   land:{grass:[0.45,0.40,0.24], forest:[0.24,0.32,0.18], rock:[0.55,0.33,0.22],
         scree:[0.66,0.45,0.31], treeLine:2300},
   fog:[0.80,0.74,0.64], fogD:0.00014, sky:[0.28,0.48,0.80],
   grass:{n:900,col:[0.45,0.40,0.22]}},
- {id:'r_iceland', name:'Island', icon:'🌋', real:true, key:'iceland',
+ {id:'r_iceland', name:'Island', tempC:5, icon:'🌋', real:true, key:'iceland',
   desc:'Echtes isländisches Hochland: Vulkankegel, Aschefelder und Gletscherzungen.',
   ter:{seed:106}, gen:'real', range:3800, trees:0,
   land:{grass:[0.26,0.36,0.20], forest:[0.20,0.32,0.17], rock:[0.20,0.18,0.18],
         scree:[0.34,0.30,0.28], treeLine:640, snowLine:940},
   fog:[0.74,0.76,0.78], fogD:0.00017, sky:[0.38,0.50,0.68]},
- {id:'r_glarus', name:'Glarus · Klöntal', icon:'🏞️', real:true, key:'glarus',
+ {id:'r_glarus', name:'Glarus · Klöntal', tempC:12, icon:'🏞️', real:true, key:'glarus',
   desc:'Echtes Glarnerland: Start am Klöntalersee, dahinter Glärnisch (2910 m), Fronalpstock und Schilt – bis hinunter ins Linthtal.',
   ter:{seed:108}, gen:'real', range:8900, trees:130,
   water:{level:838.5, col:[0.09,0.28,0.34]},
@@ -1377,7 +1377,7 @@ const REAL_MAPS=[
         scree:[0.55,0.53,0.50], treeLine:1850, snowLine:2650, water:[0.09,0.28,0.34]},
   fog:[0.71,0.78,0.87], fogD:0.00013, sky:[0.24,0.48,0.84],
   grass:{n:1300,col:[0.30,0.46,0.2],maxAlt:1850}},
- {id:'r_fjord', name:'Norwegischer Fjord', icon:'🇳🇴', real:true, key:'fjord',
+ {id:'r_fjord', name:'Norwegischer Fjord', tempC:7, icon:'🇳🇴', real:true, key:'fjord',
   desc:'Echter Geirangerfjord: Steilwände fallen über 1600 m direkt ins Meer.',
   ter:{seed:107}, gen:'real', range:3600, trees:80,
   water:{level:0.0, col:[0.06,0.20,0.28]},
@@ -1541,6 +1541,19 @@ const WEATHER=[
    fogD:4.2, kind:null, rate:0, drag:1, amp:1,
    tint:[0.70,0.73,0.77], tintK:0.6},
 ];
+/* Wie kalt es der Drohne wird. Drei Beiträge, alle mit Grund:
+   - Die Karte bringt ihre Bodentemperatur mit (tempC).
+   - Nach oben wird es kälter: 6,5 K je 1000 m ist die Standardatmosphäre.
+     Auf 1000 m über der Startstelle sind das gute 6 K.
+   - Nachts und bei nassem Wetter ist es kühler.
+   Karten ohne Angabe (selbstgebaute) bekommen 15 °C. */
+const DAY_TEMP={morgen:-4, mittag:0, abend:-2, nacht:-8};
+const WX_TEMP={klar:0, regen:-3, schnee:-5, nebel:-2, staub:0};
+function airTempAt(map,y,daytimeId,weatherId){
+  const base=(map&&map.tempC!==undefined)?map.tempC:15;
+  return base - 0.0065*Math.max(y,0)
+       + (DAY_TEMP[daytimeId]||0) + (WX_TEMP[weatherId]||0);
+}
 function daytimeById(id){ return DAYTIMES.find(t=>t.id===id)||DAYTIMES[1]; }
 function weatherById(id){ return WEATHER.find(w=>w.id===id)||WEATHER[0]; }
 /* ---------------- Abzeichen ----------------
@@ -4452,6 +4465,7 @@ const DR={
   motors:[0,0,0,0], propAng:[0,0,0,0],
   armed:false, onGround:true, crashed:false, groundTimer:0,
   soc:1, volts:0, amps:0, battF:1, dead:0, vrs:0, pw:0, rateLP:0,
+  battT:null, airT:15, battCap:1,
   pkg:false, iTerm:[0,0,0], flightTime:0,
   driftV:[0,0], wob:[0,0],
   dbg:{rateT:[0,0,0],T:0},
@@ -4477,6 +4491,8 @@ function resetDrone(fullBatt=true,clearWreck=true){
   RTH.on=false; RTH.phase=''; HOME.set=false; LINK.q=1;
   DR.warn25=0; DR.warnT=0; DR.warnManual=0; DR.warnDead=0; DR.dead=0; GIM.user=0;
   DR.vrs=0; DR.warnVrs=0; DR.pw=0; DR.rateLP=0;
+  // Der Akku startet auf Umgebungstemperatur – kalte Karte, kaltes Pack.
+  DR.battT=null; DR.battCap=1; DR.warnKalt=0;
   resetFacts(); STATS.flights++; saveStats(); ghostStart();
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST;
@@ -5132,17 +5148,51 @@ function physStep(dt){
   groundAndCollisions(dt,m);
 }
 
+/* --- Zelltemperatur -------------------------------------------------
+   Ein LiPo in der Kälte ist ein anderer Akku. Der Innenwiderstand steigt,
+   die Spannung bricht unter Last früher ein, und ein Teil der Ladung ist
+   schlicht nicht abrufbar – bei 0 °C etwa ein Fünftel, bei −20 °C fast
+   die Hälfte. Genau deshalb halten Piloten im Winter das Pack warm und
+   fliegen die erste Minute vorsichtig.
+
+   Und genau deshalb wird der Akku hier auch wieder wärmer: Er heizt sich
+   durch den eigenen Strom auf (I²·R im Pack), und der Fahrtwind kühlt ihn
+   gegen die Umgebung. Wer kalt startet, hat nach etwa einer Minute
+   Schweben spürbar mehr Reserve als in der ersten Sekunde. */
+function packMass(b){ return Math.max(0.02, b.cells*(b.mah/1000)*0.028); }
+function battTempFactors(T){
+  const kalt=Math.max(0, 20-T);
+  return {
+    // Innenwiderstand: bei 0 °C rund doppelt, bei −20 °C rund dreifach
+    ri:  Math.min(4.0, 1+kalt*0.048),
+    // Nutzbare Kapazität: 0 °C ≈ 83 %, −20 °C ≈ 66 %. Gemessen an dem,
+    // was ein gewöhnliches Pack im Winter tatsächlich noch hergibt.
+    cap: clamp(1-kalt*0.0085, 0.55, 1),
+  };
+}
 function batteryStep(dt,Tsum,m){
   const d=APP.model, b=d.batt;
   const hoverT=m*G;
   const load=Math.max(Tsum/hoverT,0.02);
   // Regen und Kälte kosten zusätzlich Strom
   DR.amps=(DR.armed? d.hoverAmp*Math.pow(load,1.5)+0.25 : 0.05)*WX.amp;
-  DR.soc=Math.max(0,DR.soc - DR.amps*dt/3600/(b.mah/1000));
+  // Umgebung, dann die Zelle selbst: Eigenerwärmung gegen Auskühlung.
+  const amb=airTempAt(SCENE?SCENE.map:null, DR.pos[1], APP.daytime, APP.weather);
+  DR.airT=amb;
+  if(DR.battT===null||DR.battT===undefined) DR.battT=amb;
+  const heizW=DR.amps*DR.amps*b.Ri*b.cells;          // Verlustleistung im Pack
+  const waermeK=packMass(b)*1000;                    // J/K, LiPo ≈ 1000 J/(kg·K)
+  DR.battT+=(heizW/waermeK-(DR.battT-amb)/200)*dt;   // 200 s Auskühlzeit im Fahrtwind
+  const tf=battTempFactors(DR.battT);
+  DR.battCap=tf.cap;
+  // Die kalte Ladung ist nicht weg, sie ist nur nicht abrufbar: der
+  // Ladestand fällt entsprechend schneller.
+  DR.soc=Math.max(0,DR.soc - DR.amps*dt/3600/(b.mah/1000*tf.cap));
   const ocv=3.35+0.85*DR.soc;
   // Spannungseinbruch = Strom x Innenwiderstand, also abhängig von der Packgrösse.
-  // Ein leerer Akku hat zusätzlich mehr Innenwiderstand als ein voller.
-  const sag=Math.min(0.55,DR.amps*b.Ri*(1.6-0.6*DR.soc));
+  // Ein leerer Akku hat zusätzlich mehr Innenwiderstand als ein voller,
+  // ein kalter erst recht.
+  const sag=Math.min(0.55,DR.amps*b.Ri*tf.ri*(1.6-0.6*DR.soc));
   const vc=Math.max(2.9,ocv-sag);
   DR.volts=vc*b.cells;
   // Leerer Akku heisst leer. Unter Last fällt die Zellspannung dann unter
@@ -5150,6 +5200,13 @@ function batteryStep(dt,Tsum,m){
   // von gut zwei Sekunden ist kein Schub mehr da – ab da kommt sie herunter,
   // ob der Pilot will oder nicht. Kein harter Schnitt: ein Pack stirbt über
   // ein paar Sekunden, nicht in einem Bild.
+  // Einmal sagen, wenn das Pack kalt in die Luft geht – und was hilft.
+  if(DR.armed&&!DR.warnKalt&&DR.battT<5&&DR.flightTime>2){
+    DR.warnKalt=1; beep(440,0.25);
+    toast('🥶 <b>Akku kalt</b> ('+DR.battT.toFixed(0)+' °C) – nur '+
+      Math.round(DR.battCap*100)+' % der Ladung sind abrufbar.'+
+      '<br><small>Er wärmt sich im Flug selbst auf. Die erste Minute ruhig fliegen.</small>',5000);
+  }
   if(DR.soc<=0&&DR.armed){
     if(!DR.dead&&!DR.warnDead){ DR.warnDead=1; beep(220,0.5);
       toast('🪫 <b>Akku leer</b> – die Motoren geben auf',4000); }
@@ -7292,6 +7349,18 @@ function drawHUD(){
   hud.fillRect(bx,by-6*u,bw*pct,12*u);
   hud.fillStyle='#fff';hud.font=`bold ${11*u}px sans-serif`;hud.textAlign='center';
   hud.fillText((pct*100).toFixed(0)+' %  ·  '+DR.volts.toFixed(1)+' V  ·  '+fmtTime(DR.flightTime),cx,by-22*u);
+  // Zelltemperatur, aber nur wenn sie etwas ändert. Ein Pack bei 20 °C
+  // braucht keine Anzeige; eines bei −20 °C erklärt, warum der Balken
+  // so schnell fällt. Der Strich hinter der Ladung zeigt, wo sie in
+  // dieser Kälte tatsächlich endet.
+  if(DR.battT!==null&&DR.battT<10){
+    const kalt=clamp((10-DR.battT)/25,0,1);
+    hud.fillStyle=kalt>0.6?'#7fd4ff':'#a9d8ee';
+    hud.font=`bold ${9.5*u}px sans-serif`;
+    hud.fillText('🥶 '+DR.battT.toFixed(0)+' °C  ·  '+Math.round(DR.battCap*100)+' % abrufbar',cx,by-33*u);
+    hud.fillStyle='rgba(127,212,255,0.85)';
+    hud.fillRect(bx+bw*DR.battCap-1*u,by-9*u,2*u,18*u);
+  }
   if(pct<0.15&&Math.sin(APP.time*6)>0){
     hud.fillStyle='#ff5d5d';hud.font=`bold ${15*u}px sans-serif`;
     hud.fillText(pct<=0?'⚠ AKKU LEER – NOTLANDUNG ⚠':'⚠ AKKU KRITISCH – LANDEN ⚠',cx,by-44*u);
@@ -9550,7 +9619,8 @@ window.T={
   CTRL_PRESETS,ctrlPresetName,applyCtrlPreset,
   lagReset,inDelayed,padRaw,padCalStart,get PADCAL(){return PADCAL;},
   fixedCenter,touchRad,buildCtrlUI,buildMenu,acroRateAt,
-  hitPeopleAt,revivePeople,crashSpeed,touchLimits,canFlyOn,liftRatio,suggestDroneFor,suggestMapFor,get STATS(){return STATS;},get FACT(){return FACT;},
+  hitPeopleAt,revivePeople,crashSpeed,touchLimits,canFlyOn,liftRatio,suggestDroneFor,suggestMapFor,
+  airTempAt,battTempFactors,packMass,get STATS(){return STATS;},get FACT(){return FACT;},
   MP,get MP_SERVER(){return MP_SERVER;},mpSetServer(u){MP_SERVER=u||'';},
   mpSetOn,mpSetMode,mpSetRoom,mpRandomRoom,mpLink,mpOnMessage,mpSend,mpChatSend,
   mpPublicRoom,mpWantRoom,mpSyncRoom,mpStop,mpStart,MP_SHARD_MAX,
@@ -9592,6 +9662,7 @@ window.T={
   drawHUD,
   st(){return {pos:[...DR.pos],vel:[...DR.vel],mode:APP.mode,armed:DR.armed,
     onGround:DR.onGround,crashed:DR.crashed,soc:DR.soc,volts:DR.volts,
+    battT:DR.battT,airT:DR.airT,battCap:DR.battCap,
     battF:DR.battF,dead:DR.dead,
     motors:[...DR.motors],tilt:tiltAngle()/deg,map:SCENE.map.id,
     debris:DEBRIS.length,wreck:!!WRECK,carrying:!!(RESCUE&&RESCUE.carrying),photos:PHOTOS.length};},
