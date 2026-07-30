@@ -12,7 +12,7 @@ Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffn
 - 6-Freiheitsgrade-Starrkörpersimulation mit 500 Hz Physik-Takt
 - Motormodell mit Anlaufverzögerung, Schub ∝ Drehzahl², Motor-Mixer wie bei echten Flight Controllern
 - Aerodynamik: geschwindigkeitsabhängiger Luftwiderstand, Bodeneffekt, Wind mit Böen und Turbulenz (4 Stufen)
-- **Wirbelringstadium** beim schnellen Sinkflug – siehe unten
+- **Wirbelringstadium** beim schnellen Sinkflug und **Prop-Wash** nach harten Figuren – siehe unten
 - Batteriemodell: Kapazität, Spannungssackung unter Last, nachlassender Schub bei leerem Akku
 - Crash-Erkennung mit harten/sanften Landungen
 
@@ -41,6 +41,26 @@ Im Ring bleiben bei gleichem Gasweg nur **66 % vom Schub** übrig, und die Drehr
 Zwei Dinge lösen ihn nicht aus, beide absichtlich: **dicht über dem Boden** strömt die Luft seitlich ab statt sich oben wieder anzusaugen (das Mass ist der Rotor, nicht der Meter – rund vier Durchmesser über Grund), und im **Sturzflug** strömt sie wieder glatt von unten durch. Er baut sich mit 0,45 s Zeitkonstante auf und verschwindet ebenso wieder.
 
 Nicht die Masse entscheidet, sondern die Flächenbelastung: Die 4-kg-Cine hat mit ihren grossen Scheiben den **ruhigeren** Abwind (6,0 m/s) als das 0,65-kg-Rennquad (7,2 m/s) – und gerät deshalb erst später in den Ring.
+
+### 💨 Prop-Wash: das Schütteln nach der Figur
+
+Der kleine Bruder des Wirbelrings, und der Grund, warum sich in echten Aufnahmen nach jeder harten Figur das Bild kurz schüttelt: Die Drohne wirft beim Drehen und Sinken Wirbel in die Luft und fliegt gleich darauf selbst wieder hindurch. Die Blätter treffen für einen Moment ungleichmässig angeströmte Luft, der Regler kommt nicht mehr ganz nach.
+
+Anders als der Wirbelring ist das **kein Zustand, sondern ein Nachlauf** – er ist nach etwa anderthalb Sekunden wieder weg und bringt niemanden zum Absturz. Deshalb auch keine Warnung im HUD: er gehört zum Fliegen dazu.
+
+Gemessen (Rennquad, 5 Zoll):
+
+| Was du tust | Prop-Wash |
+|---|---|
+| Ruhig geradeaus | 0,00 |
+| **Scharfe Rolle im Stand** | **0,54** |
+| Dieselbe Rolle, 4,5 m/s Fahrt | 0,27 |
+| Dieselbe Rolle, 9 m/s Fahrt | 0,00 |
+| Langsam sinken (2,5 m/s) | 0,46 |
+| 0,5 s nach der Figur | 0,30 |
+| 1,5 s nach der Figur | 0,05 |
+
+Der Regler verfehlt darin seinen eigenen Sollwert um **0,53 rad/s statt 0,11** – spürbar, aber nicht reissend. Was hilft: **Fahrt**, genau wie beim Wirbelring. Was ihn dämpft: **Ducts** (die Cinewhoop kommt auf 0,16 statt 0,54, weil der Kanal den Abwind führt) und eine **ruhige Bauart** (die Kameradrohne bleibt bei 0,15 rad/s Abweichung).
 
 ### 4 Flugmodi (je nach Modell)
 | Modus | Verhalten |

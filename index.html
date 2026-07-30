@@ -4451,7 +4451,7 @@ const DR={
   pos:[0,0,0], vel:[0,0,0], q:Q.ident(), w:[0,0,0],
   motors:[0,0,0,0], propAng:[0,0,0,0],
   armed:false, onGround:true, crashed:false, groundTimer:0,
-  soc:1, volts:0, amps:0, battF:1, dead:0, vrs:0,
+  soc:1, volts:0, amps:0, battF:1, dead:0, vrs:0, pw:0, rateLP:0,
   pkg:false, iTerm:[0,0,0], flightTime:0,
   driftV:[0,0], wob:[0,0],
   dbg:{rateT:[0,0,0],T:0},
@@ -4476,7 +4476,7 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.lightOn=!!d.light; wxReset();
   RTH.on=false; RTH.phase=''; HOME.set=false; LINK.q=1;
   DR.warn25=0; DR.warnT=0; DR.warnManual=0; DR.warnDead=0; DR.dead=0; GIM.user=0;
-  DR.vrs=0; DR.warnVrs=0;
+  DR.vrs=0; DR.warnVrs=0; DR.pw=0; DR.rateLP=0;
   resetFacts(); STATS.flights++; saveStats(); ghostStart();
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST;
@@ -5034,11 +5034,43 @@ function physStep(dt){
     toast('🌀 <b>Wirbelring</b> – sie sackt im eigenen Abwind durch.'+
       '<br><small>Mehr Gas hilft nicht. Nach vorn fliegen.</small>',4500); }
   if(DR.vrs<0.2) DR.warnVrs=0;
-  // Schubverlust plus Zappeln – der Ring ist nie ruhig
-  const vrsF=1-DR.vrs*(0.30+0.10*Math.sin(APP.time*17.3+DR.pos[0]));
+  /* --- Prop-Wash ------------------------------------------------------
+     Der kleine Bruder des Wirbelrings, und der Grund, warum sich in echten
+     Aufnahmen nach jeder harten Figur das Bild kurz schüttelt: Die Drohne
+     wirft beim Drehen und Sinken Wirbel in die Luft und fliegt gleich
+     darauf selbst wieder hindurch. Die Blätter treffen für einen Moment
+     ungleichmässig angeströmte Luft, der Schub wird unruhig.
+
+     Anders als der Wirbelring ist das kein Zustand, sondern ein Nachlauf:
+     er baut sich schnell auf, ist nach etwa einer Sekunde wieder weg und
+     bringt niemanden zum Absturz. Deshalb auch keine Warnung im HUD – er
+     gehört zum Fliegen dazu. */
+  /* Die Drehrate wird geglättet, bevor sie den Prop-Wash speist. Sonst
+     facht das Zittern sich selbst an: es erzeugt Drehrate, die Drehrate
+     erzeugt Zittern. Der Tiefpass lässt die Figur durch (die dauert
+     Zehntelsekunden) und blendet das eigene 7-Hz-Rütteln aus. */
+  const rateRaw=Math.hypot(DR.w[0],DR.w[1],DR.w[2]);
+  DR.rateLP=(DR.rateLP||0)+(rateRaw-(DR.rateLP||0))*(1-Math.exp(-dt/0.30));
+  const rate=DR.rateLP;
+  let pw=0;
+  if(!DR.onGround&&DR.armed){
+    // Zwei Quellen: das Drehen selbst, und das Absinken in den eigenen
+    // Abwind. Letzteres greift schon weit unterhalb von vi, wo der
+    // Wirbelring noch gar nichts tut.
+    const stir=clamp(rate/7,0,1)*0.75 + clamp(vDown/(0.45*vi),0,1)*0.55;
+    // Fahrt trägt die Wirbel nach hinten weg, bevor sie stören.
+    const blow=1-clamp(vHoriz/9,0,1);
+    // Ein Kanal führt den Abwind – ummantelte Rotoren leiden weniger.
+    pw=clamp(stir*blow,0,1)*(d.ducted?0.45:1);
+  }
+  // Kurze Zeitkonstante: Nachlauf, nicht Zustand.
+  DR.pw=(DR.pw||0)+(pw-(DR.pw||0))*(1-Math.exp(-dt/0.25));
+  // Schubverlust plus Zappeln – der Ring ist nie ruhig. Prop-Wash kostet
+  // dazu ein paar Prozent, spürbar aber nicht gefährlich.
+  const vrsF=(1-DR.vrs*(0.30+0.10*Math.sin(APP.time*17.3+DR.pos[0])))*(1-DR.pw*0.05);
   for(let i=0;i<4;i++){ thr[i]=d.tmaxMotor*DR.motors[i]*DR.motors[i]*bf*ge*rho*ductF*vrsF; Tsum+=thr[i]; }
   DR.dbg.Tsum=Tsum; DR.dbg.ge=ge; DR.dbg.ductF=ductF; DR.dbg.rho=rho;
-  DR.dbg.vrs=DR.vrs; DR.dbg.vi=vi;
+  DR.dbg.vrs=DR.vrs; DR.dbg.vi=vi; DR.dbg.pw=DR.pw;
   let tqx=0,tqy=0,tqz=0;
   for(let i=0;i<4;i++){
     const [sx,sz,dir]=MOT[i];
@@ -5056,6 +5088,15 @@ function physStep(dt){
     const t=APP.time, s=DR.vrs*DR.vrs;
     tqx+=d.Ix*(Math.sin(t*6.3)+0.8*Math.sin(t*17.9+2.1)+0.5*Math.sin(t*29.3))*s*9;
     tqz+=d.Iz*(Math.sin(t*5.1+1.4)+0.8*Math.sin(t*21.3)+0.5*Math.sin(t*33.7+0.7))*s*9;
+  }
+  // Prop-Wash rüttelt auf Roll und Nick, im typischen Band um 7 und 13 Hz.
+  // Bewusst schneller, als der Rate-Regler noch nachführen kann – sonst
+  // bügelt er es weg und man sieht nichts. Wie stark, hängt an der Drohne:
+  // eine nervöse Rennmaschine zittert, eine schwere Kameradrohne kaum.
+  if(DR.pw>0.03){
+    const t=APP.time, s=DR.pw*(1.35-d.stab);
+    tqx+=d.Ix*(Math.sin(t*44.0)+0.7*Math.sin(t*81.7+1.3))*s*2.2;
+    tqz+=d.Iz*(Math.sin(t*47.3+0.9)+0.7*Math.sin(t*78.1))*s*2.2;
   }
   // Leichte externe Böen-Momente (kleiner Anteil; der Haupt-Effekt kommt über den
   // verrauschten Sollwert im Flight Controller – siehe dortiges Instabilitäts-Rauschen)
