@@ -14,6 +14,7 @@ Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffn
 - Aerodynamik: geschwindigkeitsabhängiger Luftwiderstand, Bodeneffekt, Wind mit Böen und Turbulenz (4 Stufen)
 - **Wirbelringstadium** beim schnellen Sinkflug und **Prop-Wash** nach harten Figuren – siehe unten
 - Batteriemodell: Kapazität, Spannungssackung unter Last, nachlassender Schub bei leerem Akku
+- **Kälte kostet Akku** – Zelltemperatur, Eigenerwärmung im Flug, siehe unten
 - Crash-Erkennung mit harten/sanften Landungen
 
 ### 🌀 Wirbelring: wenn sie in den eigenen Abwind sackt
@@ -242,6 +243,26 @@ Ist der Server einmal nicht erreichbar, fällt der Mehrspieler von selbst auf **
 **Kostenlos**, im Gratisrahmen von Cloudflare: 100 000 Anfragen pro Tag, eingehende WebSocket-Nachrichten zählen 20:1, ausgehende sind frei, und dank Hibernation kostet ein leerer Raum keine Rechenzeit. Gemessen sendet ein Spieler **145 Bytes pro Pose bei 20 Hz, also rund 2,8 kB/s**.
 
 **Was der Server nicht tut:** Er hat keine Spiellogik und keine Autorität – jeder rechnet seine eigene Physik, Torzeiten kommen von den Spielern selbst. Schummeln ist damit technisch möglich; das ist ein Spiel unter Freunden, kein Wettkampfsystem. Gespeichert wird nichts, ein Raum existiert nur, solange jemand drin ist, und wer den Code nicht kennt, kommt nicht hinein. Details in [`server/README.md`](server/README.md).
+
+### 🥶 Kälte kostet Akku
+
+Ein LiPo bei Minusgraden ist ein anderer Akku. Der Innenwiderstand steigt, die Spannung bricht unter Last früher ein, und ein Teil der Ladung ist schlicht nicht abrufbar. Genau deshalb halten Piloten im Winter das Pack warm und fliegen die erste Minute vorsichtig.
+
+**Wie kalt es wird**, kommt aus drei Dingen: Jede Karte bringt ihre Bodentemperatur mit (Antarktis −25 °C, Matterhorn 1 °C, Zürich 18 °C, Grand Canyon 28 °C, Mars −58 °C). Nach oben wird es kälter, mit **6,5 K je 1000 m** – der Standardatmosphäre. Und Nacht (−8 K), Schnee (−5 K) und Regen (−3 K) kühlen zusätzlich.
+
+**Was das mit dem Akku macht:**
+
+| Zelltemperatur | Abrufbare Ladung | Innenwiderstand |
+|---|---|---|
+| 20 °C | 100 % | 1,0× |
+| 0 °C | 83 % | 2,0× |
+| −20 °C | 66 % | 2,9× |
+
+Gemessen mit demselben Rennquad, demselben Gasweg, derselben Uhr: In der Stadt reicht die Ladung **89 s**, auf der Antarktis **66 s** – **26 % weniger Flugzeit**. Bei gleichem Ladestand sackt der kalte Akku unter Last auf 19,3 V statt 21,3 V. Und er zieht dabei sogar *mehr* Strom, nicht weniger: die sackende Spannung kostet Schub, der Regler gibt dafür mehr Gas.
+
+**Aber er wärmt sich selbst auf.** Der eigene Strom heizt das Pack (I²·R), der Fahrtwind kühlt es. Auf der Antarktis startet es bei −25 °C und arbeitet sich unter Last auf −17 °C hoch; in der Stadt kommt es auf 35 °C. Wer kalt startet, hat nach einer Minute spürbar mehr Reserve als in der ersten Sekunde.
+
+Im HUD steht die Zelltemperatur, **sobald sie etwas ändert** (unter 10 °C), zusammen mit dem abrufbaren Anteil. Ein blauer Strich im Akkubalken zeigt, wo die Ladung in dieser Kälte tatsächlich endet.
 
 ### 🌅 Tageszeit und Wetter
 Im Menü vor dem Start wählbar – beides steckt in den eingebackenen Schatten und im Nebel, deshalb wird die Szene beim Wechsel neu aufgebaut.
