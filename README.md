@@ -12,8 +12,35 @@ Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffn
 - 6-Freiheitsgrade-Starrkörpersimulation mit 500 Hz Physik-Takt
 - Motormodell mit Anlaufverzögerung, Schub ∝ Drehzahl², Motor-Mixer wie bei echten Flight Controllern
 - Aerodynamik: geschwindigkeitsabhängiger Luftwiderstand, Bodeneffekt, Wind mit Böen und Turbulenz (4 Stufen)
+- **Wirbelringstadium** beim schnellen Sinkflug – siehe unten
 - Batteriemodell: Kapazität, Spannungssackung unter Last, nachlassender Schub bei leerem Akku
 - Crash-Erkennung mit harten/sanften Landungen
+
+### 🌀 Wirbelring: wenn sie in den eigenen Abwind sackt
+
+Sinkt ein Drehflügler etwa so schnell, wie seine Rotoren die Luft nach unten beschleunigen, holt er seinen eigenen Abwind wieder ein. Um die Rotoren legt sich ein Ring aus umlaufender Luft, die Blätter arbeiten in ihrer eigenen Turbulenz statt in ruhiger Luft – der Schub bricht ein, das Gerät kippelt, und **mehr Gas macht es schlimmer**. Herauskommen kannst du nur, indem du nach vorn fliegst.
+
+Der Simulator rechnet das aus der Strahltheorie, nicht aus einer Tabelle. Die Abwindgeschwindigkeit ist
+
+> vi = √( G / (2 · ρ · A) )
+
+mit dem Gewicht G, der Luftdichte ρ in der aktuellen Höhe und der gesamten Rotorkreisfläche A. Gefährlich wird es, wenn die Sinkrate in der Grössenordnung von vi liegt.
+
+Gemessen im Simulator (Rennquad, 5 Zoll):
+
+| Zustand | Sinkrate | Ring |
+|---|---|---|
+| Schweben | 0 m/s | 0,00 |
+| Gemächlich sinken | 1,1 m/s | 0,04 |
+| **Im Wirbelring** | **7,2 m/s** | **0,99** |
+| Sturzflug | 19 m/s | 0,00 |
+| 7,2 m/s sinken, 6 m/s vorwärts | – | 0,00 |
+
+Im Ring bleiben bei gleichem Gasweg nur **66 % vom Schub** übrig, und die Drehrate steigt von 0,03 auf **0,72 rad/s** – das sichtbare Kippeln. Das HUD sagt einmal an, was los ist und wie man herauskommt.
+
+Zwei Dinge lösen ihn nicht aus, beide absichtlich: **dicht über dem Boden** strömt die Luft seitlich ab statt sich oben wieder anzusaugen (das Mass ist der Rotor, nicht der Meter – rund vier Durchmesser über Grund), und im **Sturzflug** strömt sie wieder glatt von unten durch. Er baut sich mit 0,45 s Zeitkonstante auf und verschwindet ebenso wieder.
+
+Nicht die Masse entscheidet, sondern die Flächenbelastung: Die 4-kg-Cine hat mit ihren grossen Scheiben den **ruhigeren** Abwind (6,0 m/s) als das 0,65-kg-Rennquad (7,2 m/s) – und gerät deshalb erst später in den Ring.
 
 ### 4 Flugmodi (je nach Modell)
 | Modus | Verhalten |
@@ -80,6 +107,8 @@ Gemessen im Simulator: ein Fall aus 10 m dauert auf der Erde **1,46 s**, auf dem
 **Kein GPS**: Auf dem Mars gibt es keine Navigationssatelliten. Der GPS-Modus verschwindet aus der Liste, Return-to-Home sagt klar, warum es nicht geht – geflogen wird in ATTI und ANGLE.
 
 Dazu ein **Staubsturm** als neue Wetterlage: nimmt vor allem die Sicht. Marswind ist schnell, aber kraftlos – die Kraft geht mit der Luftdichte, und die ist fast nicht da.
+
+**Marsrotoren im Editor**, in vier echten und drei erfundenen Grössen. Die vier echten (0,6 m bis 2,4 m) rechnen ernst: die Masse kommt vom Rotor, nicht vom Rahmen, und der Schub aus der Kreisfläche. Die drei Mini-Formate (**8 cm, 16 cm, 30 cm**) heissen im Katalog offen „Spass" – so kleine Scheiben tragen in 0,02 kg/m³ Luft in Wirklichkeit gar nichts. Für sie ist die Luftdichte abgeschaltet, damit man auf dem Mars auch im Whoop-Format herumkurven kann. Marsgeräte bleiben sie trotzdem: ihr Schub ist auf 3,7 m/s² ausgelegt, auf der Erde bleiben davon gemessen nur **0,9–1,1×** statt 2,4–2,8× auf dem Mars.
 
 **Zur Ehrlichkeit:** Die acht Erdkarten stammen aus echten Höhendaten. Das Marsgelände ist dagegen **nachempfunden**, nicht aus Messdaten gebacken – die Geländeform folgt dem Jezero-Krater (Deltafront, Streukrater nach der üblichen Grössenverteilung, Blockfelder, Windrippel), weil die Bauumgebung die NASA- und USGS-Server nicht erreicht. Echt ist die Physik, nicht die Topografie.
 

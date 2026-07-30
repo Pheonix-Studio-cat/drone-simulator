@@ -745,7 +745,10 @@ function finalizeDrone(d){
 function liftRatio(d,map){
   const W=worldOf(map);
   const design=WORLDS[d.world||'earth'];
-  const rho=Math.min(1.6, W.rho/design.rho);
+  // Spassrotoren (rhoFree) hat die Luftdichte nicht zu interessieren: sie
+  // ziehen überall ihren vollen Schub. Das ist bewusst keine Physik, sondern
+  // die Ausnahme, damit es die Marsrotoren auch im Mini-Format gibt.
+  const rho=d.rhoFree?1:Math.min(1.6, W.rho/design.rho);
   return (d.tmax*rho)/(d.mass*W.g);
 }
 function canFlyOn(d,map){ return liftRatio(d,map)>1.05; }
@@ -881,6 +884,21 @@ const PARTS={
      desc:'Trägt Kamera und Instrumente'},
     {id:'mars_xl', name:'Mars-Rotor 2,4 m', propR:1.20, mass:0.85, world:'mars', discN:1.8, zelle:4.60,
      desc:'Für schwere Forschungsflieger'},
+    /* Marsrotoren im Mini- und Whoop-Format. Die gibt es in Wirklichkeit
+       nicht: bei 0,02 kg/m³ Luft trägt eine so kleine Scheibe nichts, egal
+       wie schnell sie dreht. Sie stehen trotzdem im Katalog, weil man auf dem
+       Mars auch mal klein herumkurven können soll. `frei` schaltet für sie
+       die Marsrechnung ab – Masse und Schub kommen wie auf der Erde aus
+       Rahmen, Motoren und Akku. Der Name sagt das offen dazu.
+       Marsgeräte bleiben sie trotzdem: ihr Schub ist auf 3,7 m/s² ausgelegt,
+       auf der Erde bleibt davon kaum etwas übrig (gemessen 0,9–1,1× statt
+       2,4–2,8× auf dem Mars). */
+    {id:'mars_xxs', name:'Mars-Whoop 8 cm (Spass)', propR:0.04, mass:0.004, world:'mars', frei:true,
+     desc:'Winzig, wendig – und auf dem echten Mars unmöglich'},
+    {id:'mars_xs', name:'Mars-Mini 16 cm (Spass)', propR:0.08, mass:0.008, world:'mars', frei:true,
+     desc:'Mini-Format für die Marskarte, ohne echte Rechnung'},
+    {id:'mars_sm', name:'Mars-Mini 30 cm (Spass)', propR:0.15, mass:0.02, world:'mars', frei:true,
+     desc:'Wie ein 6-Zöller, nur eben auf dem Mars'},
   ],
   batt:[
     {id:'2smini', name:'2S 300 mAh', cells:2, mah:300, mass:0.018, min:4.5, desc:'Whoop-Pack: federleicht, sackt unter Last'},
@@ -942,9 +960,10 @@ function buildDIYDrone(sel,name,id){
   if(sel.c1 && sel.c2 && sel.color==='custom'){ c1=hexToRgb(sel.c1)||[.7,.7,.7]; c2=hexToRgb(sel.c2)||[.15,.15,.15]; }
   else { const COL=partBy('color',sel.color); c1=COL.c1; c2=COL.c2; }
   const fpv=F.cls==='fpv';
-  const mars=P.world==='mars';
-  const marsArm = mars ? Math.max(F.arm, P.propR*1.08) : F.arm;
-  const marsArea = mars ? 4*Math.PI*P.propR*P.propR : 0;
+  // `frei` = Spassformat: fliegt auf dem Mars, rechnet aber wie auf der Erde.
+  const marsWorld=P.world==='mars';
+  const mars=marsWorld&&!P.frei;
+  const marsArm = marsWorld ? Math.max(F.arm, P.propR*1.08) : F.arm;
   let mass=Math.max(0.045, F.mass + M.mass*4 + P.mass*4 + B.mass + (C.mass||0) + (Gr.mass||0) + accMass);
   /* Ein Marsfluggerät wiegt, was seine Rotoren verlangen: Ausleger, Naben,
      Getriebe, Streben. Ein 1,8-m-Rotor an einem 18-Gramm-Whoop-Rahmen ist
@@ -981,7 +1000,7 @@ function buildDIYDrone(sel,name,id){
     // sonst überlappen sich die Kreise – im Bild wie in Wirklichkeit.
     mass, arm:marsArm,
     twr, tauUp:M.tau*(mars?3:1), tauDn:M.tau*1.45*(mars?3:1), propR:P.propR,
-    ...(mars?{world:'mars'}:{}),
+    ...(marsWorld?{world:'mars'}:{}), ...(P.frei?{rhoFree:true}:{}),
     maxTilt: F.maxTilt||(fpv?55:35), maxSpeed, dragF:F.dragF,
     ...((F.bombs||sum('bombs'))?{bombs:(F.bombs||0)+sum('bombs')}:{}),
     ...(F.range?{range:F.range}:{}),
@@ -1001,8 +1020,12 @@ function buildDIYDrone(sel,name,id){
     batt:{cells:B.cells, mah:B.mah, min:B.min},
     // Auf dem Mars gibt es keine Navigationssatelliten – modesFor blendet GPS
     // ohnehin aus, aber ein Marsaufbau soll es gar nicht erst führen.
-    modes: mars?['ATTI','ANGLE']:(fpv?['GPS','ANGLE','ACRO']:['GPS','ATTI']),
-    gpsQ:mars?0:(C.gimbal?1.0:0.9), agility,
+    // Ohne Satellitennetz gibt es auf dem Mars kein GPS – auch nicht für die
+    // Spassformate. Die dürfen dafür in den Kunstflugmodus.
+    modes: mars?['ATTI','ANGLE']
+         : marsWorld?(fpv?['ANGLE','ACRO','ATTI']:['ATTI','ANGLE'])
+         : (fpv?['GPS','ANGLE','ACRO']:['GPS','ATTI']),
+    gpsQ:marsWorld?0:(C.gimbal?1.0:0.9), agility,
     rates:{max: fpv?560+agility*120:340, expo:fpv?.68:.6},
     // Action-Cam zählt wie eine feste Frontkamera, wiegt aber fast nichts
     camAngle: (C.fpvcam||has('actionCam'))?(fpv?22:8):0, fovFpv: fpv?112:74,
@@ -4428,7 +4451,7 @@ const DR={
   pos:[0,0,0], vel:[0,0,0], q:Q.ident(), w:[0,0,0],
   motors:[0,0,0,0], propAng:[0,0,0,0],
   armed:false, onGround:true, crashed:false, groundTimer:0,
-  soc:1, volts:0, amps:0, battF:1, dead:0,
+  soc:1, volts:0, amps:0, battF:1, dead:0, vrs:0,
   pkg:false, iTerm:[0,0,0], flightTime:0,
   driftV:[0,0], wob:[0,0],
   dbg:{rateT:[0,0,0],T:0},
@@ -4453,6 +4476,7 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.lightOn=!!d.light; wxReset();
   RTH.on=false; RTH.phase=''; HOME.set=false; LINK.q=1;
   DR.warn25=0; DR.warnT=0; DR.warnManual=0; DR.warnDead=0; DR.dead=0; GIM.user=0;
+  DR.vrs=0; DR.warnVrs=0;
   resetFacts(); STATS.flights++; saveStats(); ghostStart();
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST;
@@ -4954,7 +4978,13 @@ function physStep(dt){
   // Welt, für die die Drohne ausgelegt ist. Nach oben gedeckelt: in dichterer
   // Luft als vorgesehen begrenzt das Motordrehmoment, nicht die Luft.
   const rhoDesign=WORLDS[d.world||'earth'].rho;
-  const rho=Math.min(1.6, (RHO/rhoDesign)*Math.exp(-Math.max(DR.pos[1],0)/WORLD.H));
+  // Spassrotoren (rhoFree, die Mini-Marsrotoren) ziehen ihren vollen Schub in
+  // jeder Luft. Die Höhenabnahme gilt trotzdem – nur der Weltenvergleich
+  // entfällt. Das ist absichtlich keine Physik, sondern die Ausnahme, damit
+  // es Marsrotoren auch im Whoop-Format gibt.
+  const rho = d.rhoFree
+    ? Math.exp(-Math.max(DR.pos[1],0)/WORLD.H)
+    : Math.min(1.6, (RHO/rhoDesign)*Math.exp(-Math.max(DR.pos[1],0)/WORLD.H));
   let Tsum=0;
   const MOT=[[1,-1,1],[1,1,-1],[-1,1,1],[-1,-1,-1]];
   const thr=[0,0,0,0];
@@ -4964,8 +4994,51 @@ function physStep(dt){
   // im Vorwärtsflug.
   const ductF = d.ducted
     ? 1-0.22*clamp(Math.hypot(DR.vel[0],DR.vel[2])/12,0,1) : 1;
-  for(let i=0;i<4;i++){ thr[i]=d.tmaxMotor*DR.motors[i]*DR.motors[i]*bf*ge*rho*ductF; Tsum+=thr[i]; }
+  /* --- Wirbelringstadium (Vortex Ring State) ---------------------------
+     Sinkt ein Drehflügler etwa so schnell, wie seine Rotoren die Luft nach
+     unten beschleunigen, holt er seinen eigenen Abwind wieder ein. Um die
+     Rotoren legt sich ein Ring aus umlaufender Luft; die Blätter arbeiten
+     dann in ihrer eigenen Turbulenz statt in ruhiger Luft. Der Schub bricht
+     ein und zappelt, mehr Gas macht es schlimmer – herauskommt man nur, indem
+     man nach vorn fliegt und den Ring hinter sich lässt (oder das Gas
+     wegnimmt). Genau das bildet die Formel ab: schnelle Fahrt löscht den
+     Effekt, und er hört von selbst auf, sobald die Sinkrate aus dem Fenster
+     fällt.
+
+     vi ist die Abwindgeschwindigkeit im Schwebeflug aus der Strahltheorie:
+     vi = sqrt(G / (2 ρ A)) mit A = gesamte Kreisfläche der Rotoren. */
+  const rhoAbs=Math.max(1e-4, WORLD.rho*Math.exp(-Math.max(DR.pos[1],0)/WORLD.H));
+  const discA=4*Math.PI*d.propR*d.propR;
+  const vi=Math.sqrt(Math.max(0.01,(m*WORLD.g)/(2*rhoAbs*discA)));
+  const vDown=-DR.vel[1];                       // positiv beim Sinken
+  const vHoriz=Math.hypot(DR.vel[0],DR.vel[2]);
+  let vrs=0;
+  if(!DR.onGround&&DR.armed&&vDown>0){
+    const r=vDown/vi;
+    // Glockenkurve über dem gefährlichen Bereich, Spitze bei r≈1. Darüber
+    // hinaus strömt die Luft wieder glatt von unten durch (Windmühlenbremse),
+    // darunter ist der Abwind schneller als das Sinken – beides ist sauber.
+    const band=Math.exp(-Math.pow((r-1.05)/0.5,2));
+    // Vorwärtsfahrt bläst den Ring weg
+    const clean=1-clamp(vHoriz/(0.65*vi),0,1);
+    vrs=clamp(band*clean,0,1);
+    // Bodennähe verhindert ihn: dort strömt die Luft seitlich ab, statt sich
+    // oben wieder anzusaugen. Das Mass ist der Rotor selbst – rund vier
+    // Durchmesser über Grund kann sich der Ring nicht mehr schliessen.
+    vrs*=clamp(alt/(d.propR*8),0,1);
+  }
+  // Trägheit: der Ring baut sich auf und löst sich wieder auf
+  DR.vrs=(DR.vrs||0)+(vrs-(DR.vrs||0))*(1-Math.exp(-dt/0.45));
+  // Einmal sagen, was los ist – und wie man wieder herauskommt.
+  if(DR.vrs>0.55&&!DR.warnVrs){ DR.warnVrs=1; beep(180,0.35);
+    toast('🌀 <b>Wirbelring</b> – sie sackt im eigenen Abwind durch.'+
+      '<br><small>Mehr Gas hilft nicht. Nach vorn fliegen.</small>',4500); }
+  if(DR.vrs<0.2) DR.warnVrs=0;
+  // Schubverlust plus Zappeln – der Ring ist nie ruhig
+  const vrsF=1-DR.vrs*(0.30+0.10*Math.sin(APP.time*17.3+DR.pos[0]));
+  for(let i=0;i<4;i++){ thr[i]=d.tmaxMotor*DR.motors[i]*DR.motors[i]*bf*ge*rho*ductF*vrsF; Tsum+=thr[i]; }
   DR.dbg.Tsum=Tsum; DR.dbg.ge=ge; DR.dbg.ductF=ductF; DR.dbg.rho=rho;
+  DR.dbg.vrs=DR.vrs; DR.dbg.vi=vi;
   let tqx=0,tqy=0,tqz=0;
   for(let i=0;i<4;i++){
     const [sx,sz,dir]=MOT[i];
@@ -4974,6 +5047,16 @@ function physStep(dt){
   tqx-=d.Ix*(2.0*DR.w[0]+0.5*DR.w[0]*Math.abs(DR.w[0]));
   tqy-=d.Iy*(2.5*DR.w[1]+0.5*DR.w[1]*Math.abs(DR.w[1]));
   tqz-=d.Iz*(2.0*DR.w[2]+0.5*DR.w[2]*Math.abs(DR.w[2]));
+  // Der Wirbelring wirkt nicht auf alle vier Rotoren gleich: der Ring wandert,
+  // mal hängt eine Seite tiefer darin als die andere. Das ist das Kippeln, an
+  // dem man den Zustand im Flug erkennt, noch bevor das Vario Alarm schlägt.
+  if(DR.vrs>0.05){
+    // Bewusst schneller als der Regler: die hohen Anteile kann er nicht mehr
+    // ausregeln, deshalb bleibt das Zappeln im Bild stehen.
+    const t=APP.time, s=DR.vrs*DR.vrs;
+    tqx+=d.Ix*(Math.sin(t*6.3)+0.8*Math.sin(t*17.9+2.1)+0.5*Math.sin(t*29.3))*s*9;
+    tqz+=d.Iz*(Math.sin(t*5.1+1.4)+0.8*Math.sin(t*21.3)+0.5*Math.sin(t*33.7+0.7))*s*9;
+  }
   // Leichte externe Böen-Momente (kleiner Anteil; der Haupt-Effekt kommt über den
   // verrauschten Sollwert im Flight Controller – siehe dortiges Instabilitäts-Rauschen)
   if(APP.windLevel>0&&!DR.onGround){
