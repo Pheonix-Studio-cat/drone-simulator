@@ -15,6 +15,7 @@ Alternativ einfach [`index.html`](index.html) herunterladen und im Browser öffn
 - **Wirbelringstadium** beim schnellen Sinkflug und **Prop-Wash** nach harten Figuren – siehe unten
 - Batteriemodell: Kapazität, Spannungssackung unter Last, nachlassender Schub bei leerem Akku
 - **Kälte kostet Akku** – Zelltemperatur, Eigenerwärmung im Flug, siehe unten
+- **Motoren werden heiss** – Dauervollgas lässt den Schub nach, siehe unten
 - Crash-Erkennung mit harten/sanften Landungen
 
 ### 🌀 Wirbelring: wenn sie in den eigenen Abwind sackt
@@ -263,6 +264,26 @@ Gemessen mit demselben Rennquad, demselben Gasweg, derselben Uhr: In der Stadt r
 **Aber er wärmt sich selbst auf.** Der eigene Strom heizt das Pack (I²·R), der Fahrtwind kühlt es. Auf der Antarktis startet es bei −25 °C und arbeitet sich unter Last auf −17 °C hoch; in der Stadt kommt es auf 35 °C. Wer kalt startet, hat nach einer Minute spürbar mehr Reserve als in der ersten Sekunde.
 
 Im HUD steht die Zelltemperatur, **sobald sie etwas ändert** (unter 10 °C), zusammen mit dem abrufbaren Anteil. Ein blauer Strich im Akkubalken zeigt, wo die Ladung in dieser Kälte tatsächlich endet.
+
+### 🔥 Motoren werden heiss
+
+Ein Motor ist nicht unendlich belastbar. Er setzt rund **18 %** der elektrischen Leistung in Wärme um, das Kupfer der Wicklung wird mit jedem Kelvin schlechter leitend, und irgendwann greift der Überhitzungsschutz des Reglers ein.
+
+Gekühlt wird gegen dieselbe Lufttemperatur wie der Akku — und vor allem durch **Fahrtwind**. Genau deshalb überhitzen schwere Kameradrohnen im Schwebeflug und nicht auf der Strecke. Ein Kanal um den Rotor führt die Luft am Motor vorbei, ummantelte Aufbauten kühlen deshalb schlechter.
+
+Gemessen nach 90 s Vollgas, festgehalten und ohne Fahrtwind — der ungünstigste Fall:
+
+| | Motoren | Schub |
+|---|---|---|
+| Cine, Schweben | 40 °C | 100 % |
+| Cine, Vollgas mit 15 m/s Fahrt | 53 °C | 100 % |
+| Cine, Vollgas im Stand | 81 °C | 97 % |
+| **Cinewhoop, Vollgas** (der Kanal kühlt schlecht) | **120 °C** | **82 %** |
+| Cine auf der Antarktis | 29 °C | 100 % |
+
+Die Wärme baut sich über Sekunden auf (32 → 42 → 50 → 57 → 64 → 69 → 74 → 78 → 81 °C) und läuft in eine Sättigung. Gas weg, und sie kommt zurück: die heissgefahrene Cinewhoop ist nach drei Minuten wieder bei 30 °C und vollem Schub.
+
+**Kein Motorschaden, kein Absturz.** Das ist ein Nachlassen, kein Ausfall — Fahrt aufnehmen oder kurz vom Gas, und es ist wieder gut. Im echten Steigflug kühlt der Fahrtwind so gut, dass gar nichts passiert. Eine einmalige Warnung sagt, was hilft; die Temperatur steht im HUD, sobald sie etwas ändert (über 70 °C).
 
 ### 🌅 Tageszeit und Wetter
 Im Menü vor dem Start wählbar – beides steckt in den eingebackenen Schatten und im Nebel, deshalb wird die Szene beim Wechsel neu aufgebaut.
