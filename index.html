@@ -4465,7 +4465,7 @@ const DR={
   motors:[0,0,0,0], propAng:[0,0,0,0],
   armed:false, onGround:true, crashed:false, groundTimer:0,
   soc:1, volts:0, amps:0, battF:1, dead:0, vrs:0, pw:0, rateLP:0,
-  battT:null, airT:15, battCap:1,
+  battT:null, airT:15, battCap:1, motT:null, motF:1,
   pkg:false, iTerm:[0,0,0], flightTime:0,
   driftV:[0,0], wob:[0,0],
   dbg:{rateT:[0,0,0],T:0},
@@ -4493,6 +4493,8 @@ function resetDrone(fullBatt=true,clearWreck=true){
   DR.vrs=0; DR.warnVrs=0; DR.pw=0; DR.rateLP=0;
   // Der Akku startet auf Umgebungstemperatur – kalte Karte, kaltes Pack.
   DR.battT=null; DR.battCap=1; DR.warnKalt=0;
+  // Motoren ebenso: sie starten so warm wie die Luft, nicht wie der letzte Flug.
+  DR.motT=null; DR.motF=1; DR.warnHeiss=0;
   resetFacts(); STATS.flights++; saveStats(); ghostStart();
   BOMBS=[]; BLASTS=[]; APP.shake=0; APP.flashT=0;
   if(clearWreck){ WRECK=null; RESCUE=null; DEBRIS=[]; AIDRONES=[]; aiTimer=AI_FIRST;
@@ -5084,9 +5086,58 @@ function physStep(dt){
   // Schubverlust plus Zappeln – der Ring ist nie ruhig. Prop-Wash kostet
   // dazu ein paar Prozent, spürbar aber nicht gefährlich.
   const vrsF=(1-DR.vrs*(0.30+0.10*Math.sin(APP.time*17.3+DR.pos[0])))*(1-DR.pw*0.05);
-  for(let i=0;i<4;i++){ thr[i]=d.tmaxMotor*DR.motors[i]*DR.motors[i]*bf*ge*rho*ductF*vrsF; Tsum+=thr[i]; }
+  /* --- Motorwärme -----------------------------------------------------
+     Bisher war der Motor unendlich belastbar: Vollgas mit schwerer Last,
+     stundenlang, ohne dass etwas nachliess. In Wirklichkeit setzt er einen
+     Teil der Leistung in Wärme um, das Kupfer der Wicklung wird mit jedem
+     Kelvin um rund 0,4 % schlechter leitend, und irgendwann greift der
+     Überhitzungsschutz des Reglers ein.
+
+     Gekühlt wird gegen die Umgebungstemperatur – dieselbe Kette wie beim
+     Akku – und vor allem durch Fahrtwind. Genau deshalb überhitzen schwere
+     Kameradrohnen im Schwebeflug und nicht auf der Strecke. Ein Kanal um
+     den Rotor führt die Luft am Motor vorbei, ummantelte Aufbauten kühlen
+     deshalb schlechter. */
+  const ambM=airTempAt(SCENE?SCENE.map:null, DR.pos[1], APP.daytime, APP.weather);
+  if(DR.motT===null||DR.motT===undefined) DR.motT=ambM;
+  {
+    // Verlustleistung aus der elektrischen Leistung, die das Akkumodell
+    // ohnehin schon rechnet: rund 18 % gehen in Motoren und Reglern als
+    // Wärme verloren, der Rest wird Schub.
+    const pv=Math.max(0, DR.amps*DR.volts*0.18);
+    /* Wärmekapazität der Motoren selbst, nicht des ganzen Geräts: Kupfer
+       und Eisen, rund 450 J/(kg·K). Ihr Massenanteil fällt mit der Grösse –
+       bei einem 5-Zöller sind vier Motoren rund ein Fünftel der Abflugmasse
+       (0,65 kg gegen 4 × 32 g), bei einer 4-kg-Cine nur noch ein Achtel
+       (4 × 120 g). Das Potenzgesetz trifft beide und die Whoops dazu. */
+    const motM=Math.max(0.010, 0.16*Math.pow(d.mass,0.85));
+    const waerme=motM*450;
+    /* Abkühlzeit. Grosse Motoren halten die Wärme länger: die Masse wächst
+       mit dem Volumen, die kühlende Oberfläche nur mit dem Quadrat – die
+       Zeitkonstante geht deshalb mit der dritten Wurzel der Masse. Fahrt
+       kühlt kräftig, ein Kanal um den Rotor schlechter, und am Boden mit
+       stehenden Motoren kühlt es am besten. */
+    const kuehl=(1+Math.hypot(DR.vel[0],DR.vel[2])*0.11)*(d.ducted?0.72:1)*(DR.armed?1:1.8);
+    const tau=clamp(70*Math.cbrt(motM/0.50)/kuehl, 8, 90);
+    DR.motT+=(pv/waerme-(DR.motT-ambM)/tau)*dt;
+  }
+  /* Zwei Wirkungen. Das Kupfer wird schlechter – ab 60 °C spürbar, aber
+     kein Drama. Und oberhalb von 105 °C nimmt der Überhitzungsschutz des
+     Reglers Schub weg; das ist die Stelle, an der es dem Piloten auffällt.
+     Absichtlich kein Motorschaden: es ist ein Nachlassen, kein Ausfall –
+     Fahrt aufnehmen oder kurz vom Gas, und es ist wieder gut. */
+  const kupfer=1-clamp((DR.motT-60)/100,0,1)*0.12;
+  /* Der Überhitzungsschutz muss kräftig genug greifen, um die Sache
+     einzufangen: weniger Schub heisst weniger Strom heisst weniger Wärme.
+     Ein zu zaghafter Schutz stabilisiert nichts und lässt die Rechnung
+     ins Unendliche laufen – gemessen, nicht vermutet. */
+  const schutz=1-clamp((DR.motT-110)/60,0,1)*0.70;
+  const motF=kupfer*schutz;
+  DR.motF=motF;
+  for(let i=0;i<4;i++){ thr[i]=d.tmaxMotor*DR.motors[i]*DR.motors[i]*bf*ge*rho*ductF*vrsF*motF; Tsum+=thr[i]; }
   DR.dbg.Tsum=Tsum; DR.dbg.ge=ge; DR.dbg.ductF=ductF; DR.dbg.rho=rho;
   DR.dbg.vrs=DR.vrs; DR.dbg.vi=vi; DR.dbg.pw=DR.pw;
+  DR.dbg.motT=DR.motT; DR.dbg.motF=motF;
   let tqx=0,tqy=0,tqz=0;
   for(let i=0;i<4;i++){
     const [sx,sz,dir]=MOT[i];
@@ -5175,7 +5226,12 @@ function batteryStep(dt,Tsum,m){
   const hoverT=m*G;
   const load=Math.max(Tsum/hoverT,0.02);
   // Regen und Kälte kosten zusätzlich Strom
-  DR.amps=(DR.armed? d.hoverAmp*Math.pow(load,1.5)+0.25 : 0.05)*WX.amp;
+  // Ein heisser Motor zieht mehr: schlechter leitendes Kupfer heisst mehr
+  // Verlustleistung für denselben Schub. Damit greifen Motor- und
+  // Akkumodell ineinander, statt nebeneinander herzulaufen.
+  const heissF=1+clamp(((DR.motT===null?20:DR.motT)-60)/100,0,1)*0.14;
+  DR.amps=(DR.armed? d.hoverAmp*Math.pow(load,1.5)+0.25 : 0.05)*WX.amp*heissF;
+  DR.dbg.heissF=heissF; DR.dbg.load=load;
   // Umgebung, dann die Zelle selbst: Eigenerwärmung gegen Auskühlung.
   const amb=airTempAt(SCENE?SCENE.map:null, DR.pos[1], APP.daytime, APP.weather);
   DR.airT=amb;
@@ -5200,6 +5256,13 @@ function batteryStep(dt,Tsum,m){
   // von gut zwei Sekunden ist kein Schub mehr da – ab da kommt sie herunter,
   // ob der Pilot will oder nicht. Kein harter Schnitt: ein Pack stirbt über
   // ein paar Sekunden, nicht in einem Bild.
+  // Einmal sagen, wenn die Motoren heiss werden – und was hilft.
+  if(DR.armed&&!DR.warnHeiss&&DR.motT>100){
+    DR.warnHeiss=1; beep(300,0.3);
+    toast('🔥 <b>Motoren heiss</b> ('+DR.motT.toFixed(0)+' °C) – der Regler nimmt Schub weg.'+
+      '<br><small>Fahrt aufnehmen kühlt, oder kurz vom Gas.</small>',5000);
+  }
+  if(DR.motT!==null&&DR.motT<80) DR.warnHeiss=0;
   // Einmal sagen, wenn das Pack kalt in die Luft geht – und was hilft.
   if(DR.armed&&!DR.warnKalt&&DR.battT<5&&DR.flightTime>2){
     DR.warnKalt=1; beep(440,0.25);
@@ -7353,6 +7416,12 @@ function drawHUD(){
   // braucht keine Anzeige; eines bei −20 °C erklärt, warum der Balken
   // so schnell fällt. Der Strich hinter der Ladung zeigt, wo sie in
   // dieser Kälte tatsächlich endet.
+  if(DR.motT!==null&&DR.motT>70){
+    hud.fillStyle=DR.motT>105?'#ff8a5d':'#ffc98a';
+    hud.font=`bold ${9.5*u}px sans-serif`;
+    hud.fillText('🔥 Motoren '+DR.motT.toFixed(0)+' °C  ·  '+Math.round(DR.motF*100)+' % Schub',
+      cx, by-(DR.battT!==null&&DR.battT<10?44:33)*u);
+  }
   if(DR.battT!==null&&DR.battT<10){
     const kalt=clamp((10-DR.battT)/25,0,1);
     hud.fillStyle=kalt>0.6?'#7fd4ff':'#a9d8ee';
@@ -9662,7 +9731,7 @@ window.T={
   drawHUD,
   st(){return {pos:[...DR.pos],vel:[...DR.vel],mode:APP.mode,armed:DR.armed,
     onGround:DR.onGround,crashed:DR.crashed,soc:DR.soc,volts:DR.volts,
-    battT:DR.battT,airT:DR.airT,battCap:DR.battCap,
+    battT:DR.battT,airT:DR.airT,battCap:DR.battCap,motT:DR.motT,motF:DR.motF,
     battF:DR.battF,dead:DR.dead,
     motors:[...DR.motors],tilt:tiltAngle()/deg,map:SCENE.map.id,
     debris:DEBRIS.length,wreck:!!WRECK,carrying:!!(RESCUE&&RESCUE.carrying),photos:PHOTOS.length};},
